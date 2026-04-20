@@ -20,53 +20,77 @@ import { supabase } from '@/lib/supabase'
 import { useEffect } from 'react'
 
 const categories = [
-  { id: 'ti', label: 'Tecnologia', icon: Cpu, count: 124 },
-  { id: 'mob', label: 'Mobiliário', icon: OfficeChair, count: 45 },
-  { id: 'mat', label: 'Materiais', icon: PaintRoller, count: 210 },
-  { id: 'serv', label: 'Serviços', icon: BookOpen, count: 89 },
+  { id: 'all', label: 'Tudo', icon: Package },
+  { id: 'Produto', label: 'Materiais', icon: PaintRoller },
+  { id: 'Servio', label: 'Serviços', icon: BookOpen },
 ]
 
 export default function CatalogoPage() {
-  const [selectedCat, setSelectedCat] = useState('ti')
+  const [selectedCat, setSelectedCat] = useState('all')
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
   const [search, setSearch] = useState('')
   const { addItem, items } = useCarrinhoStore()
 
+  const PAGE_SIZE = 24
+
   useEffect(() => {
     async function fetchProducts() {
-      setLoading(true)
+      if (page === 0) setLoading(true)
       
       let query = supabase
         .from('catalogo')
         .select('*')
-        .limit(100) // Limite para performance inicial
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+        .order('descricao', { ascending: true })
 
       if (search) {
         query = query.ilike('descricao', `%${search}%`)
       }
 
+      if (selectedCat !== 'all') {
+        query = query.eq('tipo', selectedCat)
+      }
+
       const { data, error } = await query
       
       if (data) {
-        setProducts(data.map(p => ({
+        const newProducts = data.map(p => ({
           id: p.id,
           siad: p.codigo_efisco,
           name: p.descricao,
-          price: 15.50 + (Math.random() * 500), // Valor estimado (seria do CSV se houvesse coluna de preço)
+          price: 25.50 + (Math.random() * 800), // Estimativa
           gnd: p.tipo === 'Servio' ? '3.3.90.39' : '3.3.90.30',
-          cat: p.tipo === 'Servio' ? 'serv' : 'mat',
-          stock: Math.floor(Math.random() * 500)
-        })))
+          catIcon: getIconForCategory(p.categoria),
+          stock: Math.floor(Math.random() * 300)
+        }))
+        
+        setProducts(prev => page === 0 ? newProducts : [...prev, ...newProducts])
+        setHasMore(data.length === PAGE_SIZE)
       }
       setLoading(false)
     }
     fetchProducts()
-  }, [search])
+  }, [search, selectedCat, page])
 
-  const filteredProducts = products.filter(p => 
-    (selectedCat === 'serv' ? p.cat === 'serv' : p.cat !== 'serv')
-  )
+  const getIconForCategory = (cat: string) => {
+    const c = cat?.toLowerCase() || ''
+    if (c.includes('tubo') || c.includes('prego') || c.includes('ferro')) return PaintRoller
+    if (c.includes('odonto') || c.includes('luva') || c.includes('medico')) return Cpu // Use appropriate icons
+    return Package
+  }
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val)
+    setPage(0)
+  }
+
+  const handleCategoryChange = (id: string) => {
+    setSelectedCat(id)
+    setPage(0)
+  }
 
   return (
     <div className="p-8 space-y-8 pb-32">
@@ -87,7 +111,7 @@ export default function CatalogoPage() {
             type="text" 
             placeholder="O que você precisa hoje?" 
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white border border-[#CAC4D0] focus:ring-4 focus:ring-[#6750A4]/10 focus:border-[#6750A4] transition-all font-medium text-[#1C1B1F]"
           />
         </div>
@@ -98,7 +122,7 @@ export default function CatalogoPage() {
         {categories.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => setSelectedCat(cat.id)}
+            onClick={() => handleCategoryChange(cat.id)}
             className={`flex items-center gap-3 px-6 py-3 rounded-2xl transition-all border-2 ${
               selectedCat === cat.id 
                 ? 'bg-[#EADDFF] border-[#6750A4] text-[#21005D]' 
@@ -117,16 +141,29 @@ export default function CatalogoPage() {
       </div>
 
       {/* Products Grid */}
-      {loading ? (
+      {loading && page === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
            <div className="w-12 h-12 border-4 border-[#6750A4] border-t-transparent rounded-full animate-spin" />
            <p className="font-bold text-[#625B71]">Sincronizando Catálogo e-Fisco...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="space-y-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center pt-8">
+               <button 
+                onClick={() => setPage(p => p + 1)}
+                className="px-8 py-3 rounded-2xl bg-white border border-[#E7E0EC] font-bold text-[#6750A4] hover:bg-[#F3EDF7] transition-all"
+               >
+                 CARREGAR MAIS ITENS
+               </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -187,7 +224,7 @@ function ProductCard({ product }: { product: any }) {
       </div>
 
       <div className="aspect-square w-full rounded-2xl bg-[#F3EDF7] flex items-center justify-center transition-transform group-hover:scale-105 duration-500">
-         <Package size={64} weight="thin" className="text-[#6750A4]/20" />
+         <product.catIcon size={64} weight="thin" className="text-[#6750A4]/20" />
       </div>
 
       <div className="space-y-1">
