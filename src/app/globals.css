@@ -1,0 +1,160 @@
+/* ============================================================
+   PERCATA 2027 — Design System M3 Expressive
+   Baseado fielmente no dashboard.html fornecido
+   ============================================================ */
+
+/* 1. Google Fonts */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap");
+
+/* 2. Tailwind Core */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Outfit", system-ui, sans-serif;
+  
+  /* M3 Tokens mapeados */
+  --color-primary: var(--md-primary);
+  --color-on-primary: var(--md-on-primary);
+  --color-primary-container: var(--md-primary-container);
+  --color-secondary: var(--md-secondary);
+  --color-surface: var(--md-surface);
+  --color-outline: var(--md-outline);
+  
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 8px;
+}
+
+:root {
+  /* --- M3 Expressive Core Colors --- */
+  --md-primary: #4F378B;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #EADDFF;
+  --md-on-primary-container: #21005D;
+  --md-secondary: #625B71;
+  --md-secondary-container: #E8DEF8;
+  --md-on-secondary-container: #1D192B;
+  --md-surface: #FEF7FF;
+  --md-on-surface: #1D1B20;
+  --md-surface-variant: #E7E0EC;
+  --md-outline: #79747E;
+
+  /* --- Custom Aesthetics (from dashboard.html) --- */
+  --bg-gradient: linear-gradient(135deg, #fdfbfb 0%, #ebebeb 100%);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  
+  /* Shadcn Overrides */
+  --background: #fdfbfb;
+  --foreground: #1D1B20;
+  --card: rgba(255, 255, 255, 0.7);
+  --card-foreground: #1D1B20;
+  --primary: #4F378B;
+  --primary-foreground: #FFFFFF;
+  --secondary: #625B71;
+  --secondary-foreground: #FFFFFF;
+  --muted: #E7E0EC;
+  --muted-foreground: #79747E;
+  --accent: #EADDFF;
+  --accent-foreground: #21005D;
+  --border: rgba(0, 0, 0, 0.05);
+  --input: #E7E0EC;
+  --ring: #4F378B;
+  --radius: 1rem;
+}
+
+/* Base resets */
+@layer base {
+  body {
+    @apply bg-[var(--bg-gradient)] text-[var(--md-on-surface)] antialiased;
+    font-family: "Inter", sans-serif;
+  }
+  h1, h2, h3, .font-display {
+    font-family: "Outfit", sans-serif;
+  }
+}
+
+@layer components {
+  /* --- Navigation Rail (80px) --- */
+  .nav-rail {
+    @apply w-20 bg-[var(--md-surface)] flex flex-col items-center py-6 fixed left-0 top-0 h-full z-50 border-r border-black/5;
+  }
+  
+  .nav-rail-item {
+    @apply w-14 h-14 flex flex-col items-center justify-center mb-4 rounded-2xl cursor-pointer text-[var(--md-secondary)] transition-all duration-300 relative no-underline;
+  }
+  
+  .nav-rail-item span {
+    @apply text-[10px] mt-1 font-medium;
+  }
+  
+  .nav-rail-item:hover {
+    @apply bg-[var(--md-surface-variant)];
+  }
+  
+  .nav-rail-item.active {
+    @apply bg-[var(--md-primary-container)] text-[var(--md-primary)];
+  }
+
+  /* --- Glass Cards --- */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    @apply shadow-[var(--glass-shadow)] transition-all duration-300 overflow-hidden p-6;
+  }
+  
+  .glass-card:hover {
+    @apply -translate-y-1 shadow-[0_12px_40px_0_rgba(31,38,135,0.1)];
+  }
+
+  /* --- App Bar --- */
+  .app-bar {
+    @apply h-[72px] flex items-center justify-between px-8 fixed top-0 right-0 z-40 border-b border-black/5;
+    background: rgba(253, 251, 251, 0.8);
+    backdrop-filter: blur(12px);
+    width: calc(100% - var(--sidebar-width, 80px));
+  }
+
+  /* --- Carousel --- */
+  .hero-carousel {
+    background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+    border-radius: 24px;
+    @apply p-8 relative overflow-hidden min-h-[160px] flex items-center shadow-[0_10px_20px_rgba(132,250,176,0.2)] text-[#0f4c3a];
+  }
+  
+  .hero-carousel::after {
+    content: '';
+    @apply absolute -top-1/2 -left-1/2 w-[200%] h-[200%] opacity-50;
+    background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%);
+    animation: rotate-slow 20s linear infinite;
+  }
+
+  @keyframes rotate-slow {
+    100% { transform: rotate(360deg); }
+  }
+
+  /* --- Buttons --- */
+  .btn-m3-primary {
+    @apply bg-[var(--md-primary)] text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition-all duration-300 shadow-[0_4px_10px_rgba(79,55,139,0.2)];
+  }
+  
+  .btn-m3-primary:hover {
+    @apply bg-[#3B2868] -translate-y-0.5 shadow-[0_6px_15px_rgba(79,55,139,0.3)];
+  }
+
+  .badge-m3 {
+    @apply absolute top-1 right-2 bg-[#B3261E] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[var(--md-surface)];
+  }
+}

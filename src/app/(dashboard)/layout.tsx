@@ -1,0 +1,52 @@
+'use client'
+
+import { Sidebar } from '@/components/layout/Sidebar'
+import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-screen" style={{ '--sidebar-width': '80px' } as any}>
+      <Sidebar />
+      
+      <main className="flex-1 ml-20 flex flex-col h-screen overflow-hidden">
+        {/* App Bar */}
+        <header className="app-bar">
+          <div className="font-display font-semibold text-xl">
+             Dashboard do Solicitante
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="bg-[var(--md-surface-variant)] rounded-full h-10 px-4 flex items-center gap-3 w-64 focus-within:w-80 focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--md-primary-container)] transition-all duration-300">
+               <MagnifyingGlass size={20} className="text-[var(--md-secondary)]" />
+               <input 
+                 type="text" 
+                 placeholder="Pesquisar catálogos ou pedidos..." 
+                 className="bg-transparent border-none outline-none text-sm w-full"
+               />
+            </div>
+            
+            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative">
+               <Bell size={24} />
+               <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#B3261E] rounded-full border border-white"></div>
+            </button>
+            
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#a18cd1] to-[#fbc2eb] flex items-center justify-center text-white font-bold shadow-sm cursor-pointer">
+               SU
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto mt-[72px] p-8">
+           <div className="max-w-7xl mx-auto">
+             {children}
+           </div>
+        </div>
+      </main>
+    </div>
+  )
+}
