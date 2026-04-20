@@ -16,7 +16,8 @@ import {
   Minus,
   Buildings,
   Calendar,
-  FileText
+  FileText,
+  ListChecks
 } from '@phosphor-icons/react'
 import { useCarrinhoStore } from '@/store/carrinho'
 import { useUserStore } from '@/store/user'
@@ -199,7 +200,7 @@ export default function NovaDFDPage() {
               {items.length > 1 && (
                 <div className="p-4 bg-[#6750A4]/5 border-b border-black/5 flex items-center justify-between">
                    <div className="flex items-center gap-2">
-                      <Selection size={18} weight="fill" className="text-[#6750A4]" />
+                      <ListChecks size={18} weight="fill" className="text-[#6750A4]" />
                       <span className="text-[10px] font-black text-[#6750A4] uppercase tracking-widest">Ações em Lote</span>
                    </div>
                    <button 

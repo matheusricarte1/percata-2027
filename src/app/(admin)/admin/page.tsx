@@ -6,7 +6,7 @@ import {
   Users, 
   FileText, 
   ArrowRight,
-  TrendingUp,
+  TrendUp,
   Clock,
   CheckCircle,
   Warning,
@@ -144,7 +144,7 @@ function MetricCard({ icon: Icon, label, value, sub, color }: { icon: any, label
          <p className="text-[10px] font-black text-black/30 uppercase tracking-widest leading-none mb-1">{label}</p>
          <p className="font-display text-3xl font-black text-[#1A237E]">{value}</p>
          <p className="text-[10px] font-bold text-black/40 mt-1 flex items-center gap-1">
-            <TrendingUp size={12} weight="bold" className="text-emerald-500" />
+            <TrendUp size={12} weight="bold" className="text-emerald-500" />
             {sub}
          </p>
       </div>

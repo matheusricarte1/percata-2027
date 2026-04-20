@@ -11,7 +11,8 @@ import {
   User,
   ArrowRight,
   WarningCircle,
-  FileText
+  FileText,
+  Buildings
 } from '@phosphor-icons/react'
 
 const pendingAprovals = [

@@ -1,3 +1,5 @@
+'use client'
+
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
 

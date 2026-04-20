@@ -5,7 +5,7 @@ import {
   ShieldCheck, 
   ArrowRight, 
   GoogleLogo, 
-  BuildingLibrary,
+  Bank,
   Key,
   IdentificationCard
 } from '@phosphor-icons/react'
@@ -32,7 +32,7 @@ export default function LoginPage() {
         <div className="relative z-10 space-y-8 animate-in slide-in-from-left duration-1000">
            <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-2xl text-[#6750A4]">
-                 <BuildingLibrary size={40} weight="fill" />
+                 <Bank size={40} weight="fill" />
               </div>
               <h1 className="font-display text-5xl font-black text-white tracking-widest uppercase">
                  PERCATA
