@@ -1,25 +1,33 @@
 const fs = require('fs');
-const path = require('path');
 const { parse } = require('csv-parse');
 const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: '.env.local' });
 
-// Configuração (Pegando das variáveis que já usamos)
-const SUPABASE_URL = 'https://hudbtcobpbyfkpcgosuu.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_uCI0c3Y5_DEUBc2o9CMbTA_6fE36m-O'; // Anon Key
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Credenciais do Supabase não encontradas!');
+  process.exit(1);
+}
 
-const csvFilePath = path.join(__dirname, '..', 'extrac_a_o_itens_ativos.csv');
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function importData() {
-  console.log('🚀 Iniciando importação do catálogo...');
+async function importCatalogo() {
+  console.log('🚀 Iniciando importação FINAL (com suporte a BOM)...');
   
+  const csvFilePath = 'C:\\Users\\Mac-PC\\Downloads\\PERCATA\\extrac_a_o_itens_ativos.csv';
+  
+  // Truncar antes de começar para garantir limpeza total
+  await supabase.from('catalogo').delete().neq('id', 0); // Hack para truncar via API se necessário
+
   const parser = fs.createReadStream(csvFilePath).pipe(
     parse({
-      delimiter: ';',
       columns: true,
       skip_empty_lines: true,
-      relax_column_count: true
+      delimiter: ';',
+      trim: true,
+      bom: true // <<--- ESSENCIAL: Ignora o caractere invisível do Excel
     })
   );
 
@@ -30,7 +38,7 @@ async function importData() {
   for await (const record of parser) {
     batch.push({
       codigo_efisco: record['EFISCO'],
-      descricao: record['DESCRIÇÃO DO PRODUTO'] || record['DESCRIO DO PRODUTO'],
+      descricao: record['DESCRIÇÃO DO PRODUTO'],
       tipo: record['TIPO PRODUTO'],
       categoria: record['CATEGORIA PRODUTO'],
       grupo: record['GRUPO'],
@@ -43,7 +51,7 @@ async function importData() {
         console.error('❌ Erro no lote:', error.message);
       } else {
         totalImported += batch.length;
-        console.log(`✅ Importados: ${totalImported} itens...`);
+        if (totalImported % 10000 === 0) console.log(`✅ Progressão: ${totalImported} itens...`);
       }
       batch = [];
     }
@@ -51,9 +59,12 @@ async function importData() {
 
   if (batch.length > 0) {
     await supabase.from('catalogo').upsert(batch, { onConflict: 'codigo_efisco' });
+    totalImported += batch.length;
   }
 
-  console.log('🏁 Importação finalizada com sucesso!');
+  console.log(`🏁 VITÓRIA! Importação concluída: ${totalImported} itens.`);
 }
 
-importData().catch(console.error);
+importCatalogo().catch(err => {
+  console.error('❌ Erro fatal:', err);
+});

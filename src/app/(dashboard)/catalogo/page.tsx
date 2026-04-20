@@ -54,7 +54,6 @@ export default function CatalogoPage() {
       setPage(0)
     }
 
-    // Chamando via RPC para suporte a Ranking por Relevância (ts_rank)
     const { data, error } = await supabase.rpc('buscar_catalogo_inteligente', {
       query_text: debouncedSearch.trim(),
       categoria_filtro: selectedCat,
@@ -62,7 +61,13 @@ export default function CatalogoPage() {
       offset_val: currentPage * PAGE_SIZE
     })
 
+    if (error) {
+      console.error('❌ Erro na busca inteligente:', error.message)
+      setHasMore(false)
+    }
+
     if (data) {
+      console.log(`✅ Busca retornou ${data.length} itens (Pág: ${currentPage})`)
       const newProducts = data.map((p: any) => ({
         id: p.id,
         siad: p.codigo_efisco,
@@ -74,6 +79,9 @@ export default function CatalogoPage() {
       
       setProducts(prev => isNewSearch ? newProducts : [...prev, ...newProducts])
       setHasMore(data.length === PAGE_SIZE)
+    } else {
+      if (isNewSearch) setProducts([])
+      setHasMore(false)
     }
     setLoading(false)
   }, [debouncedSearch, selectedCat, page])
