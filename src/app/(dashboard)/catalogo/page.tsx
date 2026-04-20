@@ -1,341 +1,249 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   MagnifyingGlass, 
-  Package, 
-  Funnel, 
-  CheckCircle, 
+  ShoppingCart, 
   Plus, 
-  X, 
-  CaretDown, 
-  DotsThreeVertical,
-  Export,
-  Trash,
-  ArrowsLeftRight,
-  List,
-  SquaresFour,
-  Bell
+  Check,
+  Package,
+  PaintRoller,
+  BookOpen,
+  Info,
+  Queue,
+  WarningCircle,
+  Hash
 } from '@phosphor-icons/react'
-import { supabase } from '@/lib/supabase'
 import { useCarrinhoStore } from '@/store/carrinho'
+import { supabase } from '@/lib/supabase'
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
-export default function CatalogoTecnicoPage() {
-  const [items, setItems] = useState<any[]>([])
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+const categories = [
+  { id: 'all', label: 'Tudo', icon: Queue },
+  { id: 'Produto', label: 'Materiais', icon: PaintRoller },
+  { id: 'Serviço', label: 'Serviços', icon: BookOpen },
+]
+
+export default function CatalogoPage() {
+  const [selectedCat, setSelectedCat] = useState('all')
+  const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
   const [search, setSearch] = useState('')
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  
-  // -- Filtros Dinâmicos --
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([])
-  
-  const addItem = useCarrinhoStore(s => s.addItem)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const { addItem, items } = useCarrinhoStore()
 
-  const fetchItems = async () => {
-    setLoading(true)
-    let query = supabase.from('catalogo_efisco').select('*')
-    
-    if (search) {
-      query = query.textSearch('descricao_fts', search.split(' ').join(' & '))
-    }
-    
-    const { data, error } = await query.limit(50)
-    if (!error && data) setItems(data)
-    setLoading(false)
-  }
+  const PAGE_SIZE = 30
 
   useEffect(() => {
-    const timer = setTimeout(fetchItems, 500)
-    return () => clearTimeout(timer)
+    const handler = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(handler)
   }, [search])
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
+  const fetchProducts = useCallback(async (isNewSearch = false) => {
+    const currentPage = isNewSearch ? 0 : page
+    if (isNewSearch) {
+      setLoading(true)
+      setPage(0)
+    }
 
-  const selectedItems = useMemo(() => items.filter(item => selectedIds.includes(item.id)), [items, selectedIds])
+    // Chamando via RPC para suporte a Ranking por Relevância (ts_rank)
+    const { data, error } = await supabase.rpc('buscar_catalogo_inteligente', {
+      query_text: debouncedSearch.trim(),
+      categoria_filtro: selectedCat,
+      limit_val: PAGE_SIZE,
+      offset_val: currentPage * PAGE_SIZE
+    })
+
+    if (data) {
+      const newProducts = data.map((p: any) => ({
+        id: p.id,
+        siad: p.codigo_efisco,
+        name: p.descricao,
+        gnd: p.tipo === 'Serviço' ? '3.3.90.39' : '3.3.90.30',
+        category: p.categoria,
+        rank: p.rank
+      }))
+      
+      setProducts(prev => isNewSearch ? newProducts : [...prev, ...newProducts])
+      setHasMore(data.length === PAGE_SIZE)
+    }
+    setLoading(false)
+  }, [debouncedSearch, selectedCat, page])
+
+  useEffect(() => {
+    fetchProducts(true)
+  }, [debouncedSearch, selectedCat])
+
+  useEffect(() => {
+    if (page > 0) fetchProducts(false)
+  }, [page])
 
   return (
-    <div className="flex h-screen bg-[#FBFBFF] overflow-hidden">
-      
-      {/* 1. SIDEBAR DE FILTROS (ESQUERDA) */}
-      <aside className="w-64 bg-white border-r border-black/5 flex flex-col p-6 space-y-8 overflow-y-auto shrink-0">
-        <h2 className="font-display font-black text-xl tracking-tight uppercase italic">Filtros</h2>
-        
-        <div className="space-y-6">
-          {/* Categoria: MATERIAIS */}
-          <FilterSection title="MATERIAIS" count="65.432">
-            <FilterOption label="Construção" count="22.101" />
-            <FilterOption label="Hidráulica" count="15.800" />
-            <FilterOption label="Elétrica" count="10.543" />
-            <FilterOption label="Outros" count="16.308" />
-          </FilterSection>
+    <div className="p-6 space-y-6 pb-40 min-h-screen bg-[#FBFBFF]">
+      {/* Search & Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-1">
+          <h1 className="font-display text-4xl font-black text-[#1C1B1F] tracking-tight">Catalogo e-Fisco</h1>
+          <p className="text-[#625B71] text-sm font-medium">Priorizando os melhores resultados para você.</p>
+        </motion.div>
 
-          {/* Categoria: SERVIÇOS */}
-          <FilterSection title="SERVIÇOS" count="84.568">
-            <FilterOption label="Manutenção" count="28.901" />
-            <FilterOption label="Projetos" count="19.452" />
-            <FilterOption label="Limpeza" count="15.203" />
-            <FilterOption label="Outros" count="21.012" />
-          </FilterSection>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full lg:w-[400px]">
+          <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1C1B1F]/40" size={20} weight="bold" />
+          <input 
+            type="text" 
+            placeholder="Pesquise por nome ou SIAD..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-12 pr-6 py-4 rounded-3xl bg-white border border-black/5 shadow-sm focus:ring-4 focus:ring-[#6750A4]/10 transition-all font-display text-base font-bold text-[#1C1B1F] placeholder:text-black/20"
+          />
+        </motion.div>
+      </div>
 
-          {/* Categoria: STATUS */}
-          <FilterSection title="STATUS">
-            <FilterOption label="Ativo" count="5.200" active />
-            <FilterOption label="Em Processo" count="3.452" />
-            <FilterOption label="Inativo" count="110" />
-          </FilterSection>
-        </div>
-
-        <button className="mt-8 w-full py-3 bg-[#F3EDF7] text-[#4F378B] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#EADDFF] transition-all">
-          Limpar Filtros
-        </button>
-      </aside>
-
-      {/* 2. ÁREA CENTRAL (CONTEÚDO) */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        
-        {/* Header Superior Interno */}
-        <header className="h-[120px] bg-white border-b border-black/5 px-8 flex flex-col justify-center space-y-4 shrink-0">
-          <div className="flex items-center justify-between">
-            <h1 className="font-display text-2xl font-black text-[#1C1B1F] tracking-tighter">Dashboard do Solicitante</h1>
-            
-            {/* Search Bar Estilo Print */}
-            <div className="flex-1 max-w-2xl mx-12 relative">
-              <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30" size={20} />
-              <input 
-                type="text" 
-                placeholder="Pesquisar e filtrar (ex: aço, manutenção, ID)..." 
-                className="w-full bg-[#F8F9FA] border-none rounded-full py-3 pl-12 pr-6 text-sm font-medium focus:ring-2 focus:ring-[#EADDFF]"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button className="p-2 text-black/40 hover:text-red-500 relative transition-all">
-                <Bell size={24} weight="bold" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-              </button>
-              <div className="w-10 h-10 rounded-full bg-[#EADDFF] border border-[#4F378B]/20 overflow-hidden flex items-center justify-center font-black text-[#4F378B]">
-                MR
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-black/40">
-            <span>Filtros ativos:</span>
-            <span className="bg-[#EADDFF] text-[#4F378B] px-3 py-1 rounded-full flex items-center gap-2">
-              MATERIAIS - Construção <X size={12} weight="bold" />
-            </span>
-            <span className="bg-[#F3EDF7] text-[#4F378B] px-3 py-1 rounded-full flex items-center gap-2">
-              Status - Ativo <X size={12} weight="bold" />
-            </span>
-          </div>
-        </header>
-
-        {/* Grade de Itens */}
-        <div className="flex-1 p-8 overflow-y-auto no-scrollbar pb-32">
-          <div className="flex items-center justify-between mb-8">
-            <span className="text-sm font-bold text-black/50 tracking-tight">Exibindo 1-50 de 22.101 Resultados</span>
-            <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-sm border border-black/5">
-              <button className="p-2 bg-[#EADDFF] text-[#4F378B] rounded-lg shadow-inner"><SquaresFour size={20} weight="fill" /></button>
-              <button className="p-2 text-black/20 hover:text-[#4F378B]"><List size={20} weight="bold" /></button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-            {loading ? (
-              Array(12).fill(0).map((_, i) => <div key={i} className="h-64 bg-black/5 animate-pulse rounded-[24px]" />)
-            ) : (
-              items.map((item) => (
-                <CardItem 
-                  key={item.id} 
-                  item={item} 
-                  isSelected={selectedIds.includes(item.id)}
-                  onToggle={() => toggleSelection(item.id)}
-                />
-              ))
+      {/* Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => { setSelectedCat(cat.id); setPage(0); }}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-full transition-all font-display font-black text-xs uppercase tracking-wider",
+              selectedCat === cat.id 
+                ? 'bg-[#6750A4] text-white shadow-md' 
+                : 'bg-white text-[#49454F] hover:bg-black/5 border border-black/5'
             )}
-          </div>
-        </div>
+          >
+            <cat.icon size={16} weight="bold" />
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Paginação Estilo Print */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-8 py-3 rounded-full border border-black/5 shadow-2xl flex items-center gap-6 z-30">
-          <span className="text-[10px] font-black uppercase tracking-widest text-black/40">Página doc:</span>
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4, 10].map(p => (
-              <button key={p} className={cn("w-8 h-8 rounded-full text-xs font-black transition-all", p === 1 ? "bg-[#4F378B] text-white" : "hover:bg-black/5 text-black/40")}>{p}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-black uppercase text-black/40">Ir para página</span>
-            <input type="text" defaultValue="1" className="w-10 h-10 border border-black/5 rounded-xl text-center font-black text-sm" />
-          </div>
-        </div>
-      </main>
+      {/* Masonry Layout Grid */}
+      <div className="relative min-h-[400px]">
+        <AnimatePresence mode="wait">
+          {loading && page === 0 ? (
+            <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
+              {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : products.length > 0 ? (
+            <div className="space-y-10">
+              <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
+                {products.map((product, idx) => (
+                  <ProductCard key={`${product.id}-${idx}`} product={product} index={idx % 30} />
+                ))}
+              </div>
 
-      {/* 3. PAINEL DE AÇÕES EM LOTE (DIREITA) */}
-      <aside className="w-[340px] bg-white border-l border-black/5 flex flex-col p-6 shrink-0 h-full overflow-hidden">
-        <div className="flex items-center justify-between mb-8 group cursor-pointer">
-          <h2 className="font-display font-black text-lg tracking-tight uppercase">Painel de Ações em Lote</h2>
-          <CaretDown size={20} weight="bold" className="text-black/30" />
-        </div>
-
-        <div className="mb-6">
-          <h3 className="font-display font-black text-2xl tracking-tighter text-[#1C1B1F] mb-6">{selectedIds.length} Itens Selecionados</h3>
-          
-          <div className="space-y-3">
-            <button 
-              disabled={selectedIds.length === 0}
-              className="w-full py-4 bg-[#4F378B] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-[#4F378B]/20 disabled:opacity-30 disabled:shadow-none hover:bg-[#3d296e] transition-all"
-            >
-              Adicionar Seleção ao Carrinho
-            </button>
-            <button className="w-full py-3 bg-[#F3EDF7] text-[#4F378B] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#EADDFF] border border-transparent hover:border-[#4F378B]/20 transition-all">
-              Exportar Especificações (PDF/CSV)
-            </button>
-            <button className="w-full py-3 bg-white text-black/60 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black/5 border border-black/5 transition-all">
-              Mudar Categoria
-            </button>
-            <button className="w-full py-3 bg-white text-red-600/60 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 border border-black/5 transition-all">
-              Remover do Catálogo
-            </button>
-          </div>
-        </div>
-
-        {/* Lista Lateral de Itens Selecionados */}
-        <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-12">
-          <AnimatePresence>
-            {selectedItems.map((item) => (
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                key={item.id} 
-                className="group flex gap-4 p-4 bg-[#F8F9FA] rounded-2xl relative border border-transparent hover:border-[#4F378B]/10 transition-all"
-              >
-                <div className="w-16 h-16 bg-white rounded-xl shrink-0 flex items-center justify-center p-2 shadow-sm border border-black/5">
-                   <Package size={32} weight="light" className="opacity-20" />
+              {hasMore && (
+                <div className="flex justify-center pt-8">
+                   <button 
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={loading}
+                    className="px-8 py-3 rounded-full bg-white border border-[#E7E0EC] font-display font-black text-xs tracking-widest text-[#6750A4] hover:bg-[#6750A4] hover:text-white transition-all shadow-sm"
+                   >
+                     {loading ? 'CARREGANDO...' : 'CARREGAR MAIS REGISTROS'}
+                   </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-black text-[#4F378B] uppercase tracking-widest line-clamp-3 leading-tight">
-                    {item.descricao.split('-')[0].trim().toUpperCase()}
-                  </p>
-                  <p className="text-[10px] text-black/50 font-medium line-clamp-2 mt-1">
-                    {item.descricao.split('-').slice(1).join('-').trim()}
-                  </p>
-                </div>
-                <button onClick={() => toggleSelection(item.id)} className="absolute top-2 right-2 text-black/10 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                  <X size={16} weight="bold" />
-                </button>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          
-          {selectedIds.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-48 opacity-10">
-              <Package size={64} weight="thin" />
-              <p className="text-xs font-black uppercase tracking-tighter mt-4">Nenhum item selecionado</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
+              <WarningCircle size={48} />
+              <p className="font-display font-black text-xl mt-4">Nenhum resultado relevante</p>
             </div>
           )}
-        </div>
-      </aside>
+        </AnimatePresence>
+      </div>
 
+      {/* Floating Checkout */}
+      {items.length > 0 && (
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 w-full max-w-xs px-4">
+             <a href="/nova-dfd" className="flex items-center justify-between bg-[#1C1B1F] text-white p-2 pl-6 rounded-full shadow-2xl hover:scale-105 transition-all">
+                <div className="flex items-center gap-3">
+                  <ShoppingCart size={22} weight="fill" className="text-[#D0BCFF]" />
+                  <span className="font-display font-black text-xs uppercase tracking-tighter">{items.length} itens</span>
+                </div>
+                <div className="bg-[#6750A4] px-6 py-3 rounded-full font-display font-black text-[10px] tracking-widest">PROSSEGUIR</div>
+             </a>
+          </motion.div>
+      )}
     </div>
   )
 }
 
-function FilterSection({ title, count, children }: any) {
+function SkeletonCard() {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-[#625B71] group cursor-pointer">
-        <div className="flex items-center gap-2">
-          <CaretDown size={14} weight="bold" className="transition-transform group-hover:scale-110" />
-          <span className="font-black text-[11px] uppercase tracking-widest">{title}</span>
-        </div>
-        {count && <span className="text-[10px] font-bold opacity-40">({count})</span>}
-      </div>
-      <div className="pl-5 space-y-2">
-        {children}
-      </div>
+    <div className="bg-white rounded-3xl p-4 h-[120px] border border-black/5 animate-pulse flex flex-col gap-2 break-inside-avoid">
+       <div className="h-3 bg-black/5 rounded-full w-1/2" />
+       <div className="h-4 bg-black/5 rounded-xl w-full" />
+       <div className="h-4 bg-black/5 rounded-xl w-3/4" />
     </div>
   )
 }
 
-function FilterOption({ label, count, active }: any) {
-  return (
-    <label className="flex items-center justify-between group cursor-pointer py-1">
-      <div className="flex items-center gap-3">
-        <input 
-          type="checkbox" 
-          defaultChecked={active}
-          className="w-4 h-4 rounded-md border-black/10 text-[#4F378B] focus:ring-[#EADDFF]" 
-        />
-        <span className={cn("text-xs font-medium transition-colors", active ? "text-[#4F378B] font-bold" : "text-black/50 group-hover:text-black")}>{label}</span>
-      </div>
-      <span className="text-[10px] font-bold text-black/20 group-hover:text-black/40 transition-colors">({count})</span>
-    </label>
-  )
-}
+function ProductCard({ product, index }: { product: any, index: number }) {
+  const { addItem, items } = useCarrinhoStore()
+  const inCart = items.some(i => i.item_efisco.codigo_tce === product.siad)
 
-function CardItem({ item, isSelected, onToggle }: any) {
-  const parts = item.descricao.split('-')
-  const destaque = parts[0].trim()
-  const resto = parts.slice(1).join('-').trim()
-  const efisco = item.id_efisco || item.id.substring(0, 8)
+  const handleAdd = () => {
+    if (inCart) return
+    addItem({
+      codigo_tce: product.siad,
+      descricao: product.name,
+      gnd: product.gnd as any,
+      unidade_medida: 'UN',
+      categoria_consumo: true
+    }, 'Sede Reitoria')
+  }
 
   return (
     <motion.div 
-      whileHover={{ y: -4, boxShadow: '0 12px 30px rgba(0,0,0,0.06)' }}
-      className={cn(
-        "bg-white border p-6 rounded-[24px] flex flex-col justify-between transition-all duration-300 relative group overflow-hidden",
-        isSelected ? "border-[#4F378B] bg-[#FBFBFF] ring-2 ring-[#4F378B]/10" : "border-black/5"
-      )}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.01 }}
+      className="break-inside-avoid mb-4 group bg-white border border-black/5 rounded-[28px] p-4 flex flex-col gap-3 hover:shadow-xl hover:border-[#6750A4]/30 transition-all relative"
     >
-      <div className="space-y-4">
-        {/* Top Indicators */}
-        <div className="flex items-center justify-between">
-          <span className="px-3 py-1 bg-[#F8F9FA] rounded-full text-[10px] font-mono font-bold text-black/30 group-hover:text-[#4F378B] transition-colors">#{efisco}</span>
-          <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Ativo
-          </span>
-        </div>
-
-        {/* Descrição em Bloco */}
-        <div className="space-y-2">
-          <h3 className="font-display font-black text-base text-[#1C1B1F] tracking-tight leading-tight line-clamp-4">
-            <span className="text-[#4F378B] block mb-1 text-[11px] uppercase tracking-widest opacity-80">{destaque}</span>
-            {resto}
-          </h3>
-        </div>
+      <div className="flex items-center justify-between">
+         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3EDF7] text-[9px] font-black tracking-tighter text-[#6750A4]">
+            <Hash size={10} weight="bold" />
+            {product.siad}
+         </div>
+         {product.rank > 0.05 && (
+            <div className="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[8px] font-black uppercase text-[#6750A4]">
+              Relevante
+            </div>
+         )}
       </div>
 
-      {/* Botões Inferiores */}
-      <div className="mt-8 pt-6 border-t border-black/5 flex items-center justify-between">
-        <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest">
-          {item.categoria?.toUpperCase() || 'SERVIÇO'}
-        </span>
+      <h3 className="font-display font-black text-[#1C1B1F] leading-tight text-[11px] tracking-tight group-hover:text-[#6750A4] transition-colors overflow-hidden break-words">
+        {product.name}
+      </h3>
+
+      <div className="flex justify-between items-center pt-2">
+        <div className={cn(
+           "text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm",
+           product.gnd === '3.3.90.39' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+         )}>
+           {product.gnd === '3.3.90.39' ? 'Serviço' : 'Material'}
+         </div>
         
         <button 
-          onClick={onToggle}
+          onClick={handleAdd}
           className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-md active:scale-95",
-            isSelected ? "bg-[#4F378B] text-white" : "bg-[#F3EDF7] text-[#4F378B] hover:bg-[#EADDFF]"
+            "w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90",
+            inCart ? 'bg-[#6750A4] text-white' : 'bg-white border border-black/5 text-[#6750A4] hover:bg-[#F3EDF7]'
           )}
         >
-          {isSelected ? <CheckCircle size={20} weight="fill" /> : <Plus size={20} weight="bold" />}
+          {inCart ? <Check size={14} weight="bold" /> : <Plus size={14} weight="bold" />}
         </button>
       </div>
     </motion.div>
   )
 }
-
-function cn(...inputs: any) {
-  return twMerge(clsx(inputs))
-}
-
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
