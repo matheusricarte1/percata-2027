@@ -288,7 +288,7 @@ function CardItem({ item, isSelected, onToggle }: any) {
 
   return (
     <motion.div 
-      whileHover={{ y: -4, shadow: '0 12px 30px rgba(0,0,0,0.06)' }}
+      whileHover={{ y: -4, boxShadow: '0 12px 30px rgba(0,0,0,0.06)' }}
       className={cn(
         "bg-white border p-6 rounded-[24px] flex flex-col justify-between transition-all duration-300 relative group overflow-hidden",
         isSelected ? "border-[#4F378B] bg-[#FBFBFF] ring-2 ring-[#4F378B]/10" : "border-black/5"
