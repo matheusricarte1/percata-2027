@@ -1,123 +1,95 @@
 /* ============================================================
-   PERCATA 2027 — Design System M3 Expressive (PRO)
-   DNA Oficial: Material Design 3 + Base UI
+   PERCATA 2027 — Design Unificado & Fluido
+   Foco em Clareza, Performance e Elegância
    ============================================================ */
 
-/* 1. Tailwind Core & Third Party */
+/* 1. Tailwind Core */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
-@theme {
+@theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   
-  /* Fontes Semânticas */
-  --font-sans: "Roboto", system-ui, sans-serif;
+  --font-sans: "Roboto", "Inter", system-ui, sans-serif;
   --font-display: "Outfit", system-ui, sans-serif;
   
-  /* M3 Tokens de Alto Contraste */
-  --color-primary: var(--md-sys-color-primary);
-  --color-on-primary: var(--md-sys-color-on-primary);
-  --color-primary-container: var(--md-sys-color-primary-container);
-  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-primary: #4F378B;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #625B71;
+  --color-surface: #FEF7FF;
+  --color-border: #E7E0EC;
   
-  --color-secondary: var(--md-sys-color-secondary);
-  --color-on-secondary: var(--md-sys-color-on-secondary);
-  --color-secondary-container: var(--md-sys-color-secondary-container);
-  
-  --color-surface: var(--md-sys-color-surface);
-  --color-on-surface: var(--md-sys-color-on-surface);
-  --color-surface-variant: var(--md-sys-color-surface-variant);
-  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
-  
-  --color-outline: var(--md-sys-color-outline);
-  --color-outline-variant: var(--md-sys-color-outline-variant);
-
-  /* Shadcn / Tailwind Compat */
-  --color-border: var(--border);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-
-  /* Elevation & Radius M3 */
-  --radius-lg: 28px;
+  --radius-lg: 24px;
   --radius-md: 16px;
-  --radius-sm: 12px;
-  --radius-full: 9999px;
-  
-  --shadow-m3-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
-  --shadow-m3-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
+  --radius-sm: 8px;
 }
 
 :root {
-  /* --- M3 Light Baseline Palette (Expressive Purple) --- */
-  --md-sys-color-primary: #6750A4;
-  --md-sys-color-on-primary: #FFFFFF;
-  --md-sys-color-primary-container: #EADDFF;
-  --md-sys-color-on-primary-container: #21005D;
-  
-  --md-sys-color-secondary: #625B71;
-  --md-sys-color-on-secondary: #FFFFFF;
-  --md-sys-color-secondary-container: #E8DEF8;
-  --md-sys-color-on-secondary-container: #1D192B;
-  
-  --md-sys-color-surface: #FEF7FF;
-  --md-sys-color-on-surface: #1D1B20;
-  --md-sys-color-surface-variant: #E7E0EC;
-  --md-sys-color-on-surface-variant: #49454F;
-  
-  --md-sys-color-outline: #79747E;
-  --md-sys-color-outline-variant: #CAC4D0;
-
-  /* --- Glassmorphism Enhancements --- */
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --glass-shadow: 0 8px 32px 0 rgba(103, 80, 164, 0.08);
-
-  /* Shadcn Semantic Overrides */
-  --background: #FBFBFF;
-  --foreground: #1D1B20;
-  --card: #FFFFFF;
-  --primary: #6750A4;
-  --secondary: #625B71;
-  --border: #E7E0EC; /* DEFINIÇÃO DO BORDER AQUI */
-  --ring: #6750A4;
+  --background: #fdfbfb;
+  --foreground: #1C1B1F;
+  --border: rgba(0, 0, 0, 0.05);
   --input: #E7E0EC;
+  --ring: #4F378B;
+
+  /* Custom Aesthetics */
+  --bg-gradient: linear-gradient(135deg, #fdfbfb 0%, #f3f4f6 100%);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.5);
 }
 
 @layer base {
-  * {
-    border-color: var(--border); /* Uso direto da variável em vez de @apply */
-  }
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/20;
+    @apply bg-[var(--bg-gradient)] text-[#1C1B1F] antialiased;
     font-family: var(--font-sans);
   }
-  h1, h2, h3, h4, .font-display {
+  h1, h2, h3, .font-display {
     font-family: var(--font-display);
-    @apply tracking-tight font-black;
+    @apply font-bold tracking-tight;
   }
 }
 
 @layer components {
-  /* --- M3 Carousel Container --- */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  /* --- App Bar Unificada --- */
+  .app-bar {
+    @apply h-[72px] flex items-center justify-between px-8 fixed top-0 right-0 z-40 border-b border-black/5;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    width: calc(100% - 80px);
   }
 
-  /* --- Navigation Rail M3 --- */
+  /* --- Navigation Rail (80px) --- */
   .nav-rail {
-    @apply w-20 bg-surface flex flex-col items-center py-8 fixed left-0 top-0 h-full z-50 border-r border-outline-variant/30;
+    @apply w-20 bg-white flex flex-col items-center py-6 fixed left-0 top-0 h-full z-50 border-r border-black/5 shadow-sm;
+  }
+  
+  .nav-rail-item {
+    @apply w-14 h-14 flex flex-col items-center justify-center mb-4 rounded-2xl cursor-pointer text-[#625B71] transition-all duration-300 relative no-underline;
+  }
+  
+  .nav-rail-item span {
+    @apply text-[10px] mt-1 font-bold uppercase tracking-tighter;
+  }
+  
+  .nav-rail-item:hover {
+    @apply bg-[#F3EDF7] text-[#4F378B];
+  }
+  
+  .nav-rail-item.active {
+    @apply bg-[#EADDFF] text-[#4F378B];
   }
 
-  /* --- Premium M3 Button Shadow --- */
-  .btn-m3-elevated {
-    @apply bg-surface text-primary shadow-m3-1 hover:shadow-m3-2 hover:bg-primary/5 transition-all duration-300 rounded-full px-6 py-3 font-display font-bold;
+  /* --- Glass Cards (Otimizados) --- */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border);
+    @apply rounded-[24px] shadow-sm transition-all duration-300 p-6;
   }
+  
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
