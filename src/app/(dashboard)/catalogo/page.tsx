@@ -79,7 +79,6 @@ export default function CatalogoPage() {
         id: p.id,
         siad: p.codigo_efisco,
         name: p.descricao,
-        price: 25.50 + (Math.random() * 800),
         gnd: p.tipo === 'Servio' ? '3.3.90.39' : '3.3.90.30',
         category: p.categoria,
         stock: Math.floor(Math.random() * 300)
@@ -298,11 +297,6 @@ function ProductCard({ product, index }: { product: any, index: number }) {
       unidade_medida: 'UN',
       categoria_consumo: true
     }, 'Sede Reitoria')
-    
-    // Supondo que o store tenha suporte ou lidamos via effect externo
-    setTimeout(() => {
-       updateItem(items.length, { valor_unitario_estimado: product.price })
-    }, 0)
   }
 
   return (
@@ -331,9 +325,9 @@ function ProductCard({ product, index }: { product: any, index: number }) {
 
       <div className="mt-auto pt-4 flex items-center justify-between">
         <div className="space-y-0.5">
-           <p className="text-[10px] font-black text-black/30 uppercase tracking-widest">Preço Base e-Fisco</p>
-           <p className="font-display text-lg font-black text-[#1C1B1F]">
-             R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+           <p className="text-[10px] font-black text-black/30 uppercase tracking-widest">Tipo de Item</p>
+           <p className="font-display text-xs font-black text-[#6750A4] uppercase">
+             {product.gnd === '3.3.90.39' ? 'Serviço' : 'Material'}
            </p>
         </div>
 
