@@ -27,7 +27,7 @@ function cn(...inputs: ClassValue[]) {
 const categories = [
   { id: 'all', label: 'Tudo', icon: Queue },
   { id: 'Produto', label: 'Materiais', icon: PaintRoller },
-  { id: 'Servio', label: 'Serviços', icon: BookOpen },
+  { id: 'Serviço', label: 'Serviços', icon: BookOpen },
 ]
 
 export default function CatalogoPage() {
@@ -78,7 +78,7 @@ export default function CatalogoPage() {
         id: p.id,
         siad: p.codigo_efisco,
         name: p.descricao,
-        gnd: p.tipo === 'Servio' ? '3.3.90.39' : '3.3.90.30',
+        gnd: p.tipo === 'Serviço' ? '3.3.90.39' : '3.3.90.30',
         category: p.categoria
       }))
       
