@@ -101,7 +101,7 @@ const CATEGORIES = ["CONSTRUÇÃO", "LABORATÓRIO", "TI", "LIMPEZA", "ELÉTRICA"
 export default function CatalogMasterPage() {
   const [activeTab, setActiveTab] = useState('todos')
   const [loading, setLoading] = useState(true)
-  const [selectedItem, setSelectedItem] = useState(null)
+  const [selectedItem, setSelectedItem] = useState<any>(null)
   const [isSnackbarOpen, setIsSnackbarOpen] = useState(false)
   const addItem = useCarrinhoStore(s => s.addItem)
 
