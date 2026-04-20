@@ -13,8 +13,11 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`)
     }
+    // Se houve erro na troca do código, aí sim mostramos o erro
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${error.message}`)
   }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  // Se não veio código, mas você tem o #access_token (visível ao navegador), 
+  // o dashboard vai conseguir te logar. Vamos tentar!
+  return NextResponse.redirect(`${origin}${next}`)
 }
