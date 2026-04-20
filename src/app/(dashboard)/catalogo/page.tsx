@@ -1,233 +1,249 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Package, 
-  CheckCircle, 
-  Tag, 
+  MagnifyingGlass, 
+  ShoppingCart, 
+  Plus, 
+  Check,
+  Package,
+  PaintRoller,
+  BookOpen,
   Info,
-  ShoppingCartSimple,
-  X,
-  CaretRight,
-  CaretLeft,
-  CircleNotch,
-  CornersOut
+  Queue,
+  WarningCircle,
+  Hash
 } from '@phosphor-icons/react'
 import { useCarrinhoStore } from '@/store/carrinho'
+import { supabase } from '@/lib/supabase'
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
-// --- 1. M3 Snackbar Component ---
-function Snackbar({ message, isOpen, onClose }: any) {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#1C1B1F] text-white px-6 py-3 rounded-xl shadow-level-3 flex items-center gap-4 z-[999]"
-        >
-          <span className="text-sm font-bold">{message}</span>
-          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-all">
-            <X size={16} weight="bold" />
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
 }
 
-// --- 2. M3 Dialog (Modal de Detalhes) ---
-function ItemDialog({ item, isOpen, onClose }: any) {
-  if (!item) return null
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
-          />
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-white w-full max-w-2xl rounded-[28px] overflow-hidden shadow-level-3 relative z-10"
-          >
-            <div className="p-8 space-y-6">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                   <span className="chip">#ID {item.id.substring(0,8)}</span>
-                   <h2 className="font-display font-black text-2xl text-[#1C1B1F] leading-tight">{item.descricao}</h2>
-                </div>
-                <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full"><X size={24} weight="bold" /></button>
-              </div>
+const categories = [
+  { id: 'all', label: 'Tudo', icon: Queue },
+  { id: 'Produto', label: 'Materiais', icon: PaintRoller },
+  { id: 'Serviço', label: 'Serviços', icon: BookOpen },
+]
 
-              <div className="divider-h" />
-
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-black/40">Especificações Técnicas</h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-xs font-bold text-black/60">
-                      <Tag size={18} className="text-primary" /> Unidade: UNIDADE
-                    </li>
-                    <li className="flex items-center gap-3 text-xs font-bold text-black/60">
-                      <Package size={18} className="text-primary" /> Categoria: {item.categoria || 'Geral'}
-                    </li>
-                  </ul>
-                </div>
-                <div className="bg-primary/5 p-6 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
-                   <Info size={32} weight="fill" className="text-primary" />
-                   <p className="text-[10px] font-bold text-primary/60 uppercase tracking-tighter">O preço sugerido será inserido pelo usuário no DFD.</p>
-                </div>
-              </div>
-
-              <button className="w-full btn-filled flex items-center justify-center gap-3 py-4">
-                <ShoppingCartSimple size={24} weight="bold" />
-                Adicionar ao Planejamento
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  )
-}
-
-const CATEGORIES = ["CONSTRUÇÃO", "LABORATÓRIO", "TI", "LIMPEZA", "ELÉTRICA", "SAÚDE", "MÓVEIS", "FERRAMENTAS"]
-
-export default function CatalogMasterPage() {
-  const [activeTab, setActiveTab] = useState('todos')
+export default function CatalogoPage() {
+  const [selectedCat, setSelectedCat] = useState('all')
+  const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedItem, setSelectedItem] = useState<any>(null)
-  const [isSnackbarOpen, setIsSnackbarOpen] = useState(false)
-  const addItem = useCarrinhoStore(s => s.addItem)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const { addItem, items } = useCarrinhoStore()
+
+  const PAGE_SIZE = 30
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1500)
-    return () => clearTimeout(timer)
-  }, [])
+    const handler = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(handler)
+  }, [search])
+
+  const fetchProducts = useCallback(async (isNewSearch = false) => {
+    const currentPage = isNewSearch ? 0 : page
+    if (isNewSearch) {
+      setLoading(true)
+      setPage(0)
+    }
+
+    // Chamando via RPC para suporte a Ranking por Relevância (ts_rank)
+    const { data, error } = await supabase.rpc('buscar_catalogo_inteligente', {
+      query_text: debouncedSearch.trim(),
+      categoria_filtro: selectedCat,
+      limit_val: PAGE_SIZE,
+      offset_val: currentPage * PAGE_SIZE
+    })
+
+    if (data) {
+      const newProducts = data.map((p: any) => ({
+        id: p.id,
+        siad: p.codigo_efisco,
+        name: p.descricao,
+        gnd: p.tipo === 'Serviço' ? '3.3.90.39' : '3.3.90.30',
+        category: p.categoria,
+        rank: p.rank
+      }))
+      
+      setProducts(prev => isNewSearch ? newProducts : [...prev, ...newProducts])
+      setHasMore(data.length === PAGE_SIZE)
+    }
+    setLoading(false)
+  }, [debouncedSearch, selectedCat, page])
+
+  useEffect(() => {
+    fetchProducts(true)
+  }, [debouncedSearch, selectedCat])
+
+  useEffect(() => {
+    if (page > 0) fetchProducts(false)
+  }, [page])
 
   return (
-    <div className="p-8 space-y-12 min-h-screen">
-      {/* 1. CAROUSEL DE CATEGORIAS (M3 Tonal Chips) */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-[0.2em] text-black/40">Categorias em Destaque</h2>
-          <div className="flex gap-2">
-             <button className="p-2 bg-white rounded-full border border-black/5 hover:bg-black/5 transition-all"><CaretLeft weight="bold" /></button>
-             <button className="p-2 bg-white rounded-full border border-black/5 hover:bg-black/5 transition-all"><CaretRight weight="bold" /></button>
-          </div>
-        </div>
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-          {CATEGORIES.map((cat, i) => (
-            <button key={cat} className={cn(
-              "px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest whitespace-nowrap transition-all border",
-              i === 0 ? "bg-primary text-white border-transparent" : "bg-white border-black/5 text-black/40 hover:border-primary/20"
-            )}>
-              {cat}
-            </button>
-          ))}
-        </div>
-      </section>
+    <div className="p-6 space-y-6 pb-40 min-h-screen bg-[#FBFBFF]">
+      {/* Search & Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-1">
+          <h1 className="font-display text-4xl font-black text-[#1C1B1F] tracking-tight">Catalogo e-Fisco</h1>
+          <p className="text-[#625B71] text-sm font-medium">Priorizando os melhores resultados para você.</p>
+        </motion.div>
 
-      {/* 2. TABS E BARRA DE FERRAMENTAS */}
-      <section className="bg-white/50 backdrop-blur-md p-2 rounded-2xl flex items-center justify-between sticky top-20 z-30 border border-white shadow-level-1">
-        <div className="flex gap-1">
-          {['Todos', 'Sugeridos', 'Favoritos'].map(tab => (
-            <button 
-              key={tab}
-              onClick={() => setActiveTab(tab.toLowerCase())}
-              className={cn(
-                "px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
-                activeTab === tab.toLowerCase() ? "bg-[#1C1B1F] text-white" : "text-black/40 hover:bg-black/5"
-              )}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-        <div className="divider-v h-8 mx-4" />
-        <div className="flex items-center gap-4 flex-1 px-4">
-           {/* Chips de Filtro */}
-           {['Ativo', 'Material'].map(f => (
-             <span key={f} className="chip bg-primary/10 text-primary">
-               {f} <X size={14} weight="bold" className="cursor-pointer" />
-             </span>
-           ))}
-        </div>
-      </section>
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full lg:w-[400px]">
+          <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1C1B1F]/40" size={20} weight="bold" />
+          <input 
+            type="text" 
+            placeholder="Pesquise por nome ou SIAD..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-12 pr-6 py-4 rounded-3xl bg-white border border-black/5 shadow-sm focus:ring-4 focus:ring-[#6750A4]/10 transition-all font-display text-base font-bold text-[#1C1B1F] placeholder:text-black/20"
+          />
+        </motion.div>
+      </div>
 
-      {/* 3. GRID COM LOADING E CARDS AUDITADOS */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {loading ? (
-          Array(8).fill(0).map((_, i) => (
-            <div key={i} className="card-outlined space-y-6 animate-pulse">
-               <div className="h-6 w-20 bg-black/5 rounded-full" />
-               <div className="h-24 bg-black/5 rounded-xl" />
-               <div className="flex justify-between items-center pt-4">
-                  <div className="h-4 w-16 bg-black/5 rounded-full" />
-                  <div className="h-10 w-10 bg-black/5 rounded-xl" />
-               </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => { setSelectedCat(cat.id); setPage(0); }}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-full transition-all font-display font-black text-xs uppercase tracking-wider",
+              selectedCat === cat.id 
+                ? 'bg-[#6750A4] text-white shadow-md' 
+                : 'bg-white text-[#49454F] hover:bg-black/5 border border-black/5'
+            )}
+          >
+            <cat.icon size={16} weight="bold" />
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Masonry Layout Grid */}
+      <div className="relative min-h-[400px]">
+        <AnimatePresence mode="wait">
+          {loading && page === 0 ? (
+            <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
+              {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
-          ))
-        ) : (
-          [1,2,3,4,5,6,7,8].map(i => (
-            <CardDemo key={i} onOpen={() => setSelectedItem({id: `ITEM-${i}`, descricao: `EQUIPAMENTO TÉCNICO DE LABORATÓRIO TIPO ${i} PARA PESQUISA DE ALTO DESEMPENHO`})} />
-          ))
-        )}
-      </section>
+          ) : products.length > 0 ? (
+            <div className="space-y-10">
+              <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
+                {products.map((product, idx) => (
+                  <ProductCard key={`${product.id}-${idx}`} product={product} index={idx % 30} />
+                ))}
+              </div>
 
-      {/* COMPONENTES DE FEEDBACK E DIALOG */}
-      <ItemDialog 
-        item={selectedItem} 
-        isOpen={!!selectedItem} 
-        onClose={() => setSelectedItem(null)} 
-      />
-      
-      <Snackbar 
-        message="Item adicionado ao seu planejamento!" 
-        isOpen={isSnackbarOpen} 
-        onClose={() => setIsSnackbarOpen(false)} 
-      />
+              {hasMore && (
+                <div className="flex justify-center pt-8">
+                   <button 
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={loading}
+                    className="px-8 py-3 rounded-full bg-white border border-[#E7E0EC] font-display font-black text-xs tracking-widest text-[#6750A4] hover:bg-[#6750A4] hover:text-white transition-all shadow-sm"
+                   >
+                     {loading ? 'CARREGANDO...' : 'CARREGAR MAIS REGISTROS'}
+                   </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
+              <WarningCircle size={48} />
+              <p className="font-display font-black text-xl mt-4">Nenhum resultado relevante</p>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Floating Checkout */}
+      {items.length > 0 && (
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 w-full max-w-xs px-4">
+             <a href="/nova-dfd" className="flex items-center justify-between bg-[#1C1B1F] text-white p-2 pl-6 rounded-full shadow-2xl hover:scale-105 transition-all">
+                <div className="flex items-center gap-3">
+                  <ShoppingCart size={22} weight="fill" className="text-[#D0BCFF]" />
+                  <span className="font-display font-black text-xs uppercase tracking-tighter">{items.length} itens</span>
+                </div>
+                <div className="bg-[#6750A4] px-6 py-3 rounded-full font-display font-black text-[10px] tracking-widest">PROSSEGUIR</div>
+             </a>
+          </motion.div>
+      )}
     </div>
   )
 }
 
-function CardDemo({ onOpen }: any) {
+function SkeletonCard() {
   return (
-    <motion.div 
-      whileHover={{ y: -8, boxShadow: '0 12px 32px rgba(0,0,0,0.08)' }}
-      className="card-elevated group"
-    >
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-           <span className="text-[10px] font-black text-black/30 font-mono tracking-widest">#CAT-45091</span>
-           <div className="badge-dot" />
-        </div>
-        
-        <h3 className="font-display font-black text-lg text-[#1C1B1F] tracking-tight leading-tight line-clamp-3 group-hover:text-primary transition-colors">
-          CADEIRA ERGONÔMICA DE ESCRITÓRIO - TIPO DIRETOR COM APOIO LOMBAR E RODÍZIOS DE SILICONE
-        </h3>
-
-        <div className="flex items-center justify-between pt-4">
-           <span className="chip">MARCENARIA</span>
-           <div className="flex gap-2">
-             <button onClick={onOpen} className="w-10 h-10 rounded-xl bg-black/5 flex items-center justify-center text-black/40 hover:bg-black/10 transition-all">
-               <CornersOut size={20} weight="bold" />
-             </button>
-             <button className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-110 active:scale-95 transition-all">
-               <CheckCircle size={20} weight="fill" />
-             </button>
-           </div>
-        </div>
-      </div>
-    </motion.div>
+    <div className="bg-white rounded-3xl p-4 h-[120px] border border-black/5 animate-pulse flex flex-col gap-2 break-inside-avoid">
+       <div className="h-3 bg-black/5 rounded-full w-1/2" />
+       <div className="h-4 bg-black/5 rounded-xl w-full" />
+       <div className="h-4 bg-black/5 rounded-xl w-3/4" />
+    </div>
   )
 }
 
-function cn(...inputs: any) {
-  return inputs.filter(Boolean).join(' ')
+function ProductCard({ product, index }: { product: any, index: number }) {
+  const { addItem, items } = useCarrinhoStore()
+  const inCart = items.some(i => i.item_efisco.codigo_tce === product.siad)
+
+  const handleAdd = () => {
+    if (inCart) return
+    addItem({
+      codigo_tce: product.siad,
+      descricao: product.name,
+      gnd: product.gnd as any,
+      unidade_medida: 'UN',
+      categoria_consumo: true
+    }, 'Sede Reitoria')
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: index * 0.01 }}
+      className="break-inside-avoid mb-4 group bg-white border border-black/5 rounded-[28px] p-4 flex flex-col gap-3 hover:shadow-xl hover:border-[#6750A4]/30 transition-all relative"
+    >
+      <div className="flex items-center justify-between">
+         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3EDF7] text-[9px] font-black tracking-tighter text-[#6750A4]">
+            <Hash size={10} weight="bold" />
+            {product.siad}
+         </div>
+         {product.rank > 0.05 && (
+            <div className="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[8px] font-black uppercase text-[#6750A4]">
+              Relevante
+            </div>
+         )}
+      </div>
+
+      <h3 className="font-display font-black text-[#1C1B1F] leading-tight text-[11px] tracking-tight group-hover:text-[#6750A4] transition-colors overflow-hidden break-words">
+        {product.name}
+      </h3>
+
+      <div className="flex justify-between items-center pt-2">
+        <div className={cn(
+           "text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm",
+           product.gnd === '3.3.90.39' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+         )}>
+           {product.gnd === '3.3.90.39' ? 'Serviço' : 'Material'}
+         </div>
+        
+        <button 
+          onClick={handleAdd}
+          className={cn(
+            "w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90",
+            inCart ? 'bg-[#6750A4] text-white' : 'bg-white border border-black/5 text-[#6750A4] hover:bg-[#F3EDF7]'
+          )}
+        >
+          {inCart ? <Check size={14} weight="bold" /> : <Plus size={14} weight="bold" />}
+        </button>
+      </div>
+    </motion.div>
+  )
 }
