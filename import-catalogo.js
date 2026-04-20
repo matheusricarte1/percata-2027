@@ -25,7 +25,7 @@ async function importData() {
 
   let batch = [];
   let totalImported = 0;
-  const BATCH_SIZE = 100;
+  const BATCH_SIZE = 1000;
 
   for await (const record of parser) {
     batch.push({
@@ -47,9 +47,6 @@ async function importData() {
       }
       batch = [];
     }
-
-    // Limite inicial para teste rápido
-    if (totalImported >= 2000) break;
   }
 
   if (batch.length > 0) {
