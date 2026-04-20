@@ -15,24 +15,24 @@ export default function DashboardLayout({
       
       <main className="flex-1 ml-20 flex flex-col h-screen overflow-hidden">
         {/* App Bar */}
-        <header className="app-bar">
-          <div className="font-display font-semibold text-xl">
-             Dashboard do Solicitante
+        <header className="app-bar border-b border-outline-variant/30">
+          <div className="font-display font-black text-2xl tracking-tighter text-primary italic uppercase">
+             PERCATA <span className="text-foreground/40 font-medium tracking-normal lowercase not-italic text-sm">2027</span>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="bg-[var(--md-surface-variant)] rounded-full h-10 px-4 flex items-center gap-3 w-64 focus-within:w-80 focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--md-primary-container)] transition-all duration-300">
-               <MagnifyingGlass size={20} className="text-[var(--md-secondary)]" />
+            <div className="bg-surface-variant/50 rounded-full h-12 px-6 flex items-center gap-4 w-72 focus-within:w-96 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-500 shadow-sm">
+               <MagnifyingGlass size={20} weight="bold" className="text-secondary" />
                <input 
                  type="text" 
-                 placeholder="Pesquisar catálogos ou pedidos..." 
-                 className="bg-transparent border-none outline-none text-sm w-full"
+                 placeholder="O que você está procurando?" 
+                 className="bg-transparent border-none outline-none text-sm w-full font-medium placeholder:text-secondary/50"
                />
             </div>
             
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative mr-2">
-               <Bell size={24} />
-               <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#B3261E] rounded-full border border-white"></div>
+            <button className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-surface-variant transition-all relative group shadow-sm bg-white border border-outline-variant/20">
+               <Bell size={24} className="text-secondary group-hover:text-primary transition-colors" />
+               <div className="absolute top-3.5 right-3.5 w-2.5 h-2.5 bg-red-600 rounded-full border-2 border-white"></div>
             </button>
             
             <UserNav />

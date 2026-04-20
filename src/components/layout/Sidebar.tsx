@@ -8,18 +8,14 @@ import {
   Files,
   Package,
   ClockCounterClockwise,
-  Scales,
-  ChartBar,
-  Lightning,
   SignOut,
-  PuzzlePiece,
-  Gear,
-  CheckCircle,
-  Wallet,
+  Lightning,
   SquaresFour,
+  CheckCircle,
   Users,
-  Database,
-  ChartLineUp,
+  Gear,
+  Wallet,
+  ChartLineUp
 } from '@phosphor-icons/react'
 import { useCarrinhoStore } from '@/store/carrinho'
 
@@ -31,85 +27,91 @@ export function Sidebar({ role = 'usuario' }: SidebarProps) {
   const pathname = usePathname()
   const itemCount = useCarrinhoStore((s) => s.items.length)
 
-  // -- ADMIN SIDEBAR (WIDE) --
+  // -- ADMIN SIDEBAR (WIDE / PREMIUM M3) --
   if (role === 'admin') {
     return (
-      <nav className="fixed left-0 top-0 h-full w-[260px] bg-[#1A237E] text-white flex flex-col p-6 z-50 shadow-xl">
-        <div className="flex items-center gap-3 font-display text-2xl font-extrabold mb-10 px-3">
-          <Lightning weight="fill" className="text-white" />
+      <nav className="fixed left-0 top-0 h-full w-[280px] bg-[#1C1B1F] text-[#E6E1E5] flex flex-col p-4 z-50 shadow-2xl border-r border-white/5">
+        <div className="flex items-center gap-4 font-display text-2xl font-black mb-12 px-4 py-4 italic">
+          <div className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+            <Lightning weight="fill" className="text-white" size={24} />
+          </div>
           PERCATA
         </div>
 
-        <div className="text-[10px] uppercase text-white/40 font-bold tracking-widest mb-3 px-3">
-          Visão Gerencial
-        </div>
-
-        <div className="space-y-2 flex-1">
-          <SidebarLink href="/admin" icon={SquaresFour} label="Dashboard Geral" active={pathname === '/admin'} wide />
-          <SidebarLink href="/admin/aprovacoes" icon={CheckCircle} label="Aprovações (DFD)" active={pathname === '/admin/aprovacoes'} badge="12" wide />
+        <div className="space-y-1 flex-1">
+          <SectionLabel label="Gestão Superior" />
+          <SidebarLink href="/admin" icon={SquaresFour} label="Painel Executivo" active={pathname === '/admin'} wide />
+          <SidebarLink href="/admin/aprovacoes" icon={CheckCircle} label="Triagem de Demandas" active={pathname === '/admin/aprovacoes'} badge="12" wide />
           <SidebarLink href="#" icon={ChartLineUp} label="Planejamento PCA" active={false} wide />
           
-          <div className="h-[1px] bg-white/10 my-4" />
+          <div className="h-[1px] bg-white/10 my-6 mx-4" />
           
-          <div className="text-[10px] uppercase text-white/40 font-bold tracking-widest mb-3 px-3">
-            Cadastros Base
-          </div>
-          
-          <SidebarLink href="#" icon={Package} label="Inventário Central" active={false} wide />
-          <SidebarLink href="#" icon={Users} label="Usuários & Níveis" active={false} wide />
-          <SidebarLink href="#" icon={Gear} label="Configurações" active={false} wide />
+          <SectionLabel label="Configurações Estruturais" />
+          <SidebarLink href="#" icon={Package} label="Catálogo Mestre" active={false} wide />
+          <SidebarLink href="#" icon={Users} label="Gestão de Usuários" active={false} wide />
+          <SidebarLink href="#" icon={Gear} label="Parâmetros do Sistema" active={false} wide />
         </div>
 
-        <button className="flex items-center gap-3 p-3 mt-auto text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all">
-          <SignOut size={22} />
-          <span className="font-medium">Sair</span>
+        <button className="flex items-center gap-4 p-4 mt-auto text-white/60 hover:text-white hover:bg-white/5 rounded-2xl transition-all font-display font-bold text-sm">
+          <SignOut size={22} weight="bold" />
+          <span>Encerrar Sessão</span>
         </button>
       </nav>
     )
   }
 
-  // -- CHEFIA NAV RAIL (90px) --
+  // -- CHEFIA NAV RAIL M3 --
   if (role === 'chefia') {
     return (
-      <nav className="fixed left-0 top-0 h-full w-[90px] bg-[#F5FBF9] flex flex-col items-center py-6 z-50 border-r border-emerald-100 shadow-sm">
-        <div className="w-[50px] h-[50px] bg-[#B2DFDB] text-[#00695C] rounded-2xl flex items-center justify-center text-2xl mb-10">
+      <nav className="fixed left-0 top-0 h-full w-20 bg-[#F5FBF9] flex flex-col items-center py-8 z-50 border-r border-emerald-100 shadow-sm">
+        <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center text-2xl mb-12 shadow-lg shadow-emerald-600/20">
           <Lightning weight="fill" />
         </div>
 
-        <div className="flex-1 w-full flex flex-col items-center gap-4">
+        <div className="flex-1 w-full flex flex-col items-center gap-6">
           <SidebarLink href="/triagem" icon={SquaresFour} label="Painel" active={pathname === '/triagem'} theme="chefia" />
-          <SidebarLink href="#" icon={CheckCircle} label="Aprovar Equipe" active={false} theme="chefia" badge="4" />
-          <SidebarLink href="#" icon={Wallet} label="Orçamento" active={false} theme="chefia" />
+          <SidebarLink href="#" icon={CheckCircle} label="Validar" active={false} theme="chefia" badge="4" />
+          <SidebarLink href="#" icon={Wallet} label="Verbas" active={false} theme="chefia" />
         </div>
 
-        <button className="flex flex-col items-center gap-1 p-2 mt-auto text-emerald-800/60 hover:text-emerald-800">
-           <SignOut size={24} />
-           <span className="text-[10px] font-bold">Sair</span>
+        <button className="flex flex-col items-center gap-1 p-3 mt-auto text-emerald-900/40 hover:text-emerald-900 transition-colors">
+           <SignOut size={26} weight="bold" />
+           <span className="text-[10px] font-black uppercase tracking-tighter">Sair</span>
         </button>
       </nav>
     )
   }
 
-  // -- USUARIO NAV RAIL (80px) --
+  // -- USUARIO NAV RAIL (Standard M3) --
   return (
     <nav className="nav-rail">
-      <div className="w-12 h-12 mb-10 flex items-center justify-center rounded-xl bg-[var(--md-primary-container)] text-[var(--md-primary)] shadow-sm">
-        <Lightning size={24} weight="bold" />
+      <div className="w-12 h-12 mb-12 flex items-center justify-center rounded-[18px] bg-primary text-white shadow-lg shadow-primary/30 active:scale-90 transition-transform cursor-pointer">
+        <Lightning size={26} weight="fill" />
       </div>
 
-      <div className="flex-1 w-full flex flex-col items-center gap-2">
+      <div className="flex-1 w-full flex flex-col items-center gap-4">
         <SidebarLink href="/dashboard" icon={House} label="Início" active={pathname === '/dashboard'} />
         <SidebarLink href="/minhas-dfds" icon={Files} label="Pedidos" active={pathname === '/minhas-dfds'} />
         <SidebarLink href="/catalogo" icon={Package} label="Catálogo" active={pathname === '/catalogo'} badge={itemCount > 0 ? itemCount.toString() : null} />
-        <div className="w-8 h-[1px] bg-black/5 my-2" />
-        <SidebarLink href="/historico" icon={ClockCounterClockwise} label="2025" active={pathname === '/historico'} />
+        <div className="w-8 h-[2px] bg-outline-variant/30 my-2 rounded-full" />
+        <SidebarLink href="/historico" icon={ClockCounterClockwise} label="Histórico" active={pathname === '/historico'} />
       </div>
 
-      <button className="nav-rail-item mt-auto hover:bg-red-50 hover:text-red-600">
-        <SignOut size={24} />
-        <span>Sair</span>
+      <button className="flex flex-col items-center gap-1 p-3 mt-auto text-on-surface-variant hover:text-red-600 transition-all group">
+        <div className="w-12 h-8 rounded-full flex items-center justify-center group-hover:bg-red-50 transition-colors">
+          <SignOut size={24} weight="bold" />
+        </div>
+        <span className="text-[10px] font-black uppercase tracking-tighter font-display">Sair</span>
       </button>
     </nav>
+  )
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div className="text-[10px] uppercase text-white/30 font-black tracking-[0.2em] mb-4 px-5">
+      {label}
+    </div>
   )
 }
 
@@ -135,16 +137,16 @@ function SidebarLink({
       <Link
         href={href}
         className={cn(
-          'flex items-center justify-between p-3.5 rounded-xl transition-all duration-200 group',
-          active ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+          'flex items-center justify-between p-4 rounded-[20px] transition-all duration-300 group mx-2',
+          active ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/60 hover:bg-white/5 hover:text-white'
         )}
       >
-        <div className="flex items-center gap-3">
-          <Icon size={22} weight={active ? 'fill' : 'regular'} />
-          <span className={cn('text-sm font-medium', active ? 'font-semibold' : '')}>{label}</span>
+        <div className="flex items-center gap-4">
+          <Icon size={24} weight={active ? 'fill' : 'bold'} className={cn(active ? 'text-white' : 'text-white/40 group-hover:text-white')} />
+          <span className={cn('text-sm font-display font-bold tracking-tight', active ? 'text-white' : '')}>{label}</span>
         </div>
         {badge && (
-          <span className="bg-[#FF5252] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+          <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm">
             {badge}
           </span>
         )}
@@ -152,30 +154,35 @@ function SidebarLink({
     )
   }
 
-  // Rail View (Narrow)
+  // Rail View (Narrow M3 Style)
   const isChefia = theme === 'chefia'
   return (
     <Link
       href={href}
       className={cn(
-        'group flex flex-col items-center justify-center transition-all duration-300 relative no-underline',
-        isChefia ? 'w-16 h-16 rounded-2xl mb-1 text-emerald-800' : 'w-14 h-14 rounded-2xl mb-4 text-[#625B71]',
-        active && (isChefia ? 'bg-[#B2DFDB] text-[#00695C]' : 'bg-[#EADDFF] text-[#4F378B]'),
-        !active && (isChefia ? 'hover:bg-emerald-50' : 'hover:bg-[#E7E0EC]')
+        'group flex flex-col items-center justify-center w-full relative no-underline gap-1',
+        active ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
       )}
     >
-      {badge && (
-        <span className={cn(
-           'absolute font-bold text-white text-[10px] px-1.5 py-0.5 rounded-full border-2',
-           isChefia ? 'top-2 right-3 bg-[#E65100] border-[#F5FBF9]' : 'top-1 right-2 bg-[#B3261E] border-[#FEF7FF]'
-        )}>
-          {badge}
-        </span>
-      )}
-      <Icon size={24} weight={active ? 'fill' : 'regular'} />
+      <div className={cn(
+        'w-14 h-8 flex items-center justify-center rounded-full transition-all duration-400',
+        active 
+          ? (isChefia ? 'bg-emerald-200 text-emerald-900' : 'bg-primary-container text-on-primary-container') 
+          : 'hover:bg-surface-variant'
+      )}>
+        <Icon size={24} weight={active ? 'fill' : 'bold'} />
+        {badge && (
+          <span className={cn(
+            'absolute font-black text-white text-[9px] min-w-[18px] h-[18px] flex items-center justify-center rounded-full border-2',
+            isChefia ? 'top-[-2px] right-2 bg-orange-600 border-[#F5FBF9]' : 'top-[-4px] right-2 bg-red-600 border-surface'
+          )}>
+            {badge}
+          </span>
+        )}
+      </div>
       <span className={cn(
-        'text-[10px] mt-1 font-medium text-center leading-tight',
-        active ? 'font-bold' : ''
+        'text-[10px] font-display font-black uppercase tracking-tighter text-center transition-colors',
+        active ? 'text-primary' : 'text-on-surface-variant'
       )}>
         {label}
       </span>
