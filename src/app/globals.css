@@ -10,7 +10,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   
@@ -35,6 +35,11 @@
   
   --color-outline: var(--md-sys-color-outline);
   --color-outline-variant: var(--md-sys-color-outline-variant);
+
+  /* Shadcn / Tailwind Compat */
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
 
   /* Elevation & Radius M3 */
   --radius-lg: 28px;
@@ -77,12 +82,14 @@
   --card: #FFFFFF;
   --primary: #6750A4;
   --secondary: #625B71;
-  --border: #E7E0EC;
+  --border: #E7E0EC; /* DEFINIÇÃO DO BORDER AQUI */
+  --ring: #6750A4;
+  --input: #E7E0EC;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border); /* Uso direto da variável em vez de @apply */
   }
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20;
