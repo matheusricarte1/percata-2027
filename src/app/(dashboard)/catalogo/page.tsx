@@ -36,29 +36,36 @@ export default function CatalogoPage() {
   useEffect(() => {
     async function fetchProducts() {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('catalogo_efisco')
+      
+      let query = supabase
+        .from('catalogo')
         .select('*')
+        .limit(100) // Limite para performance inicial
+
+      if (search) {
+        query = query.ilike('descricao', `%${search}%`)
+      }
+
+      const { data, error } = await query
       
       if (data) {
         setProducts(data.map(p => ({
           id: p.id,
-          siad: p.codigo_tce,
+          siad: p.codigo_efisco,
           name: p.descricao,
-          price: p.valor_estimado_base,
-          gnd: p.gnd,
-          cat: p.gnd === '4.4.90.52' ? 'ti' : p.gnd === '3.3.90.30' ? 'mat' : 'ti', // Simple mock mapping
+          price: 15.50 + (Math.random() * 500), // Valor estimado (seria do CSV se houvesse coluna de preço)
+          gnd: p.tipo === 'Servio' ? '3.3.90.39' : '3.3.90.30',
+          cat: p.tipo === 'Servio' ? 'serv' : 'mat',
           stock: Math.floor(Math.random() * 500)
         })))
       }
       setLoading(false)
     }
     fetchProducts()
-  }, [])
+  }, [search])
 
   const filteredProducts = products.filter(p => 
-    (p.name.toLowerCase().includes(search.toLowerCase()) || p.siad.includes(search)) &&
-    (selectedCat === 'ti' ? p.gnd === '4.4.90.52' : selectedCat === 'mat' ? p.gnd === '3.3.90.30' : true)
+    (selectedCat === 'serv' ? p.cat === 'serv' : p.cat !== 'serv')
   )
 
   return (
