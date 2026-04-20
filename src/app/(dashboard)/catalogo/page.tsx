@@ -131,11 +131,6 @@ export default function CatalogoPage() {
           >
             <cat.icon size={20} weight={selectedCat === cat.id ? 'fill' : 'regular'} />
             <span className="font-bold text-sm tracking-tight">{cat.label}</span>
-            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
-              selectedCat === cat.id ? 'bg-[#D0BCFF]/50' : 'bg-black/5'
-            }`}>
-              {cat.count}
-            </span>
           </button>
         ))}
       </div>
