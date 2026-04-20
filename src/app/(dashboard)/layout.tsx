@@ -1,6 +1,7 @@
 'use client'
 
 import { Sidebar } from '@/components/layout/Sidebar'
+import { UserNav } from '@/components/layout/UserNav'
 import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
 
 export default function DashboardLayout({
@@ -29,14 +30,12 @@ export default function DashboardLayout({
                />
             </div>
             
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative">
+            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative mr-2">
                <Bell size={24} />
                <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#B3261E] rounded-full border border-white"></div>
             </button>
             
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#a18cd1] to-[#fbc2eb] flex items-center justify-center text-white font-bold shadow-sm cursor-pointer">
-               SU
-            </div>
+            <UserNav />
           </div>
         </header>
 

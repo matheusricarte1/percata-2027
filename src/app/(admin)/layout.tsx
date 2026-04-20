@@ -1,6 +1,7 @@
 'use client'
 
 import { Sidebar } from '@/components/layout/Sidebar'
+import { UserNav } from '@/components/layout/UserNav'
 import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
 
 export default function AdminLayout({
@@ -29,13 +30,11 @@ export default function AdminLayout({
                />
             </div>
             
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative">
+            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative mr-1">
                <Bell size={24} />
             </button>
             
-            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold shadow-sm cursor-pointer">
-               AD
-            </div>
+            <UserNav />
           </div>
         </header>
 

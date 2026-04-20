@@ -1,6 +1,7 @@
 'use client'
 
 import { Sidebar } from '@/components/layout/Sidebar'
+import { UserNav } from '@/components/layout/UserNav'
 import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
 
 export default function TriagemLayout({
@@ -29,13 +30,11 @@ export default function TriagemLayout({
                />
             </div>
             
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative">
+            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative mr-1">
                <Bell size={24} />
             </button>
             
-            <div className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold shadow-sm cursor-pointer border border-amber-200">
-               CH
-            </div>
+            <UserNav />
           </div>
         </header>
 
