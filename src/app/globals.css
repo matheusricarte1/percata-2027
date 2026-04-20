@@ -9,7 +9,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
   /* Tokens de Cor M3 */
   --color-primary: #4F378B;
   --color-on-primary: #FFFFFF;
@@ -28,7 +28,7 @@
   --color-outline: #79747E;
   --color-outline-variant: #CAC4D0;
 
-  /* Elevations (M3) */
+  /* Expressions */
   --shadow-level-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
   --shadow-level-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
   --shadow-level-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.30);
@@ -53,7 +53,9 @@
 
 @layer base {
   body {
-    @apply bg-background text-[#1C1B1F] antialiased;
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply antialiased;
     font-family: var(--font-sans);
   }
   h1, h2, h3, h4, .font-display {
@@ -72,18 +74,18 @@
     @apply h-12 flex items-center gap-4 text-sm font-medium;
   }
 
-  /* --- Navigation Rail (Unificado) --- */
+  /* --- Navigation Rail --- */
   .nav-rail {
     @apply w-20 bg-white border-r border-black/5 flex flex-col items-center py-6 fixed left-0 top-0 h-full z-50;
   }
 
   /* --- Buttons M3 --- */
   .btn-filled {
-    @apply bg-primary text-on-primary px-6 py-2.5 rounded-full font-bold text-sm transition-all hover:shadow-level-1 active:scale-95;
+    @apply bg-[var(--color-primary)] text-[var(--color-on-primary)] px-6 py-2.5 rounded-full font-bold text-sm transition-all hover:bg-[var(--color-primary)]/90 active:scale-95;
   }
   
   .btn-tonal {
-    @apply bg-primary-container text-on-primary-container px-6 py-2.5 rounded-full font-bold text-sm transition-all hover:bg-[#D5C7F0];
+    @apply bg-primary-container text-on-primary-container px-6 py-2.5 rounded-full font-bold text-sm transition-all hover:opacity-80;
   }
   
   .btn-outlined {
@@ -96,7 +98,7 @@
   }
   
   .card-outlined {
-    @apply border border-outline-variant rounded-xl hover:bg-surface-variant/20 transition-all p-6;
+    @apply border border-outline-variant rounded-xl hover:bg-surface-variant transition-all p-6;
   }
 
   /* --- Chips & Badges --- */
