@@ -40,7 +40,7 @@ export default function CatalogoPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const { addItem, items } = useCarrinhoStore()
 
-  const PAGE_SIZE = 30 // Aumentado para o novo design compacto
+  const PAGE_SIZE = 30
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 400)
@@ -54,36 +54,26 @@ export default function CatalogoPage() {
       setPage(0)
     }
 
-    let query = supabase
-      .from('catalogo')
-      .select('*', { count: 'exact' })
-      .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1)
-      .order('descricao', { ascending: true })
+    // Chamando via RPC para suporte a Ranking por Relevância (ts_rank)
+    const { data, error } = await supabase.rpc('buscar_catalogo_inteligente', {
+      query_text: debouncedSearch.trim(),
+      categoria_filtro: selectedCat,
+      limit_val: PAGE_SIZE,
+      offset_val: currentPage * PAGE_SIZE
+    })
 
-    if (debouncedSearch) {
-      query = query.textSearch('descricao', debouncedSearch.trim().split(' ').join(' & '), {
-        type: 'phrase',
-        config: 'portuguese'
-      })
-    }
-
-    if (selectedCat !== 'all') {
-      query = query.eq('tipo', selectedCat)
-    }
-
-    const { data, error, count } = await query
-    
     if (data) {
-      const newProducts = data.map(p => ({
+      const newProducts = data.map((p: any) => ({
         id: p.id,
         siad: p.codigo_efisco,
         name: p.descricao,
         gnd: p.tipo === 'Serviço' ? '3.3.90.39' : '3.3.90.30',
-        category: p.categoria
+        category: p.categoria,
+        rank: p.rank
       }))
       
       setProducts(prev => isNewSearch ? newProducts : [...prev, ...newProducts])
-      setHasMore(count ? (processed => processed < count)((currentPage + 1) * PAGE_SIZE) : false)
+      setHasMore(data.length === PAGE_SIZE)
     }
     setLoading(false)
   }, [debouncedSearch, selectedCat, page])
@@ -102,7 +92,7 @@ export default function CatalogoPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-1">
           <h1 className="font-display text-4xl font-black text-[#1C1B1F] tracking-tight">Catalogo e-Fisco</h1>
-          <p className="text-[#625B71] text-sm font-medium">Buscando em {products.length} itens disponíveis hoje.</p>
+          <p className="text-[#625B71] text-sm font-medium">Priorizando os melhores resultados para você.</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full lg:w-[400px]">
@@ -117,9 +107,9 @@ export default function CatalogoPage() {
         </motion.div>
       </div>
 
-      {/* Simplified Tabs */}
+      {/* Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {categories.map((cat, idx) => (
+        {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => { setSelectedCat(cat.id); setPage(0); }}
@@ -136,16 +126,16 @@ export default function CatalogoPage() {
         ))}
       </div>
 
-      {/* Dense Grid */}
+      {/* Masonry Layout Grid */}
       <div className="relative min-h-[400px]">
         <AnimatePresence mode="wait">
           {loading && page === 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+            <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
               {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : products.length > 0 ? (
             <div className="space-y-10">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
                 {products.map((product, idx) => (
                   <ProductCard key={`${product.id}-${idx}`} product={product} index={idx % 30} />
                 ))}
@@ -166,7 +156,7 @@ export default function CatalogoPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
               <WarningCircle size={48} />
-              <p className="font-display font-black text-xl mt-4">Sem resultados registrados</p>
+              <p className="font-display font-black text-xl mt-4">Nenhum resultado relevante</p>
             </div>
           )}
         </AnimatePresence>
@@ -190,10 +180,10 @@ export default function CatalogoPage() {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-3xl p-4 h-[180px] border border-black/5 animate-pulse flex flex-col gap-2">
-      <div className="h-3 bg-black/5 rounded-full w-1/2" />
-      <div className="h-10 bg-black/5 rounded-xl w-full mt-2" />
-      <div className="h-8 bg-black/5 rounded-full w-1/4 mt-auto ml-auto" />
+    <div className="bg-white rounded-3xl p-4 h-[120px] border border-black/5 animate-pulse flex flex-col gap-2 break-inside-avoid">
+       <div className="h-3 bg-black/5 rounded-full w-1/2" />
+       <div className="h-4 bg-black/5 rounded-xl w-full" />
+       <div className="h-4 bg-black/5 rounded-xl w-3/4" />
     </div>
   )
 }
@@ -217,36 +207,41 @@ function ProductCard({ product, index }: { product: any, index: number }) {
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: index * 0.02 }}
-      className="group bg-white border border-black/5 rounded-[32px] p-4 flex flex-col gap-3 hover:shadow-xl hover:border-[#6750A4]/30 transition-all relative"
+      transition={{ delay: index * 0.01 }}
+      className="break-inside-avoid mb-4 group bg-white border border-black/5 rounded-[28px] p-4 flex flex-col gap-3 hover:shadow-xl hover:border-[#6750A4]/30 transition-all relative"
     >
       <div className="flex items-center justify-between">
-         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F3EDF7] text-[9px] font-black tracking-tighter text-[#6750A4]">
+         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#F3EDF7] text-[9px] font-black tracking-tighter text-[#6750A4]">
             <Hash size={10} weight="bold" />
             {product.siad}
          </div>
-         <div className={cn(
-           "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
+         {product.rank > 0.05 && (
+            <div className="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[8px] font-black uppercase text-[#6750A4]">
+              Relevante
+            </div>
+         )}
+      </div>
+
+      <h3 className="font-display font-black text-[#1C1B1F] leading-tight text-[11px] tracking-tight group-hover:text-[#6750A4] transition-colors overflow-hidden break-words">
+        {product.name}
+      </h3>
+
+      <div className="flex justify-between items-center pt-2">
+        <div className={cn(
+           "text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm",
            product.gnd === '3.3.90.39' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
          )}>
            {product.gnd === '3.3.90.39' ? 'Serviço' : 'Material'}
          </div>
-      </div>
-
-      <h3 className="font-display font-black text-[#1C1B1F] leading-tight text-xs h-[3rem] line-clamp-3 group-hover:text-[#6750A4] transition-colors">
-        {product.name}
-      </h3>
-
-      <div className="flex justify-between items-center mt-auto">
-        <p className="text-[8px] font-bold text-black/20 uppercase line-clamp-1 flex-1">{product.category}</p>
+        
         <button 
           onClick={handleAdd}
           className={cn(
-            "w-9 h-9 rounded-2xl flex items-center justify-center transition-all shadow-sm active:scale-90",
+            "w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-90",
             inCart ? 'bg-[#6750A4] text-white' : 'bg-white border border-black/5 text-[#6750A4] hover:bg-[#F3EDF7]'
           )}
         >
-          {inCart ? <Check size={18} weight="bold" /> : <Plus size={18} weight="bold" />}
+          {inCart ? <Check size={14} weight="bold" /> : <Plus size={14} weight="bold" />}
         </button>
       </div>
     </motion.div>
