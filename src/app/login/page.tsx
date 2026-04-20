@@ -10,6 +10,7 @@ import {
   IdentificationCard
 } from '@phosphor-icons/react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,6 +19,15 @@ export default function LoginPage() {
     e.preventDefault()
     // Simulated login redirect
     router.push('/dashboard')
+  }
+
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
   }
 
   return (
@@ -120,7 +130,10 @@ export default function LoginPage() {
              <div className="relative flex justify-center text-[10px] uppercase font-black text-black/20 tracking-widest"><span className="bg-white px-4">Ou continue com</span></div>
           </div>
 
-          <button className="w-full py-4 rounded-2xl bg-white border border-[#E7E0EC] text-[#1C1B1F] font-bold flex items-center justify-center gap-3 hover:bg-[#FBFAFD] transition-all">
+          <button 
+            onClick={handleGoogleLogin}
+            className="w-full py-4 rounded-2xl bg-white border border-[#E7E0EC] text-[#1C1B1F] font-bold flex items-center justify-center gap-3 hover:bg-[#FBFAFD] transition-all"
+          >
              <GoogleLogo size={24} weight="bold" className="text-[#EA4335]" />
              Conta Institucional Google
           </button>
