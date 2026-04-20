@@ -1,183 +1,202 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ClockCounterClockwise, 
-  MagnifyingGlass, 
   Funnel, 
-  ArrowRight,
-  Info,
-  Selection,
-  Database,
+  MagnifyingGlass, 
+  CaretRight,
   Calendar,
-  CurrencyDollar,
-  Tag
+  CurrencyCircleDollar,
+  ListNumbers,
+  ArrowUUpLeft,
+  Files,
+  Info
 } from '@phosphor-icons/react'
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
-const historicoLegado = [
-  { 
-    codigo: 'DFD-2025-0011', 
-    data: '02/09/2025', 
-    objeto: 'SSD externo 1TB para cobertura fotográfica', 
-    status: 'Concluído',
-    valor: 500.00,
-    solucao: 'Adquirir equipamentos de armazenamento periciais.',
-    campus: 'Petrolina'
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+const YEARS = [2026, 2025, 2024]
+
+const MOCK_HISTORICO = [
+  {
+    id: 'HIST-2026-042',
+    ano: 2026,
+    objeto: 'Aquisição de Material de Consumo para Laboratórios de Saúde',
+    campus: 'Petrolina',
+    valor: 45600.00,
+    itens: 15,
+    status: 'Finalizada/PCA'
   },
-  { 
-    codigo: 'DFD-2025-0012', 
-    data: '04/09/2025', 
-    objeto: 'Aquisição de expositores temáticos para o HU', 
-    status: 'Aprovado',
-    valor: 3500.00,
-    solucao: 'Mobiliário para exposição permanente de anatomia.',
-    campus: 'Petrolina'
+  {
+    id: 'HIST-2025-115',
+    ano: 2025,
+    objeto: 'Contratação de Empresa para Manutenção de Ar-Condicionados',
+    campus: 'Petrolina',
+    valor: 12000.00,
+    itens: 1,
+    status: 'Concluída'
   },
-  { 
-    codigo: 'DFD-2025-0042', 
-    data: '15/10/2025', 
-    objeto: 'Microscópio Biológico Binocular', 
-    status: 'Em Pactuação',
-    valor: 18500.00,
-    solucao: 'Modernização do Laboratório de Histologia UPE.',
-    campus: 'Petrolina'
-  },
-  { 
-    codigo: 'DFD-2025-0089', 
-    data: '22/11/2025', 
-    objeto: 'Servidor de Processamento GPU', 
-    status: 'Em Pactuação',
-    valor: 45000.00,
-    solucao: 'Recursos para o núcleo de Inteligência Artificial.',
-    campus: 'Petrolina'
+  {
+    id: 'HIST-2024-089',
+    ano: 2024,
+    objeto: 'Renovação de Cadeiras das Salas de Aula - Bloco A',
+    campus: 'Ouricuri',
+    valor: 89300.50,
+    itens: 120,
+    status: 'Concluída'
   }
 ]
 
 export default function HistoricoPage() {
+  const [selectedYear, setSelectedYear] = useState<number | 'todos'>('todos')
   const [search, setSearch] = useState('')
 
-  const filteredData = historicoLegado.filter(h => 
-    h.objeto.toLowerCase().includes(search.toLowerCase()) || 
-    h.codigo.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredData = MOCK_HISTORICO.filter(item => {
+    const matchesYear = selectedYear === 'todos' || item.ano === selectedYear
+    const matchesSearch = item.objeto.toLowerCase().includes(search.toLowerCase()) || item.id.toLowerCase().includes(search.toLowerCase())
+    return matchesYear && matchesSearch
+  })
 
   return (
-    <div className="p-8 space-y-8 pb-20">
-      <div className="flex justify-between items-end">
+    <div className="p-8 space-y-10 min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-1">
-          <h1 className="font-display text-4xl font-extrabold text-[#1C1B1F] tracking-tight">
-            Base Histórica 2025
-          </h1>
-          <p className="text-[#625B71] font-medium opacity-80 uppercase text-[10px] tracking-[2px] font-black">
-            Dados importados da planilha PERCATALICITA
+          <h1 className="font-display text-4xl font-black text-[#1C1B1F] tracking-tighter italic uppercase">Histórico de Demandas</h1>
+          <p className="text-[#625B71] text-sm font-medium flex items-center gap-2">
+            <ClockCounterClockwise size={18} weight="bold" className="text-[#4F378B]" />
+            Consulte o planejamento de anos anteriores (PCA 2024-2026)
           </p>
         </div>
+      </div>
 
-        <div className="flex gap-3">
-           <div className="bg-[#E8F0FE] border border-[#1351B4]/10 p-4 rounded-3xl flex items-center gap-4">
-              <Database size={24} weight="fill" className="text-[#1351B4]" />
-              <div className="text-sm">
-                <p className="font-black text-[#1351B4] leading-none uppercase text-[10px]">Total Pactuado</p>
-                <p className="font-display font-black text-xl text-[#1C1B1F]">R$ 67.500</p>
+      {/* Toolbar de Controle */}
+      <div className="bg-white p-6 rounded-[32px] border border-black/5 shadow-sm space-y-6">
+        <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={() => setSelectedYear('todos')}
+            className={cn(
+              "px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
+              selectedYear === 'todos' ? "bg-[#1C1B1F] text-white shadow-lg" : "bg-[#F3EDF7] text-[#4F378B] hover:bg-[#EADDFF]"
+            )}
+          >
+            Todos os Anos
+          </button>
+          {YEARS.map(year => (
+            <button 
+              key={year}
+              onClick={() => setSelectedYear(year)}
+              className={cn(
+                "px-8 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
+                selectedYear === year ? "bg-[#4F378B] text-white shadow-lg" : "bg-white border border-black/5 text-[#625B71] hover:border-[#4F378B]"
+              )}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative group">
+          <MagnifyingGlass className="absolute left-5 top-1/2 -translate-y-1/2 text-[#4F378B]/40 group-focus-within:text-[#4F378B] transition-colors" size={22} weight="bold" />
+          <input 
+            type="text" 
+            placeholder="Pesquise por objeto, campus ou código da DFD antiga..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-14 pr-6 py-4 rounded-2xl bg-[#F8F9FA] border-none focus:ring-2 focus:ring-[#EADDFF] transition-all font-medium"
+          />
+        </div>
+      </div>
+
+      {/* Lista de Itens do Histórico */}
+      <div className="grid grid-cols-1 gap-6">
+        <AnimatePresence mode="popLayout">
+          {filteredData.map((item, idx) => (
+            <motion.div
+              layout
+              key={item.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              className="group bg-white border border-black/5 rounded-[32px] p-8 flex flex-col md:flex-row gap-8 hover:shadow-xl hover:border-[#4F378B]/20 transition-all relative overflow-hidden"
+            >
+              {/* Badge de Ano - Estilo Pasta de Arquivo */}
+              <div className="flex flex-col items-center justify-center bg-[#F3EDF7] w-24 h-24 rounded-2xl shrink-0 group-hover:bg-[#4F378B] transition-colors duration-500">
+                <span className="text-[10px] font-black uppercase text-[#4F378B] group-hover:text-white/60 tracking-widest leading-none mb-1">ANO</span>
+                <span className="text-2xl font-display font-black text-[#4F378B] group-hover:text-white leading-none">{item.ano}</span>
               </div>
-           </div>
-        </div>
+
+              <div className="flex-1 space-y-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="font-mono text-xs font-bold text-[#4F378B]/40">{item.id}</span>
+                  <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    <Calendar size={14} weight="bold" />
+                    {item.status}
+                  </div>
+                </div>
+
+                <h3 className="font-display font-black text-xl text-[#1C1B1F] tracking-tight leading-tight">
+                  {item.objeto}
+                </h3>
+
+                <div className="flex flex-wrap gap-8 pt-4">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-black text-black/30 tracking-tighter flex items-center gap-1">
+                      <CurrencyCircleDollar size={14} /> Valor Estimado
+                    </span>
+                    <span className="text-lg font-black text-[#1C1B1F]">
+                      {item.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-black text-black/30 tracking-tighter flex items-center gap-1">
+                      <ListNumbers size={14} /> Qtd. Itens
+                    </span>
+                    <span className="text-lg font-black text-[#1C1B1F]">{item.itens}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-black text-black/30 tracking-tighter flex items-center gap-1">
+                      <Info size={14} /> Campus
+                    </span>
+                    <span className="text-lg font-black text-[#1C1B1F]">{item.campus}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="flex md:flex-col justify-end gap-3 pt-6 md:pt-0 border-t md:border-t-0 md:border-l border-black/5 md:pl-8">
+                <button className="flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-4 bg-[#F8F9FA] text-[#1C1B1F] rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#EADDFF] transition-all">
+                  <Files size={20} weight="bold" />
+                  Ver Itens
+                </button>
+                <button className="flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-4 bg-[#1C1B1F] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#4F378B] shadow-lg shadow-black/10 transition-all">
+                  <ArrowUUpLeft size={20} weight="bold" />
+                  Repetir em 2027
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {filteredData.length === 0 && (
+          <div className="py-20 text-center">
+            <h3 className="font-display font-black text-xl text-black/20 uppercase tracking-[0.2em]">Nenhum registro antigo encontrado</h3>
+          </div>
+        )}
       </div>
 
-      {/* Info Alert */}
-      <div className="p-6 rounded-[32px] bg-[#6750A4]/5 border border-[#6750A4]/10 flex gap-5 items-start">
-         <div className="w-12 h-12 rounded-2xl bg-[#6750A4] text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#6750A4]/20">
-            <Info size={28} weight="fill" />
-         </div>
-         <div className="space-y-1">
-            <h4 className="font-bold text-[#6750A4]">Transparência e Sigilo</h4>
-            <p className="text-sm text-[#625B71] leading-relaxed font-medium">
-               Você está acessando apenas as demandas vinculadas ao seu e-mail institucional. Itens em 
-               <strong className="text-[#B3261E] ml-1">"Em Pactuação"</strong> representam solicitações que já estão na fase interna de licitação e não podem ser replicadas no PCA 2027 para evitar duplicidade orçamentária.
-            </p>
-         </div>
-      </div>
-
-      {/* Table Container */}
-      <div className="glass-card overflow-hidden">
-        <div className="p-6 border-b border-black/5 flex flex-col md:flex-row gap-6 items-center justify-between bg-white/50">
-           <div className="relative w-full md:w-96">
-              <MagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-black/40" size={18} />
-              <input 
-                type="text" 
-                placeholder="Pesquisar nos registros de 2025..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-2xl bg-black/5 border-none focus:ring-2 focus:ring-[#6750A4]/20 transition-all text-sm font-semibold"
-              />
-           </div>
-           <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-black/5 text-[#625B71] font-bold text-xs hover:bg-black/10 transition-all">
-              <Funnel size={18} weight="bold" />
-              FILTRAR POR STATUS
-           </button>
-        </div>
-
-        <div className="overflow-x-auto">
-           <table className="w-full text-left">
-              <thead>
-                 <tr className="bg-[#FBFAFD] text-[10px] font-black uppercase tracking-widest text-[#625B71]/60">
-                    <th className="px-8 py-5">Código / Data</th>
-                    <th className="px-8 py-5">Objeto & Justificativa 2025</th>
-                    <th className="px-8 py-5 text-right">Valor</th>
-                    <th className="px-8 py-5 text-center">Status Licitatório</th>
-                    <th className="px-8 py-5 text-center">Ações</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5">
-                 {filteredData.map((h) => (
-                    <tr key={h.codigo} className="group hover:bg-[#F6F2F7] transition-all">
-                       <td className="px-8 py-6">
-                          <div className="font-mono text-xs font-bold text-[#6750A4]">{h.codigo}</div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-black/30 font-bold mt-1">
-                             <Calendar size={12} /> {h.data}
-                          </div>
-                       </td>
-                       <td className="px-8 py-6 max-w-md">
-                          <div className="font-bold text-[#1C1B1F] group-hover:text-[#6750A4] transition-colors">{h.objeto}</div>
-                          <p className="text-[10px] text-black/40 font-medium leading-relaxed mt-1">{h.solucao}</p>
-                       </td>
-                       <td className="px-8 py-6 text-right">
-                          <div className="flex flex-col items-end">
-                             <span className="font-display font-black text-[#1C1B1F]">R$ {h.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                             <span className="text-[9px] font-black text-black/20 uppercase tracking-tighter">Estimado Final</span>
-                          </div>
-                       </td>
-                       <td className="px-8 py-6 text-center">
-                          {h.status === 'Em Pactuação' ? (
-                             <div className="inline-flex flex-col items-center gap-1 animate-pulse">
-                                <span className="px-4 py-1.5 rounded-full bg-[#B3261E] text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
-                                   <ClockCounterClockwise size={12} weight="bold" />
-                                   EM PACTUAÇÃO
-                                </span>
-                             </div>
-                          ) : (
-                             <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                                h.status === 'Aprovado' ? 'bg-emerald-100 text-emerald-800' : 'bg-black/5 text-black/40'
-                             }`}>
-                                {h.status}
-                             </span>
-                          )}
-                       </td>
-                       <td className="px-8 py-6 text-center">
-                          <button className="p-2.5 rounded-xl hover:bg-[#EADDFF] text-[#6750A4] transition-all opacity-0 group-hover:opacity-100">
-                             <ArrowRight size={20} weight="bold" />
-                          </button>
-                       </td>
-                    </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-      </div>
-
-      <div className="flex justify-center items-center gap-2 text-[10px] font-black text-black/20 uppercase tracking-[2px]">
-         <Selection size={16} />
-         Dados Sincronizados com Base PERCATALICITA
+      {/* Nota de Compliance */}
+      <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex gap-4 items-start">
+        <Info size={24} weight="fill" className="text-amber-600 shrink-0" />
+        <p className="text-xs font-medium text-amber-800 leading-relaxed uppercase tracking-tight">
+          Os dados exibidos nesta tela foram migrados do sistema antigo e servem como **Referência de Planejamento**. Códigos de itens e regras de fiscalização podem ter sofrido alterações para o exercício de 2027 de acordo com a Lei 14.133.
+        </p>
       </div>
     </div>
   )
