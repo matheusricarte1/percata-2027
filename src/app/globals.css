@@ -158,3 +158,17 @@
     @apply absolute top-1 right-2 bg-[#B3261E] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-[var(--md-surface)];
   }
 }
+
+/* 4. Global Tactile Feedback */
+button, 
+[role="button"],
+a {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active, 
+[role="button"]:active,
+a:active {
+  transform: scale(0.96) translateY(2px) !important;
+  filter: brightness(0.9) contrast(1.1);
+}

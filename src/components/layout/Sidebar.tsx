@@ -19,11 +19,10 @@ import {
 } from '@phosphor-icons/react'
 import { useCarrinhoStore } from '@/store/carrinho'
 
-interface SidebarProps {
-  role?: 'usuario' | 'chefia' | 'admin'
+  role?: 'solicitante' | 'chefia' | 'admin'
 }
 
-export function Sidebar({ role = 'usuario' }: SidebarProps) {
+export function Sidebar({ role = 'solicitante' }: SidebarProps) {
   const pathname = usePathname()
   const itemCount = useCarrinhoStore((s) => s.items.length)
 
@@ -43,7 +42,7 @@ export function Sidebar({ role = 'usuario' }: SidebarProps) {
         <div className="space-y-2 flex-1">
           <SidebarLink href="/admin" icon={SquaresFour} label="Dashboard Geral" active={pathname === '/admin'} wide />
           <SidebarLink href="/admin/campanhas" icon={ChartLineUp} label="Calendário PCA" active={pathname === '/admin/campanhas'} wide />
-          <SidebarLink href="#" icon={CheckCircle} label="Consolidações" active={false} wide />
+          <SidebarLink href="/admin/consolidacao" icon={CheckCircle} label="Consolidações" active={pathname === '/admin/consolidacao'} wide />
           
           <div className="h-[1px] bg-white/10 my-4" />
           
@@ -150,6 +149,7 @@ function SidebarLink({
 
   // Rail View (Narrow)
   const isChefia = theme === 'chefia'
+  const isSolicitante = theme === 'solicitante' || !theme
   return (
     <Link
       href={href}

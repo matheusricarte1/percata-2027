@@ -15,6 +15,7 @@ import {
   WarningCircle,
   Hash
 } from '@phosphor-icons/react'
+import { toast } from 'sonner'
 import { useCarrinhoStore } from '@/store/carrinho'
 import { supabase } from '@/lib/supabase'
 import { clsx, type ClassValue } from 'clsx'
@@ -28,17 +29,50 @@ const categories = [
   { id: 'all', label: 'Tudo', icon: Queue },
   { id: 'Produto', label: 'Materiais', icon: PaintRoller },
   { id: 'Serviço', label: 'Serviços', icon: BookOpen },
+  { id: 'kits', label: 'Kits Prontos', icon: Package },
 ]
 
 export default function CatalogoPage() {
   const [selectedCat, setSelectedCat] = useState('all')
   const [products, setProducts] = useState<any[]>([])
+  const [kits, setKits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const { addItem, items } = useCarrinhoStore()
+  useEffect(() => {
+    async function fetchKits() {
+      if (selectedCat === 'kits') {
+        setLoading(true)
+        const { data } = await supabase.from('kits').select('*')
+        setKits(data || [])
+        setLoading(false)
+      }
+    }
+    fetchKits()
+  }, [selectedCat])
+
+  const addKitToCart = async (kitId: string) => {
+    const { data: items } = await supabase
+      .from('kit_items')
+      .select('*, catalogo(*)')
+      .eq('kit_id', kitId)
+    
+    if (items) {
+      items.forEach(ki => {
+        addItem({
+          codigo_tce: ki.catalogo.codigo_efisco,
+          descricao: ki.catalogo.descricao,
+          gnd: ki.catalogo.tipo === 'Serviço' ? '3.3.90.39' : '3.3.90.30',
+          unidade_medida: 'UN',
+          categoria_consumo: true
+        }, 'Kit Institucional')
+      })
+      toast.success(`${items.length} itens do kit adicionados ao carrinho!`)
+    }
+  }
 
   const PAGE_SIZE = 30
 
@@ -132,6 +166,34 @@ export default function CatalogoPage() {
           {loading && page === 0 ? (
             <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
               {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : selectedCat === 'kits' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {kits.map(kit => (
+                 <motion.div 
+                   key={kit.id} 
+                   initial={{ opacity: 0, scale: 0.95 }}
+                   animate={{ opacity: 1, scale: 1 }}
+                   className="bg-white border-2 border-[#1A237E]/5 p-8 rounded-[40px] shadow-sm hover:shadow-xl hover:border-[#1A237E]/20 transition-all group shrink-0"
+                 >
+                    <div className="flex justify-between items-start mb-6">
+                       <div className="w-14 h-14 bg-[#1A237E] text-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                          <Package size={28} weight="fill" />
+                       </div>
+                       <span className="bg-slate-100 text-slate-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{kit.categoria}</span>
+                    </div>
+                    <h3 className="text-xl font-black italic tracking-tighter uppercase text-[#1A237E] mb-2">{kit.nome}</h3>
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed mb-8 line-clamp-3">
+                       {kit.descricao || 'Este kit contém os itens essenciais homologados pela PROPLAN para esta atividade.'}
+                    </p>
+                    <Button 
+                      onClick={() => addKitToCart(kit.id)}
+                      className="w-full h-14 rounded-2xl bg-[#1A237E] text-white font-black uppercase italic tracking-tight hover:bg-[#1A237E]/90 shadow-xl shadow-indigo-100"
+                    >
+                       Adicionar Kit Completo
+                    </Button>
+                 </motion.div>
+               ))}
             </div>
           ) : products.length > 0 ? (
             <div className="space-y-10">

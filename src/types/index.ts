@@ -15,15 +15,12 @@ export type GND =
   | '4.4.90.51' // Obras e Instalações
 
 export type DFDStatus =
-  | 'rascunho'               // Criada pelo usuário, não enviada
-  | 'pendente_chefia'        // Enviada para triagem
-  | 'em_revisao_chefia'      // Chefia está editando / devolvendo
-  | 'devolvida'              // Chefia devolveu para o solicitante corrigir
-  | 'aprovada_chefia'        // Chefia aprovou e hierarquizou
-  | 'pendente_admin'         // Na mesa do Admin/Planejamento
-  | 'em_consolidacao'        // Admin está agrupando no PCA
-  | 'aprovada_pca'           // Incluída no PCA / LOA
-  | 'rejeitada'              // Rejeitada em qualquer nível
+  | 'rascunho'   // Criada pelo usuário, não enviada
+  | 'triagem'    // Enviada para análise da chefia
+  | 'devolvida'  // Devolvida para correção pelo usuário
+  | 'aprovada'   // Homologada pela chefia
+  | 'pactuando'  // Em consolidação pelo Admin no PCA
+  | 'concluida'  // Processo finalizado
 
 export type ItemPrioridade = 'essencial' | 'estratégica' | 'desejável' | 'opcional'
 

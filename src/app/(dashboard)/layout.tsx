@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { UserNav } from '@/components/layout/UserNav'
 import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
@@ -11,7 +12,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [role, setRole] = useState<'usuario' | 'chefia' | 'admin'>('usuario')
+  const router = useRouter()
+  const [role, setRole] = useState<'solicitante' | 'chefia' | 'admin'>('solicitante')
   const [email, setEmail] = useState('')
 
   useEffect(() => {
@@ -19,18 +21,25 @@ export default function DashboardLayout({
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setEmail(user.email || '')
-        // LOGICA DE HARDCODE PARA ADMIN MESTRE
+        
+        // 1. Busca perfil completo
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, campus_id')
+          .eq('id', user.id)
+          .single()
+
+        // 2. Verifica Onboarding
+        if (!profile?.campus_id && window.location.pathname !== '/onboarding') {
+          router.push('/onboarding')
+          return
+        }
+
+        // 3. Define Role
         if (user.email === 'matheus.ricarte@upe.br') {
           setRole('admin')
-        } else {
-          // Busca no banco se não for o admin mestre
-          const { data } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-          
-          if (data?.role) setRole(data.role as any)
+        } else if (profile?.role) {
+          setRole(profile.role as any)
         }
       }
     }
@@ -38,10 +47,28 @@ export default function DashboardLayout({
   }, [])
 
   const titles: any = {
-    usuario: 'Painel do Solicitante',
+    solicitante: 'Painel do Solicitante',
     chefia: 'Triagem de Setor',
     admin: 'Painel Estratégico PROPLAN'
   }
+
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    async function getNotifications() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('read', false)
+        
+        setUnreadCount(count || 0)
+      }
+    }
+    getNotifications()
+  }, [])
 
   return (
     <div className="flex min-h-screen">
@@ -64,9 +91,13 @@ export default function DashboardLayout({
                />
             </div>
             
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 transition-colors relative mr-2">
+            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 transition-colors relative mr-2 text-black/60">
                <Bell size={24} />
-               <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
+               {unreadCount > 0 && (
+                 <div className="absolute top-2.5 right-2.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black text-white">
+                   {unreadCount}
+                 </div>
+               )}
             </button>
             
             <UserNav />
