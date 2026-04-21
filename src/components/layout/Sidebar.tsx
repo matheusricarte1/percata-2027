@@ -19,6 +19,7 @@ import {
 } from '@phosphor-icons/react'
 import { useCarrinhoStore } from '@/store/carrinho'
 
+interface SidebarProps {
   role?: 'solicitante' | 'chefia' | 'admin'
 }
 
