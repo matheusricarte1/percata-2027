@@ -8,17 +8,13 @@ import {
   Files,
   Package,
   ClockCounterClockwise,
-  Scales,
-  ChartBar,
-  Lightning,
   SignOut,
-  PuzzlePiece,
+  Lightning,
   Gear,
   CheckCircle,
   Wallet,
   SquaresFour,
   Users,
-  Database,
   ChartLineUp,
 } from '@phosphor-icons/react'
 import { useCarrinhoStore } from '@/store/carrinho'
@@ -46,17 +42,16 @@ export function Sidebar({ role = 'usuario' }: SidebarProps) {
 
         <div className="space-y-2 flex-1">
           <SidebarLink href="/admin" icon={SquaresFour} label="Dashboard Geral" active={pathname === '/admin'} wide />
-          <SidebarLink href="/admin/aprovacoes" icon={CheckCircle} label="Aprovações (DFD)" active={pathname === '/admin/aprovacoes'} badge="12" wide />
-          <SidebarLink href="#" icon={ChartLineUp} label="Planejamento PCA" active={false} wide />
+          <SidebarLink href="/admin/campanhas" icon={ChartLineUp} label="Calendário PCA" active={pathname === '/admin/campanhas'} wide />
+          <SidebarLink href="#" icon={CheckCircle} label="Consolidações" active={false} wide />
           
           <div className="h-[1px] bg-white/10 my-4" />
           
           <div className="text-[10px] uppercase text-white/40 font-bold tracking-widest mb-3 px-3">
-            Cadastros Base
+            Gestão Sistema
           </div>
           
-          <SidebarLink href="#" icon={Package} label="Inventário Central" active={false} wide />
-          <SidebarLink href="#" icon={Users} label="Usuários & Níveis" active={false} wide />
+          <SidebarLink href="/admin/usuarios" icon={Users} label="Servidores & Níveis" active={pathname === '/admin/usuarios'} wide />
           <SidebarLink href="#" icon={Gear} label="Configurações" active={false} wide />
         </div>
 
@@ -77,9 +72,9 @@ export function Sidebar({ role = 'usuario' }: SidebarProps) {
         </div>
 
         <div className="flex-1 w-full flex flex-col items-center gap-4">
-          <SidebarLink href="/triagem" icon={SquaresFour} label="Painel" active={pathname === '/triagem'} theme="chefia" />
-          <SidebarLink href="#" icon={CheckCircle} label="Aprovar Equipe" active={false} theme="chefia" badge="4" />
-          <SidebarLink href="#" icon={Wallet} label="Orçamento" active={false} theme="chefia" />
+          <SidebarLink href="/triagem" icon={SquaresFour} label="Aprovações" active={pathname === '/triagem'} theme="chefia" badge="3" />
+          <SidebarLink href="/triagem/orcamento" icon={Wallet} label="Orçamento" active={pathname === '/triagem/orcamento'} theme="chefia" />
+          <SidebarLink href="#" icon={ChartLineUp} label="Relatórios" active={false} theme="chefia" />
         </div>
 
         <button className="flex flex-col items-center gap-1 p-2 mt-auto text-emerald-800/60 hover:text-emerald-800">
@@ -93,16 +88,17 @@ export function Sidebar({ role = 'usuario' }: SidebarProps) {
   // -- USUARIO NAV RAIL (80px) --
   return (
     <nav className="nav-rail">
-      <div className="w-12 h-12 mb-10 flex items-center justify-center rounded-xl bg-[var(--md-primary-container)] text-[var(--md-primary)] shadow-sm">
+      <div className="w-12 h-12 mb-10 flex items-center justify-center rounded-xl bg-[#EADDFF] text-[#4F378B] shadow-sm">
         <Lightning size={24} weight="bold" />
       </div>
 
       <div className="flex-1 w-full flex flex-col items-center gap-2">
         <SidebarLink href="/dashboard" icon={House} label="Início" active={pathname === '/dashboard'} />
         <SidebarLink href="/minhas-dfds" icon={Files} label="Pedidos" active={pathname === '/minhas-dfds'} />
+        <SidebarLink href="/nova-dfd" icon={Gear} label="Nova DFD" active={pathname === '/nova-dfd'} />
         <SidebarLink href="/catalogo" icon={Package} label="Catálogo" active={pathname === '/catalogo'} badge={itemCount > 0 ? itemCount.toString() : null} />
         <div className="w-8 h-[1px] bg-black/5 my-2" />
-        <SidebarLink href="/historico" icon={ClockCounterClockwise} label="2025" active={pathname === '/historico'} />
+        <SidebarLink href="/historico" icon={ClockCounterClockwise} label="Histórico" active={pathname === '/historico'} />
       </div>
 
       <button className="nav-rail-item mt-auto hover:bg-red-50 hover:text-red-600">
@@ -136,12 +132,12 @@ function SidebarLink({
         href={href}
         className={cn(
           'flex items-center justify-between p-3.5 rounded-xl transition-all duration-200 group',
-          active ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+          active ? 'bg-white/20 text-white shadow-inner' : 'text-white/70 hover:bg-white/10 hover:text-white'
         )}
       >
         <div className="flex items-center gap-3">
-          <Icon size={22} weight={active ? 'fill' : 'regular'} />
-          <span className={cn('text-sm font-medium', active ? 'font-semibold' : '')}>{label}</span>
+          <Icon size={22} weight={active ? 'fill' : 'bold'} />
+          <span className={cn('text-sm font-black uppercase tracking-widest text-[10px]', active ? 'text-white' : 'text-white/60 group-hover:text-white')}>{label}</span>
         </div>
         {badge && (
           <span className="bg-[#FF5252] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -172,10 +168,10 @@ function SidebarLink({
           {badge}
         </span>
       )}
-      <Icon size={24} weight={active ? 'fill' : 'regular'} />
+      <Icon size={24} weight={active ? 'fill' : 'bold'} />
       <span className={cn(
-        'text-[10px] mt-1 font-medium text-center leading-tight',
-        active ? 'font-bold' : ''
+        'text-[10px] mt-1 font-black uppercase tracking-tighter text-center leading-tight',
+        active ? 'opacity-100' : 'opacity-40'
       )}>
         {label}
       </span>
