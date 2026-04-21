@@ -17,7 +17,7 @@ import {
 } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, DfdCardSkeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -107,7 +107,9 @@ export default function MinhasDFDs() {
       {/* Lista de DFDs */}
       <div className="grid grid-cols-1 gap-4">
         {loading ? (
-          [1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-[32px]" />)
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => <DfdCardSkeleton key={i} />)}
+          </div>
         ) : (
           dfds.map((dfd, i) => {
             const status = statusMap[dfd.status] || statusMap.rascunho

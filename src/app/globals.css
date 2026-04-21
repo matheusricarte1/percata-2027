@@ -47,29 +47,41 @@
   --md-surface-variant: #E7E0EC;
   --md-outline: #79747E;
 
-  /* --- Custom Aesthetics (from dashboard.html) --- */
+  /* --- M3 Elevation Levels --- */
+  --elevation-0: 0 0 0 0 rgba(0,0,0,0);
+  --elevation-1: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+  --elevation-2: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+  --elevation-3: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  --elevation-4: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  --elevation-5: 0 35px 60px -15px rgba(0,0,0,0.3);
+
+  /* --- Custom Aesthetics --- */
   --bg-gradient: linear-gradient(135deg, #fdfbfb 0%, #ebebeb 100%);
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  --glass-shadow: var(--elevation-1);
   
+  /* --- Motion Tokens --- */
+  --spring-duration: 0.3s;
+  --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   /* Shadcn Overrides */
   --background: #fdfbfb;
   --foreground: #1D1B20;
-  --card: rgba(255, 255, 255, 0.7);
+  --card: rgba(255, 255, 255, 1);
   --card-foreground: #1D1B20;
   --primary: #4F378B;
   --primary-foreground: #FFFFFF;
   --secondary: #625B71;
   --secondary-foreground: #FFFFFF;
-  --muted: #E7E0EC;
-  --muted-foreground: #79747E;
+  --muted: #F3EDF7;
+  --muted-foreground: #625B71;
   --accent: #EADDFF;
   --accent-foreground: #21005D;
-  --border: rgba(0, 0, 0, 0.05);
-  --input: #E7E0EC;
-  --ring: #4F378B;
-  --radius: 1rem;
+  --border: rgba(0, 0, 0, 0.08);
+  --input: #F3EDF7;
+  --ring: #6750A4;
+  --radius: 1.5rem;
 }
 
 /* Base resets */
@@ -84,39 +96,43 @@
 }
 
 @layer components {
-  /* --- Navigation Rail (80px) --- */
+  /* --- Professional Utilities --- */
+  .living-border {
+    @apply border border-black/5 hover:border-primary/20 transition-colors duration-300;
+  }
+
+  /* --- Navigation Rail --- */
   .nav-rail {
     @apply w-20 bg-[var(--md-surface)] flex flex-col items-center py-6 fixed left-0 top-0 h-full z-50 border-r border-black/5;
   }
   
   .nav-rail-item {
-    @apply w-14 h-14 flex flex-col items-center justify-center mb-4 rounded-2xl cursor-pointer text-[var(--md-secondary)] transition-all duration-300 relative no-underline;
+    @apply w-14 h-14 flex flex-col items-center justify-center mb-4 rounded-3xl cursor-pointer text-[var(--md-secondary)] transition-all duration-300 relative no-underline;
   }
   
   .nav-rail-item span {
-    @apply text-[10px] mt-1 font-medium;
+    @apply text-[10px] mt-1 font-bold uppercase tracking-tighter;
   }
   
   .nav-rail-item:hover {
-    @apply bg-[var(--md-surface-variant)];
+    @apply bg-[var(--md-surface-variant)] scale-110;
   }
   
   .nav-rail-item.active {
-    @apply bg-[var(--md-primary-container)] text-[var(--md-primary)];
+    @apply bg-[var(--md-primary-container)] text-[var(--md-primary)] shadow-[var(--elevation-2)];
   }
 
   /* --- Glass Cards --- */
   .glass-card {
     background: var(--glass-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border: 1px solid var(--glass-border);
-    border-radius: 24px;
-    @apply shadow-[var(--glass-shadow)] transition-all duration-300 overflow-hidden p-6;
+    @apply shadow-[var(--elevation-1)] transition-all duration-300 overflow-hidden p-6 rounded-[40px];
   }
   
   .glass-card:hover {
-    @apply -translate-y-1 shadow-[0_12px_40px_0_rgba(31,38,135,0.1)];
+    @apply -translate-y-1 shadow-[var(--elevation-3)];
   }
 
   /* --- App Bar --- */
@@ -130,8 +146,7 @@
   /* --- Carousel --- */
   .hero-carousel {
     background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
-    border-radius: 24px;
-    @apply p-8 relative overflow-hidden min-h-[160px] flex items-center shadow-[0_10px_20px_rgba(132,250,176,0.2)] text-[#0f4c3a];
+    @apply p-8 relative overflow-hidden min-h-[160px] flex items-center shadow-[var(--elevation-2)] text-[#0f4c3a] rounded-[40px];
   }
   
   .hero-carousel::after {
@@ -147,11 +162,11 @@
 
   /* --- Buttons --- */
   .btn-m3-primary {
-    @apply bg-[var(--md-primary)] text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 transition-all duration-300 shadow-[0_4px_10px_rgba(79,55,139,0.2)];
+    @apply bg-[var(--md-primary)] text-white px-8 py-4 rounded-3xl font-black uppercase tracking-tight italic flex items-center gap-3 transition-all duration-300 shadow-[var(--elevation-2)];
   }
   
   .btn-m3-primary:hover {
-    @apply bg-[#3B2868] -translate-y-0.5 shadow-[0_6px_15px_rgba(79,55,139,0.3)];
+    @apply bg-[#3B2868] -translate-y-1 shadow-[var(--elevation-4)];
   }
 
   .badge-m3 {
@@ -159,16 +174,22 @@
   }
 }
 
-/* 4. Global Tactile Feedback */
+/* 4. Global Tactile Feedback (V2 - Spring Based) */
 button, 
 [role="button"],
 a {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--spring-duration) var(--spring-bounce);
+  outline: none;
 }
 
-button:active, 
+button:active:not(:disabled), 
 [role="button"]:active,
 a:active {
-  transform: scale(0.96) translateY(2px) !important;
-  filter: brightness(0.9) contrast(1.1);
+  transform: scale(0.94) translateY(2px) !important;
+  filter: brightness(0.92);
+}
+
+button:focus-visible,
+a:focus-visible {
+  @apply ring-4 ring-primary/30 ring-offset-2;
 }

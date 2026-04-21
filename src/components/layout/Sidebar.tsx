@@ -54,7 +54,10 @@ export function Sidebar({ role = 'solicitante' }: SidebarProps) {
           <SidebarLink href="#" icon={Gear} label="Configurações" active={false} wide />
         </div>
 
-        <button className="flex items-center gap-3 p-3 mt-auto text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+        <button 
+          aria-label="Sair do sistema"
+          className="flex items-center gap-3 p-3 mt-auto text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+        >
           <SignOut size={22} />
           <span className="font-medium">Sair</span>
         </button>
@@ -129,6 +132,7 @@ function SidebarLink({
     return (
       <Link
         href={href}
+        aria-label={label}
         className={cn(
           'flex items-center justify-between p-3.5 rounded-xl transition-all duration-200 group',
           active ? 'bg-white/20 text-white shadow-inner' : 'text-white/70 hover:bg-white/10 hover:text-white'

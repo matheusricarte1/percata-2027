@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner'
 import { useCarrinhoStore } from '@/store/carrinho'
 import { supabase } from '@/lib/supabase'
+import { Skeleton, ProductSkeleton } from '@/components/ui/skeleton'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -165,7 +166,7 @@ export default function CatalogoPage() {
         <AnimatePresence mode="wait">
           {loading && page === 0 ? (
             <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-6 gap-4 space-y-4">
-              {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
+              {[...Array(12)].map((_, i) => <ProductSkeleton key={i} />)}
             </div>
           ) : selectedCat === 'kits' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -240,15 +241,6 @@ export default function CatalogoPage() {
   )
 }
 
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-3xl p-4 h-[120px] border border-black/5 animate-pulse flex flex-col gap-2 break-inside-avoid">
-       <div className="h-3 bg-black/5 rounded-full w-1/2" />
-       <div className="h-4 bg-black/5 rounded-xl w-full" />
-       <div className="h-4 bg-black/5 rounded-xl w-3/4" />
-    </div>
-  )
-}
 
 function ProductCard({ product, index }: { product: any, index: number }) {
   const { addItem, items } = useCarrinhoStore()
