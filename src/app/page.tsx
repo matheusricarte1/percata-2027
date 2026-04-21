@@ -21,6 +21,17 @@ import { Button } from '@/components/ui/button'
 export default function LandingPage() {
   const router = useRouter()
 
+  // Auto-redirect if already logged in
+  React.useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.push('/dashboard')
+      }
+    }
+    checkSession()
+  }, [router])
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     // Simulated login redirect
