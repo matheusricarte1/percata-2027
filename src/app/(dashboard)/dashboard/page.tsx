@@ -15,7 +15,8 @@ import {
   Clock,
   Stack,
   ArrowClockwise,
-  CaretRight
+  CaretRight,
+  Buildings
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
