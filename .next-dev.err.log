@@ -1,0 +1,228 @@
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+'CustomElementRegistry' already has "md-elevation" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-focus-ring" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-ripple" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-elevated-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-tonal-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-text-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-checkbox" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-assist-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-chip-set" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filter-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-input-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-suggestion-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-divider" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-dialog" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-branded-fab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-fab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-icon" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-tonal-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-list" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-item" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-list-item" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-menu" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-menu-item" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-sub-menu" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-circular-progress" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-linear-progress" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-radio" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-select" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-select" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-select-option" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-slider" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-switch" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-primary-tab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-secondary-tab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-tabs" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-text-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-text-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+Multiple versions of Lit loaded. Loading multiple versions is not recommended. See https://lit.dev/msg/multiple-versions for more information.
+'CustomElementRegistry' already has "md-elevation" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-focus-ring" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-ripple" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-elevated-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-tonal-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-text-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-checkbox" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-assist-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-chip-set" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filter-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-input-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-suggestion-chip" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-divider" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-dialog" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-branded-fab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-fab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-icon" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-tonal-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-icon-button" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-list" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-item" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-list-item" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-menu" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-menu-item" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-sub-menu" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-circular-progress" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-linear-progress" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-radio" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-select" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-select" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-select-option" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-slider" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-switch" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-primary-tab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-secondary-tab" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-tabs" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-filled-text-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+'CustomElementRegistry' already has "md-outlined-text-field" defined. This may have been caused by live reload or hot module replacement in which case it can be safely ignored.
+Make sure to test your application with a production build as repeat registrations will throw in production.
+[browser] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+[browser] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+[browser] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.

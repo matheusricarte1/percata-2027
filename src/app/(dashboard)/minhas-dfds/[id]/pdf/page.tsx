@@ -1,173 +1,328 @@
-'use client'
+"use client";
 
-import { useParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { Printer, ArrowLeft } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Printer, ArrowLeft, SealCheck } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { resolveCampusBranding } from "@/lib/campus-branding";
+import { fetchActiveCycleYear } from "@/lib/cycle";
+import QRCode from "qrcode";
+
+type DfdRow = {
+  id: string;
+  numero_protocolo?: string | null;
+  objeto_contratacao?: string | null;
+  justificativa_contratacao?: string | null;
+  justificativa_quantidade?: string | null;
+  previsao_recebimento?: string | null;
+  status?: string | null;
+  campus?: string | null;
+  campus_id?: string | null;
+  created_at?: string | null;
+  profiles?: { full_name?: string | null; email?: string | null } | null;
+  campi?: { nome?: string | null; sigla?: string | null } | null;
+};
 
 export default function DfdPdfPage() {
-  const { id } = useParams()
-  const [dfd, setDfd] = useState<any>(null)
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { id } = useParams<{ id: string }>();
+  const [dfd, setDfd] = useState<DfdRow | null>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [signature, setSignature] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [setorNome, setSetorNome] = useState("");
+  const [cycleYear, setCycleYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
     async function fetchData() {
-      const { data: dfdData } = await supabase
-        .from('dfds')
-        .select('*, campi(nome, sigla), profiles:solicitante_id(full_name, email)')
-        .eq('id', id)
-        .single()
-      
-      const { data: itemsData } = await supabase
-        .from('dfd_items')
-        .select('*')
-        .eq('dfd_id', id)
-      
-      setDfd(dfdData)
-      setItems(itemsData || [])
-      setLoading(false)
-    }
-    fetchData()
-  }, [id])
+      try {
+        const { data: rawDfdData, error: dfdError } = await supabase
+          .from("dfds")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-  if (loading) return <div className="p-20 text-center font-bold">Gerando Documento...</div>
+        if (dfdError) throw dfdError;
+
+        const [profileResult, campusResult, signatureResult, deptResult, labResult] = await Promise.all([
+          rawDfdData?.solicitante_id
+            ? supabase
+                .from("profiles")
+                .select("full_name, email")
+                .eq("id", rawDfdData.solicitante_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null } as any),
+          rawDfdData?.campus_id
+            ? supabase
+                .from("campi")
+                .select("nome, sigla")
+                .eq("id", rawDfdData.campus_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null } as any),
+          fetch(`/api/dfd/signature?id=${encodeURIComponent(String(id || ""))}`).then(async (res) => {
+            const payload = await res.json().catch(() => null);
+            if (!res.ok) {
+              return { error: payload?.error || "Não foi possível gerar a assinatura da DFD." };
+            }
+            return payload;
+          }),
+          rawDfdData?.unidade_id
+            ? supabase
+                .from("departamentos")
+                .select("nome")
+                .eq("id", rawDfdData.unidade_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null } as any),
+          rawDfdData?.unidade_id
+            ? supabase
+                .from("laboratorios")
+                .select("nome")
+                .eq("id", rawDfdData.unidade_id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null } as any),
+        ]);
+
+        if (profileResult.error) throw profileResult.error;
+        if (campusResult.error) throw campusResult.error;
+        if (deptResult.error) throw deptResult.error;
+        if (labResult.error) throw labResult.error;
+
+        const dfdData: DfdRow = {
+          ...rawDfdData,
+          profiles: profileResult.data || null,
+          campi: campusResult.data || null,
+        };
+
+        const { data: itemsData, error: itemsError } = await supabase
+          .from("dfd_items")
+          .select("*")
+          .eq("dfd_id", id);
+
+        if (itemsError) throw itemsError;
+
+        setDfd(dfdData);
+        setItems(itemsData || []);
+        setSetorNome(
+          deptResult.data?.nome ||
+            labResult.data?.nome ||
+            rawDfdData?.local_de_uso ||
+            itemsData?.find((item: any) => item.local_uso)?.local_uso ||
+            "",
+        );
+
+        const sig = String(signatureResult?.signature || "");
+        setSignature(sig);
+        try {
+          const year = await fetchActiveCycleYear();
+          setCycleYear(year);
+        } catch {
+          // fallback local year
+        }
+
+        const verificationUrl = String(signatureResult?.verificationUrl || "");
+        if (sig && verificationUrl) {
+          const qr = await QRCode.toDataURL(verificationUrl, {
+            width: 104,
+            margin: 1,
+            color: { dark: "#164073", light: "#FFFFFF" },
+          });
+          setQrDataUrl(qr);
+        } else if (signatureResult?.error) {
+          toast.error(`Erro na assinatura da DFD: ${signatureResult.error}`);
+          setQrDataUrl("");
+        } else {
+          setQrDataUrl("");
+        }
+      } catch (error: any) {
+        toast.error("Erro ao carregar PDF da DFD: " + error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [id]);
+
+  const total = useMemo(
+    () =>
+      items.reduce(
+        (acc, item) => acc + Number(item.quantidade || 0) * Number(item.valor_unitario_estimado || 0),
+        0,
+      ),
+    [items],
+  );
+
+  if (loading || !dfd) {
+    return (
+      <div className="p-20 text-center">
+        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#5B6675]">
+          Gerando documento...
+        </p>
+      </div>
+    );
+  }
+
+  const campusName = dfd.campi?.nome || dfd.campi?.sigla || dfd.campus || "Campus UPE";
+  const branding = resolveCampusBranding(campusName);
 
   return (
-    <div className="bg-slate-50 min-h-screen p-0 md:p-10 flex flex-col items-center">
-      <div className="w-full max-w-4xl flex justify-between mb-6 no-print">
-         <Button variant="ghost" onClick={() => window.history.back()} className="font-bold">
-            <ArrowLeft size={20} className="mr-2" /> Voltar
-         </Button>
-         <Button onClick={() => window.print()} className="bg-slate-900 text-white font-bold">
-            <Printer size={20} className="mr-2" /> Imprimir / Salvar PDF
-         </Button>
+    <div className="min-h-screen bg-[#F4F7FA] p-0 md:p-8 flex flex-col items-center">
+      <div className="no-print mb-4 flex w-full max-w-5xl justify-between">
+        <Button variant="ghost" onClick={() => window.history.back()} className="font-semibold">
+          <ArrowLeft size={18} className="mr-2" /> Voltar
+        </Button>
+        <Button onClick={() => window.print()} className="bg-[#164073] text-white font-semibold hover:bg-[#0F2E57]">
+          <Printer size={18} className="mr-2" /> Imprimir / Salvar PDF
+        </Button>
       </div>
 
-      <div className="bg-white w-full max-w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl print:shadow-none print:p-0">
-        {/* Header Institucional */}
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-10">
-           <div className="space-y-1">
-              <h1 className="text-2xl font-black tracking-tighter">UNIVERSIDADE DE PERNAMBUCO</h1>
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{dfd.campi?.nome || 'Campus Regional'}</p>
-              <p className="text-xs font-medium text-slate-400">Sistema de Planejamento PERCATA 2027</p>
-           </div>
-           <div className="text-right">
-              <div className="bg-slate-900 text-white px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest mb-2">
-                 Documento Oficial
-              </div>
-              <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tighter">PROT: {dfd.id.slice(0, 8)}</p>
-           </div>
-        </div>
+      <div className="w-full max-w-[210mm] min-h-[297mm] bg-white p-[16mm] shadow-2xl print:shadow-none print:p-0">
+        <header className="rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+                PERCATA
+              </p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#164073]">
+                Ciclo {cycleYear}
+              </p>
+              <h1 className="mt-1 text-2xl font-semibold text-[#164073]">
+                {dfd.numero_protocolo || `DFD-${String(dfd.id).slice(0, 8).toUpperCase()}`}
+              </h1>
+              <p className="mt-1 text-xs text-[#5B6675]">
+                {dfd.created_at
+                  ? new Date(dfd.created_at).toLocaleDateString("pt-BR")
+                  : "Data não informada"}
+              </p>
+            </div>
+            <img
+              src={branding.logoSrc}
+              alt={branding.label}
+              className="h-[52px] w-auto object-contain"
+            />
+          </div>
+        </header>
 
-        {/* Título */}
-        <div className="text-center mb-12">
-           <h2 className="text-xl font-black uppercase tracking-tight">Documento de Formalização de Demanda (DFD)</h2>
-           <p className="text-sm font-bold text-slate-400 mt-1 italic">Processo de Planejamento e Consolidação Anual</p>
-        </div>
+        <section className="mt-5 grid grid-cols-2 gap-4">
+          <SmallInfo label="Solicitante" value={dfd.profiles?.full_name || "Não informado"} />
+          <SmallInfo label="E-mail" value={dfd.profiles?.email || "Não informado"} />
+          <SmallInfo label="Campus" value={campusName} />
+          <SmallInfo label="Setor / Local de uso" value={setorNome || "Não informado"} />
+          <SmallInfo
+            label="Previsão de recebimento"
+            value={
+              dfd.previsao_recebimento
+                ? new Date(dfd.previsao_recebimento).toLocaleDateString("pt-BR")
+                : "Não informada"
+            }
+          />
+        </section>
 
-        {/* Dados Gerais */}
-        <div className="grid grid-cols-2 gap-10 mb-12 text-sm">
-           <div className="space-y-4">
-              <div>
-                 <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Objeto da Contratação</h4>
-                 <p className="font-bold text-slate-800 leading-tight mt-1">{dfd.objeto_contratacao}</p>
-              </div>
-              <div>
-                 <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Justificativa Estratégica</h4>
-                 <p className="text-slate-600 mt-1 text-xs leading-relaxed">{dfd.justificativa_contratacao}</p>
-              </div>
-           </div>
-           <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Data Prevista</h4>
-                    <p className="font-bold text-slate-800 mt-1">{new Date(dfd.previsao_recebimento).toLocaleDateString('pt-BR')}</p>
-                 </div>
-                 <div>
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Status Atual</h4>
-                    <p className="font-bold text-emerald-600 uppercase mt-1">{dfd.status}</p>
-                 </div>
-              </div>
-              <div>
-                 <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Responsável</h4>
-                 <p className="font-bold text-slate-800 mt-1 uppercase">{dfd.profiles?.full_name}</p>
-                 <p className="text-xs text-slate-400">{dfd.profiles?.email}</p>
-              </div>
-           </div>
-        </div>
+        <section className="mt-5 rounded-2xl border border-[#D9E0E8] p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+            Objeto da Contratação
+          </h2>
+          <p className="mt-2 text-base font-semibold text-[#164073]">
+            {dfd.objeto_contratacao || "Sem objeto informado"}
+          </p>
 
-        {/* Quadro de Itens */}
-        <div className="mb-12">
-           <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Detalhamento dos Itens</h4>
-           <table className="w-full text-xs border-collapse">
-              <thead>
-                 <tr className="bg-slate-50 text-slate-400 uppercase text-[9px] font-black tracking-widest">
-                    <th className="p-3 text-left border border-slate-100">Cód (SIAD)</th>
-                    <th className="p-3 text-left border border-slate-100">Descrição do Item</th>
-                    <th className="p-3 text-center border border-slate-100">Qtd</th>
-                    <th className="p-3 text-right border border-slate-100">V. Unit</th>
-                    <th className="p-3 text-right border border-slate-100">V. Total</th>
-                 </tr>
-              </thead>
-              <tbody>
-                 {items.map((item) => (
-                    <tr key={item.id} className="text-slate-700">
-                       <td className="p-3 border border-slate-100 font-mono font-bold text-[10px]">{item.codigo_tce}</td>
-                       <td className="p-3 border border-slate-100 font-bold leading-tight uppercase text-[10px]">{item.descricao}</td>
-                       <td className="p-3 border border-slate-100 text-center font-bold">{item.quantidade}</td>
-                       <td className="p-3 border border-slate-100 text-right">R$ {Number(item.valor_unitario_estimado).toLocaleString('pt-BR')}</td>
-                       <td className="p-3 border border-slate-100 text-right font-black">R$ {(item.quantidade * item.valor_unitario_estimado).toLocaleString('pt-BR')}</td>
-                    </tr>
-                 ))}
-              </tbody>
-              <tfoot>
-                 <tr className="bg-slate-900 text-white font-black italic">
-                    <td colSpan={4} className="p-3 text-right uppercase tracking-tighter">Valor Total da Demanda</td>
-                    <td className="p-3 text-right text-lg">R$ {items.reduce((acc, i) => acc + (i.quantidade * i.valor_unitario_estimado), 0).toLocaleString('pt-BR')}</td>
-                 </tr>
-              </tfoot>
-           </table>
-        </div>
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+            Justificativa
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed text-[#3E4C5F]">
+            {dfd.justificativa_contratacao || "Sem justificativa cadastrada."}
+          </p>
+        </section>
 
-        {/* Justificativa de Quantidade */}
-        <div className="mb-16 p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-           <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Diferencial de Quantitativo</h4>
-           <p className="text-xs text-slate-500 leading-relaxed italic">
-              {dfd.justificativa_quantidade || 'Memória de cálculo baseada na média de consumo histórico e previsão de novas turmas.'}
-           </p>
-        </div>
+        <section className="mt-5 rounded-2xl border border-[#D9E0E8] overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-[#E8EDF2] text-[#164073] uppercase tracking-[0.12em]">
+                <th className="p-2 text-left">Código</th>
+                <th className="p-2 text-left">Descrição</th>
+                <th className="p-2 text-center">Qtd</th>
+                <th className="p-2 text-right">Unitário</th>
+                <th className="p-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-t border-[#E8EDF2]">
+                  <td className="p-2 font-mono text-[11px]">{item.codigo_tce || "-"}</td>
+                  <td className="p-2 text-[#2E3A4A]">{item.descricao}</td>
+                  <td className="p-2 text-center">{item.quantidade}</td>
+                  <td className="p-2 text-right">
+                    {Number(item.valor_unitario_estimado || 0).toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
+                  </td>
+                  <td className="p-2 text-right font-semibold text-[#164073]">
+                    {(
+                      Number(item.quantidade || 0) *
+                      Number(item.valor_unitario_estimado || 0)
+                    ).toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="flex justify-between border-t border-[#D9E0E8] bg-[#F4F7FA] p-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5B6675]">
+              Valor Total da Demanda
+            </span>
+            <span className="text-lg font-semibold text-[#164073]">
+              {total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </span>
+          </div>
+        </section>
 
-        {/* Assinaturas */}
-        <div className="grid grid-cols-2 gap-20 pt-10 mt-auto">
-           <div className="text-center border-t border-slate-300 pt-4">
-              <p className="text-[10px] font-black uppercase tracking-widest">{dfd.profiles?.full_name}</p>
-              <p className="text-[8px] text-slate-400 uppercase">Solicitante</p>
-              <p className="text-[7px] font-mono text-slate-300 mt-2">HASH: {dfd.id.slice(0, 16)}...</p>
-           </div>
-           <div className="text-center border-t border-slate-300 pt-4">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-20">Assinatura da Chefia</p>
-              <p className="text-[8px] text-slate-400 uppercase">Homologação Técnica</p>
-           </div>
-        </div>
-
-        {/* Rodapé Administrativo */}
-        <div className="mt-20 border-t border-slate-100 pt-6 flex justify-between items-center text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em]">
-           <span>Emitido via PERCATA 2027</span>
-           <span>Pág 01 de 01</span>
-           <span className="font-mono">{new Date().toLocaleString('pt-BR')}</span>
-        </div>
+        <section className="mt-8 rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073]">
+              <SealCheck size={14} />
+              Assinatura criptográfica
+            </p>
+            <p className="mt-1 text-[10px] text-[#5B6675] break-all">
+              {signature || "assinatura indisponível"}
+            </p>
+          </div>
+          {qrDataUrl ? (
+            <img
+              src={qrDataUrl}
+              alt="QR Code de verificação de autenticidade"
+              className="h-[104px] w-[104px] rounded-md border border-[#D9E0E8] bg-white p-1"
+            />
+          ) : null}
+        </section>
       </div>
 
       <style jsx global>{`
         @media print {
-          .no-print { display: none !important; }
-          body { background: white !important; padding: 0 !important; }
-          .bg-slate-50 { background: white !important; }
-          .shadow-2xl { shadow: none !important; }
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background: white !important;
+            padding: 0 !important;
+          }
         }
       `}</style>
     </div>
-  )
+  );
+}
+
+function SmallInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-[#2E3A4A]">{value}</p>
+    </div>
+  );
 }

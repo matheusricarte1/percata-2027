@@ -1,50 +1,52 @@
-'use client'
+"use client";
 
-import { Sidebar } from '@/components/layout/Sidebar'
-import { UserNav } from '@/components/layout/UserNav'
-import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
+import { useEffect, useState } from "react";
+import { AppShell } from "@/components/layout/AppShell";
+import { ShellLoading } from "@/components/layout/ShellLoading";
+import { getSafeUser, supabase } from "@/lib/supabase";
+import { normalizeRole } from "@/lib/access";
 
 export default function AdminLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <div className="flex min-h-screen" style={{ '--sidebar-width': '260px' } as any}>
-      <Sidebar role="admin" />
-      
-      <main className="flex-1 ml-[260px] flex flex-col h-screen overflow-hidden">
-        {/* App Bar */}
-        <header className="app-bar">
-          <div className="font-display font-semibold text-xl">
-             Painel de Administração
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="bg-[var(--md-surface-variant)] rounded-full h-10 px-4 flex items-center gap-3 w-64 focus-within:w-80 focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--md-primary-container)] transition-all duration-300">
-               <MagnifyingGlass size={20} className="text-[var(--md-secondary)]" />
-               <input 
-                 type="text" 
-                 placeholder="Pesquisar dados globais..." 
-                 className="bg-transparent border-none outline-none text-sm w-full"
-               />
-            </div>
-            
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--md-surface-variant)] transition-colors relative mr-1">
-               <Bell size={24} />
-            </button>
-            
-            <UserNav />
-          </div>
-        </header>
+  const [role, setRole] = useState<"admin" | "superadmin" | null>(null);
 
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto mt-[72px] p-8">
-           <div className="max-w-7xl mx-auto">
-             {children}
-           </div>
-        </div>
-      </main>
-    </div>
-  )
+  useEffect(() => {
+    async function resolveRole() {
+      const user = await getSafeUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const effectiveRole = normalizeRole(profile?.role, user.email);
+      setRole(effectiveRole === "superadmin" ? "superadmin" : "admin");
+    }
+
+    resolveRole();
+  }, []);
+
+  if (!role) {
+    return <ShellLoading />;
+  }
+
+  return (
+    <AppShell
+      role={role}
+      title={
+        role === "superadmin"
+          ? "Painel Institucional (Superadmin)"
+          : "Painel de Administração"
+      }
+      titleClassName="text-[#164073]"
+      searchPlaceholder="Pesquisar informações gerais..."
+    >
+      {children}
+    </AppShell>
+  );
 }

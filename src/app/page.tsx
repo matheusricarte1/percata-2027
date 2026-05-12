@@ -1,213 +1,250 @@
-'use client'
+"use client";
 
-import React from 'react'
-import { 
-  ShieldCheck, 
-  ArrowRight, 
-  GoogleLogo, 
-  Bank,
-  Key,
-  IdentificationCard,
+import React from "react";
+import {
+  ArrowRight,
   Lightning,
   TreeStructure,
-  Infinity as InfinityIcon,
-  ShieldChevron
-} from '@phosphor-icons/react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { motion } from 'framer-motion'
-import { Button } from '@/components/ui/button'
+  ShieldChevron,
+} from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { getSafeUser, supabase } from "@/lib/supabase";
+import { fetchActiveCycleYear } from "@/lib/cycle";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
+function GoogleGIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M12 10.2v4.17h5.92c-.24 1.34-1.6 3.92-5.92 3.92-3.56 0-6.46-2.95-6.46-6.59S8.44 5.1 12 5.1c2.03 0 3.39.86 4.16 1.6l2.83-2.74C17.18 2.29 14.84 1.2 12 1.2 6.94 1.2 2.84 5.3 2.84 10.37S6.94 19.54 12 19.54c6.93 0 9.16-4.86 9.16-7.38 0-.5-.05-.86-.12-1.23H12z"
+      />
+      <path
+        fill="#34A853"
+        d="M3.92 6.74l3.42 2.51C8.26 7.23 9.97 5.1 12 5.1c2.03 0 3.39.86 4.16 1.6l2.83-2.74C17.18 2.29 14.84 1.2 12 1.2 8.38 1.2 5.23 3.26 3.92 6.74z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 19.54c2.77 0 5.1-.92 6.8-2.64l-3.14-2.57c-.84.6-1.97 1.02-3.66 1.02-3.52 0-6.4-2.95-6.4-6.58 0-.78.14-1.53.4-2.22L2.5 3.95A9.18 9.18 0 0 0 1.84 10.37c0 5.07 4.1 9.17 10.16 9.17z"
+      />
+      <path
+        fill="#4285F4"
+        d="M21.16 12.16c0-.61-.05-1.05-.12-1.48H12v3.7h5.92c-.28 1.38-1.13 2.44-2.26 3.01l3.14 2.57c1.83-1.69 2.89-4.18 2.89-7.8z"
+      />
+    </svg>
+  );
+}
 
 export default function LandingPage() {
-  const router = useRouter()
+  const router = useRouter();
+  const [loadingGoogle, setLoadingGoogle] = React.useState(false);
+  const [cycleYear, setCycleYear] = React.useState<number>(new Date().getFullYear());
 
-  // Auto-redirect if already logged in
   React.useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        router.push('/dashboard')
+    const checkUser = async () => {
+      const user = await getSafeUser();
+      if (user) {
+        router.replace("/dashboard");
+      }
+    };
+    checkUser();
+  }, [router]);
+
+  React.useEffect(() => {
+    let alive = true;
+    async function loadCycleYear() {
+      try {
+        const year = await fetchActiveCycleYear();
+        if (alive) setCycleYear(year);
+      } catch {
+        // fallback local year
       }
     }
-    checkSession()
-  }, [router])
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Simulated login redirect
-    router.push('/dashboard')
-  }
+    loadCycleYear();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
+    setLoadingGoogle(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
-      }
-    })
-  }
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          prompt: "select_account consent",
+        },
+      },
+    });
+    if (error) {
+      toast.error("Falha ao iniciar login Google: " + error.message);
+      setLoadingGoogle(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col md:flex-row overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      
-      {/* Left Side: Premium Brand Hero */}
-      <div className="md:w-[55%] bg-[#1A237E] relative flex flex-col justify-center p-12 lg:p-24 overflow-hidden">
-        
-        {/* Living Background Elements */}
+    <div className="min-h-screen bg-white flex flex-col md:flex-row overflow-hidden font-sans selection:bg-upe-accent-washed-blue/40 selection:text-upe-blue-deep">
+      <div className="md:w-[55%] bg-[#164073] relative flex flex-col justify-center p-12 lg:p-24 overflow-hidden">
         <div className="absolute top-0 right-0 w-full h-full pointer-events-none">
-           <motion.div 
-             animate={{ 
-               scale: [1, 1.2, 1],
-               opacity: [0.1, 0.2, 0.1]
-             }}
-             transition={{ duration: 10, repeat: Infinity }}
-             className="absolute -top-20 -right-20 w-[600px] h-[600px] bg-indigo-400 rounded-full blur-[150px]"
-           />
-           <motion.div 
-             animate={{ 
-               scale: [1, 1.1, 1],
-               opacity: [0.05, 0.1, 0.05]
-             }}
-             transition={{ duration: 15, repeat: Infinity, delay: 2 }}
-             className="absolute -bottom-40 -left-20 w-[800px] h-[800px] bg-amber-400 rounded-full blur-[200px]"
-           />
+          <motion.div
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.1, 0.2, 0.1],
+            }}
+            transition={{ duration: 10, repeat: Infinity }}
+            className="absolute -top-20 -right-20 w-[600px] h-[600px] bg-upe-blue-medium rounded-full blur-[150px]"
+          />
+          <motion.div
+            animate={{
+              scale: [1, 1.1, 1],
+              opacity: [0.05, 0.1, 0.05],
+            }}
+            transition={{ duration: 15, repeat: Infinity, delay: 2 }}
+            className="absolute -bottom-40 -left-20 w-[800px] h-[800px] bg-amber-400 rounded-full blur-[200px]"
+          />
         </div>
-        
+
         <div className="relative z-10 space-y-12">
-           <motion.div 
-             initial={{ opacity: 0, x: -30 }}
-             animate={{ opacity: 1, x: 0 }}
-             className="flex items-center gap-6"
-           >
-              <div className="w-20 h-20 bg-white rounded-[32px] flex items-center justify-center shadow-2xl text-[#1A237E] rotate-3 hover:rotate-0 transition-transform duration-500">
-                 <Lightning size={48} weight="fill" />
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-6"
+          >
+            <div className="w-20 h-20 bg-white rounded-[32px] flex items-center justify-center shadow-2xl text-[#164073] rotate-3 hover:rotate-0 transition-transform duration-500">
+              <Lightning size={48} weight="fill" />
+            </div>
+            <div className="space-y-1">
+              <h1 className="font-display text-6xl font-semibold text-white tracking-tighter">
+                PERCATA
+              </h1>
+              <div className="flex items-center gap-2">
+                <span className="h-[2px] w-8 bg-upe-blue-medium rounded-full" />
+                <span className="text-[11px] font-semibold tracking-[0.6em] text-upe-accent-washed-blue uppercase">
+                  Ciclo {cycleYear}
+                </span>
               </div>
-              <div className="space-y-1">
-                 <h1 className="font-display text-6xl font-black text-white tracking-tighter italic">
-                    PERCATA
-                 </h1>
-                 <div className="flex items-center gap-2">
-                    <span className="h-[2px] w-8 bg-indigo-400 rounded-full" />
-                    <span className="text-[11px] font-black tracking-[0.6em] text-indigo-300 uppercase">Gestão 2027</span>
-                 </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-8 max-w-xl"
+          >
+            <h2 className="font-display text-6xl font-semibold text-white leading-[1] uppercase tracking-tighter">
+              Planejamento <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-upe-accent-washed-blue to-upe-blue-medium">
+                Institucional
+              </span>{" "}
+              <br />
+              Redefinido.
+            </h2>
+            <p className="text-upe-accent-washed-blue/80 text-xl font-medium leading-relaxed pr-10">
+              Uma plataforma simples para registrar necessidades de ensino,
+              pesquisa e extensão, com organização e transparência.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="flex gap-16 pt-12 border-t border-white/5"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <ShieldChevron
+                  size={24}
+                  weight="duotone"
+                  className="text-upe-blue-gray-blue"
+                />
+                <p className="text-3xl font-semibold text-white tracking-tighter">
+                  100%
+                </p>
               </div>
-           </motion.div>
-           
-           <motion.div 
-             initial={{ opacity: 0, y: 30 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ delay: 0.2 }}
-             className="space-y-8 max-w-xl"
-           >
-              <h2 className="font-display text-6xl font-black text-white leading-[1] italic uppercase tracking-tighter">
-                 Planejamento <br/>
-                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-indigo-400">Institucional</span> <br/>
-                 Redefinido.
-              </h2>
-              <p className="text-indigo-100/60 text-xl font-medium leading-relaxed pr-10">
-                 A plataforma definitiva para formalização de demandas (DFD), controle orçamentário e transparência estratégica integrada.
+              <p className="text-[10px] font-semibold text-upe-accent-washed-blue uppercase tracking-widest leading-none">
+                Transparência (Lei 14.133)
               </p>
-           </motion.div>
-
-           <motion.div 
-             initial={{ opacity: 0 }}
-             animate={{ opacity: 1 }}
-             transition={{ delay: 0.4 }}
-             className="flex gap-16 pt-12 border-t border-white/5"
-           >
-              <div className="space-y-2">
-                 <div className="flex items-center gap-3">
-                    <ShieldChevron size={24} weight="duotone" className="text-indigo-400" />
-                    <p className="text-3xl font-black text-white italic tracking-tighter">100%</p>
-                 </div>
-                 <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest leading-none">Auditável (Lei 14.133)</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <TreeStructure
+                  size={24}
+                  weight="duotone"
+                  className="text-upe-blue-gray-blue"
+                />
+                <p className="text-3xl font-semibold text-white tracking-tighter">
+                  PCA
+                </p>
               </div>
-              <div className="space-y-2">
-                 <div className="flex items-center gap-3">
-                    <TreeStructure size={24} weight="duotone" className="text-indigo-400" />
-                    <p className="text-3xl font-black text-white italic tracking-tighter">PCA</p>
-                 </div>
-                 <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest leading-none">Fluxo Consolidado</p>
-              </div>
-           </motion.div>
-        </div>
-
-        {/* Decorative Watermark */}
-        <div className="absolute right-[-100px] bottom-[-100px] opacity-[0.03] select-none pointer-events-none rotate-12">
-           <Lightning size={800} weight="fill" className="text-white" />
+              <p className="text-[10px] font-semibold text-upe-accent-washed-blue uppercase tracking-widest leading-none">
+                Fluxo Organizado
+              </p>
+            </div>
+          </motion.div>
         </div>
       </div>
 
-      {/* Right Side: Tactile Authentication Form */}
       <div className="md:w-[45%] bg-white flex flex-col justify-center p-8 lg:p-24 relative">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full mx-auto space-y-12"
+          className="max-w-md w-full mx-auto space-y-10"
         >
-          
           <div className="space-y-4">
-            <h3 className="font-display text-4xl font-black text-[#1A237E] uppercase italic tracking-tighter leading-none">Acesso Seguro</h3>
-            <p className="text-slate-400 text-lg font-medium leading-tight">Entre com sua identidade institucional para operar no ciclo 2027.</p>
+            <h3 className="font-display text-4xl font-semibold text-[#164073] uppercase tracking-tighter leading-none">
+              Acesso Seguro
+            </h3>
+            <p className="text-slate-500 text-base font-medium leading-relaxed">
+              O acesso ao PERCATA é exclusivo via Google institucional.
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-8">
-            <div className="space-y-3">
-               <label className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em] ml-2">E-mail Corporativo</label>
-               <div className="relative group/input">
-                  <IdentificationCard className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/input:text-indigo-500 transition-colors" size={24} weight="duotone" />
-                  <input 
-                    type="email" 
-                    placeholder="servidor@instituicao.gov.br"
-                    className="w-full pl-16 pr-8 py-6 rounded-[32px] bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all font-bold text-[#1A237E] text-lg outline-none placeholder:text-slate-300"
-                    required
-                  />
-               </div>
-            </div>
-
-            <div className="space-y-3">
-               <div className="flex justify-between items-center px-2">
-                  <label className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em] ml-2">Sua Senha</label>
-                  <button type="button" className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-indigo-500 transition-colors">Recuperar</button>
-               </div>
-               <div className="relative group/input">
-                  <Key className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/input:text-indigo-500 transition-colors" size={24} weight="duotone" />
-                  <input 
-                    type="password" 
-                    placeholder="••••••••"
-                    className="w-full pl-16 pr-8 py-6 rounded-[32px] bg-slate-50 border-2 border-transparent focus:border-indigo-100 focus:bg-white focus:ring-8 focus:ring-indigo-500/5 transition-all font-bold text-[#1A237E] text-lg outline-none placeholder:text-slate-300"
-                    required
-                  />
-               </div>
-            </div>
-
-            <Button 
-              type="submit"
-              className="w-full h-20 rounded-[32px] bg-[#1A237E] hover:bg-indigo-700 text-white font-black text-xl shadow-[0_20px_40px_-10px_rgba(26,35,126,0.3)] group transition-all"
-            >
-              AUTENTICAR <ArrowRight size={24} weight="bold" className="ml-3 group-hover:translate-x-2 transition-transform" />
-            </Button>
-          </form>
-
-          <div className="relative py-4">
-             <div className="absolute inset-0 flex items-center"><div className="w-full border-t-2 border-slate-50"></div></div>
-             <div className="relative flex justify-center text-[10px] uppercase font-black text-slate-300 tracking-[0.5em]"><span className="bg-white px-6">Login Único</span></div>
+          <div className="rounded-[24px] border border-[#D9E0E8] bg-[#FAFBFC] p-5 space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#164073]">
+              Regras de acesso
+            </p>
+            <ul className="space-y-2 text-sm text-[#3E4C5F]">
+              <li>1. E-mails `@upe.br` são permitidos automaticamente.</li>
+              <li>
+                2. E-mails externos só entram se estiverem cadastrados na lista
+                institucional.
+              </li>
+              <li>3. Não há login por senha neste ambiente.</li>
+            </ul>
           </div>
 
-          <Button 
+          <Button
             onClick={handleGoogleLogin}
+            disabled={loadingGoogle}
             variant="outline"
-            className="w-full h-20 rounded-[32px] border-2 border-slate-100 text-[#1A237E] font-black flex items-center justify-center gap-4 hover:bg-slate-50 hover:border-indigo-100 transition-all text-lg"
+            className="w-full h-14 rounded-xl border border-[#DADCE0] bg-white text-[#3C4043] font-medium text-base hover:bg-[#F8F9FA] hover:border-[#DADCE0] shadow-none"
           >
-             <GoogleLogo size={28} weight="bold" className="text-red-500" />
-             Conta Institucional Google
+            <span className="mr-3 inline-flex items-center">
+              <GoogleGIcon />
+            </span>
+            <span className="flex-1 text-center">
+              {loadingGoogle
+                ? "Conectando com Google..."
+                : "Sign in with Google"}
+            </span>
+            <ArrowRight
+              size={18}
+              weight="bold"
+              className="ml-3 text-[#5F6368] opacity-80"
+            />
           </Button>
 
-          <p className="text-[11px] text-center text-slate-300 font-bold leading-relaxed px-12 uppercase tracking-tight">
-            Ambiente Seguro. Todo acesso é monitorado e vinculado ao seu CPF/SIAPE.
+          <p className="text-[11px] text-center text-slate-400 font-semibold leading-relaxed px-4 uppercase tracking-tight">
+            Todo acesso é validado por domínio institucional e por lista de
+            autorização do sistema.
           </p>
         </motion.div>
       </div>
     </div>
-  )
+  );
 }

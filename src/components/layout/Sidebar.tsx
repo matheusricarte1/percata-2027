@@ -1,185 +1,316 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { getSafeUser, supabase } from "@/lib/supabase";
+import { resolveCampusBranding } from "@/lib/campus-branding";
+import { fetchActiveCycleYear } from "@/lib/cycle";
 import {
   House,
   Files,
   Package,
   ClockCounterClockwise,
-  SignOut,
-  Lightning,
   Gear,
   CheckCircle,
   Wallet,
-  SquaresFour,
-  Users,
-  ChartLineUp,
-} from '@phosphor-icons/react'
-import { useCarrinhoStore } from '@/store/carrinho'
+  ArrowRight,
+  UsersThree,
+} from "@phosphor-icons/react";
+import { useCarrinhoStore } from "@/store/carrinho";
 
 interface SidebarProps {
-  role?: 'solicitante' | 'chefia' | 'admin'
+  role?: "solicitante" | "chefia" | "admin" | "superadmin";
 }
 
-export function Sidebar({ role = 'solicitante' }: SidebarProps) {
-  const pathname = usePathname()
-  const itemCount = useCarrinhoStore((s) => s.items.length)
+interface NavItem {
+  href: string;
+  icon: any;
+  label: string;
+  badge?: string | null;
+}
 
-  // -- ADMIN SIDEBAR (WIDE) --
-  if (role === 'admin') {
-    return (
-      <nav className="fixed left-0 top-0 h-full w-[260px] bg-[#1A237E] text-white flex flex-col p-6 z-50 shadow-xl">
-        <div className="flex items-center gap-3 font-display text-2xl font-extrabold mb-10 px-3">
-          <Lightning weight="fill" className="text-white" />
-          PERCATA
-        </div>
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
 
-        <div className="text-[10px] uppercase text-white/40 font-bold tracking-widest mb-3 px-3">
-          Visão Gerencial
-        </div>
+export function Sidebar({ role = "solicitante" }: SidebarProps) {
+  const pathname = usePathname();
+  const itemCount = useCarrinhoStore((state) => state.items.length);
+  const [campusName, setCampusName] = useState("");
+  const [cycleYear, setCycleYear] = useState<number>(new Date().getFullYear());
 
-        <div className="space-y-2 flex-1">
-          <SidebarLink href="/admin" icon={SquaresFour} label="Dashboard Geral" active={pathname === '/admin'} wide />
-          <SidebarLink href="/admin/campanhas" icon={ChartLineUp} label="Calendário PCA" active={pathname === '/admin/campanhas'} wide />
-          <SidebarLink href="/admin/consolidacao" icon={CheckCircle} label="Consolidações" active={pathname === '/admin/consolidacao'} wide />
-          
-          <div className="h-[1px] bg-white/10 my-4" />
-          
-          <div className="text-[10px] uppercase text-white/40 font-bold tracking-widest mb-3 px-3">
-            Gestão Sistema
-          </div>
-          
-          <SidebarLink href="/admin/usuarios" icon={Users} label="Servidores & Níveis" active={pathname === '/admin/usuarios'} wide />
-          <SidebarLink href="#" icon={Gear} label="Configurações" active={false} wide />
-        </div>
+  const isActivePath = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
 
-        <button 
-          aria-label="Sair do sistema"
-          className="flex items-center gap-3 p-3 mt-auto text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-all"
-        >
-          <SignOut size={22} />
-          <span className="font-medium">Sair</span>
-        </button>
-      </nav>
-    )
-  }
+  useEffect(() => {
+    let active = true;
+    async function loadCampus() {
+      const user = await getSafeUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("campus_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!active || !profile?.campus_id) return;
 
-  // -- CHEFIA NAV RAIL (90px) --
-  if (role === 'chefia') {
-    return (
-      <nav className="fixed left-0 top-0 h-full w-[90px] bg-[#F5FBF9] flex flex-col items-center py-6 z-50 border-r border-emerald-100 shadow-sm">
-        <div className="w-[50px] h-[50px] bg-[#B2DFDB] text-[#00695C] rounded-2xl flex items-center justify-center text-2xl mb-10">
-          <Lightning weight="fill" />
-        </div>
+      const { data: campus } = await supabase
+        .from("campi")
+        .select("nome,sigla")
+        .eq("id", profile.campus_id)
+        .maybeSingle();
+      if (!active) return;
+      if (campus?.nome || campus?.sigla) {
+        setCampusName(String(campus.nome || campus.sigla));
+      }
+    }
+    loadCampus();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-        <div className="flex-1 w-full flex flex-col items-center gap-4">
-          <SidebarLink href="/triagem" icon={SquaresFour} label="Aprovações" active={pathname === '/triagem'} theme="chefia" badge="3" />
-          <SidebarLink href="/triagem/orcamento" icon={Wallet} label="Orçamento" active={pathname === '/triagem/orcamento'} theme="chefia" />
-          <SidebarLink href="#" icon={ChartLineUp} label="Relatórios" active={false} theme="chefia" />
-        </div>
+  useEffect(() => {
+    let active = true;
+    async function loadCycleYear() {
+      try {
+        const year = await fetchActiveCycleYear();
+        if (active) setCycleYear(year);
+      } catch {
+        // fallback local year
+      }
+    }
+    loadCycleYear();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-        <button className="flex flex-col items-center gap-1 p-2 mt-auto text-emerald-800/60 hover:text-emerald-800">
-           <SignOut size={24} />
-           <span className="text-[10px] font-bold">Sair</span>
-        </button>
-      </nav>
-    )
-  }
+  const sections = buildSections(role, itemCount);
+  const campusBranding = resolveCampusBranding(campusName);
 
-  // -- USUARIO NAV RAIL (80px) --
   return (
-    <nav className="nav-rail">
-      <div className="w-12 h-12 mb-10 flex items-center justify-center rounded-xl bg-[#EADDFF] text-[#4F378B] shadow-sm">
-        <Lightning size={24} weight="bold" />
-      </div>
+    <>
+      <nav className="fixed left-0 top-0 z-50 h-screen w-[var(--sidebar-width)] border-r border-[#D2D0CE] bg-[#F3F2F1] backdrop-blur-md flex flex-col p-3">
+        <div className="rounded-2xl border border-[#D2D0CE] bg-[#EBE9E8] px-3 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-[#D9E0E8] shadow-sm p-1">
+              <img
+                src={campusBranding.logoSrc}
+                alt={campusBranding.label}
+                className="max-h-8 w-auto object-contain"
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-[#605E5C]">
+                Plataforma
+              </p>
+              <p className="text-sm font-semibold text-[#323130] truncate">
+                PERCATA
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#605E5C]">
+                Ciclo {cycleYear}
+              </p>
+            </div>
+          </div>
+        </div>
 
-      <div className="flex-1 w-full flex flex-col items-center gap-2">
-        <SidebarLink href="/dashboard" icon={House} label="Início" active={pathname === '/dashboard'} />
-        <SidebarLink href="/minhas-dfds" icon={Files} label="Pedidos" active={pathname === '/minhas-dfds'} />
-        <SidebarLink href="/nova-dfd" icon={Gear} label="Nova DFD" active={pathname === '/nova-dfd'} />
-        <SidebarLink href="/catalogo" icon={Package} label="Catálogo" active={pathname === '/catalogo'} badge={itemCount > 0 ? itemCount.toString() : null} />
-        <div className="w-8 h-[1px] bg-black/5 my-2" />
-        <SidebarLink href="/historico" icon={ClockCounterClockwise} label="Histórico" active={pathname === '/historico'} />
-      </div>
-
-      <button className="nav-rail-item mt-auto hover:bg-red-50 hover:text-red-600">
-        <SignOut size={24} />
-        <span>Sair</span>
-      </button>
-    </nav>
-  )
+        <div className="sidebar-scroll mt-4 flex-1 w-full flex flex-col gap-3 overflow-y-auto pr-1">
+          {sections.map((section) => (
+            <div key={section.label} className="w-full">
+              <SidebarSectionDivider label={section.label} />
+              <div className="flex flex-col">
+                {section.items.map((item) => (
+                  <SidebarLink
+                    key={item.href}
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    active={isActivePath(item.href)}
+                    badge={item.badge}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </nav>
+    </>
+  );
 }
 
-function SidebarLink({ 
-  href, 
-  icon: Icon, 
-  label, 
-  active, 
-  wide, 
-  badge, 
-  theme 
-}: { 
-  href: string, 
-  icon: any, 
-  label: string, 
-  active: boolean, 
-  wide?: boolean, 
-  badge?: string | null,
-  theme?: 'usuario' | 'chefia' | 'admin'
-}) {
-  if (wide) {
-    return (
-      <Link
-        href={href}
-        aria-label={label}
-        className={cn(
-          'flex items-center justify-between p-3.5 rounded-xl transition-all duration-200 group',
-          active ? 'bg-white/20 text-white shadow-inner' : 'text-white/70 hover:bg-white/10 hover:text-white'
-        )}
-      >
-        <div className="flex items-center gap-3">
-          <Icon size={22} weight={active ? 'fill' : 'bold'} />
-          <span className={cn('text-sm font-black uppercase tracking-widest text-[10px]', active ? 'text-white' : 'text-white/60 group-hover:text-white')}>{label}</span>
-        </div>
-        {badge && (
-          <span className="bg-[#FF5252] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-            {badge}
-          </span>
-        )}
-      </Link>
-    )
+function buildSections(role: SidebarProps["role"], itemCount: number): NavSection[] {
+  const settingsHref =
+    role === "superadmin" || role === "admin"
+      ? "/admin/configuracoes"
+      : role === "chefia"
+        ? "/triagem/configuracoes"
+        : "/configuracoes";
+
+  const painelUnificadoSection: NavSection = {
+    label: "Painel",
+    items: [
+      {
+        href: "/dashboard",
+        icon: House,
+        label: "Painel Unificado",
+      },
+      {
+        href: settingsHref,
+        icon: Gear,
+        label: "Configurações",
+      },
+    ],
+  };
+
+  const solicitanteSection: NavSection = {
+    label: "Meu Espaço",
+    items: [
+      {
+        href: "/minhas-dfds",
+        icon: Files,
+        label: "Minhas Solicitações",
+      },
+      {
+        href: "/nova-dfd",
+        icon: Gear,
+        label: "Nova Solicitação",
+      },
+      {
+        href: "/catalogo",
+        icon: Package,
+        label: "Catálogo",
+        badge: itemCount > 0 ? itemCount.toString() : null,
+      },
+      {
+        href: "/dfds-coletivas",
+        icon: UsersThree,
+        label: "DFDs Coletivas",
+      },
+      {
+        href: "/historico",
+        icon: ClockCounterClockwise,
+        label: "Solicitações Anteriores",
+      },
+    ],
+  };
+
+  const chefiaSection: NavSection = {
+    label: "Chefia",
+    items: [
+      {
+        href: "/triagem",
+        icon: CheckCircle,
+        label: "Análise da Chefia",
+      },
+      {
+        href: "/triagem/orcamento",
+        icon: Wallet,
+        label: "Resumo do Setor",
+      },
+      {
+        href: "/dfds-coletivas",
+        icon: UsersThree,
+        label: "Salas Coletivas",
+      },
+    ],
+  };
+
+  const adminSection: NavSection = {
+    label: "Administração",
+    items: [
+      {
+        href: "/admin/consolidacao",
+        icon: CheckCircle,
+        label: "Consolidação de Pedidos",
+      },
+    ],
+  };
+
+  if (role === "superadmin") {
+    return [
+      painelUnificadoSection,
+      adminSection,
+      chefiaSection,
+      solicitanteSection,
+    ];
   }
 
-  // Rail View (Narrow)
-  const isChefia = theme === 'chefia'
-  const isSolicitante = theme === 'solicitante' || !theme
+  if (role === "admin") {
+    return [painelUnificadoSection, adminSection];
+  }
+
+  if (role === "chefia") {
+    return [painelUnificadoSection, chefiaSection, solicitanteSection];
+  }
+
+  return [painelUnificadoSection, solicitanteSection];
+}
+
+function SidebarSectionDivider({ label }: { label: string }) {
+  return (
+    <div className="w-full px-1 mb-2 mt-1">
+      <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.18em] text-[#605E5C]">
+        <span className="font-semibold whitespace-nowrap">{label}</span>
+        <span className="flex-1 border-t border-dashed border-black/10" />
+        <ArrowRight size={10} weight="bold" />
+      </div>
+    </div>
+  );
+}
+
+function SidebarLink({
+  href,
+  icon: Icon,
+  label,
+  active,
+  badge,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+  active: boolean;
+  badge?: string | null;
+}) {
   return (
     <Link
       href={href}
+      prefetch
+      aria-label={label}
       className={cn(
-        'group flex flex-col items-center justify-center transition-all duration-300 relative no-underline',
-        isChefia ? 'w-16 h-16 rounded-2xl mb-1 text-emerald-800' : 'w-14 h-14 rounded-2xl mb-4 text-[#625B71]',
-        active && (isChefia ? 'bg-[#B2DFDB] text-[#00695C]' : 'bg-[#EADDFF] text-[#4F378B]'),
-        !active && (isChefia ? 'hover:bg-emerald-50' : 'hover:bg-[#E7E0EC]')
+        "group flex items-center gap-3 transition-all duration-300 relative no-underline",
+        "w-full min-h-[46px] rounded-xl mb-1 px-2.5 py-2 text-[#323130] border",
+        active
+          ? "bg-white text-[#164073] border-[#C8C6C4] shadow-[0_8px_20px_-14px_rgba(50,49,48,0.22)]"
+          : "border-transparent hover:bg-[#EBE9E8] hover:border-[#D2D0CE]",
       )}
     >
       {badge && (
-        <span className={cn(
-           'absolute font-bold text-white text-[10px] px-1.5 py-0.5 rounded-full border-2',
-           isChefia ? 'top-2 right-3 bg-[#E65100] border-[#F5FBF9]' : 'top-1 right-2 bg-[#B3261E] border-[#FEF7FF]'
-        )}>
+        <span className="absolute top-1.5 right-2 font-bold text-white text-[10px] px-1.5 py-0.5 rounded-full border-2 bg-[#B3261E] border-[#FEF7FF]">
           {badge}
         </span>
       )}
-      <Icon size={24} weight={active ? 'fill' : 'bold'} />
-      <span className={cn(
-        'text-[10px] mt-1 font-black uppercase tracking-tighter text-center leading-tight',
-        active ? 'opacity-100' : 'opacity-40'
-      )}>
-        {label}
-      </span>
+      <div
+        className={cn(
+          "w-9 h-9 rounded-lg inline-flex items-center justify-center shrink-0",
+          active ? "bg-[#F3F2F1] text-[#164073]" : "bg-[#EDEBE9] text-[#605E5C]",
+        )}
+      >
+        <Icon size={18} weight={active ? "fill" : "bold"} />
+      </div>
+      <div className="min-w-0">
+        <p
+          className={cn(
+            "text-[11px] font-semibold uppercase tracking-wider truncate",
+            active ? "text-[#164073]" : "text-[#2E3A4A]",
+          )}
+        >
+          {label}
+        </p>
+      </div>
     </Link>
-  )
+  );
 }

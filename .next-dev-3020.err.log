@@ -1,0 +1,8 @@
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3010
+- PID:          27428
+- Dir:          C:\Users\Mac-PC\Downloads\PERCATA\web
+- Log:          .next\dev\logs\next-development.log
+
+Run taskkill /PID 27428 /F to stop it.

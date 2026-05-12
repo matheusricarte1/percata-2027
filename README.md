@@ -20,6 +20,31 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Design System
+
+As diretrizes oficiais de design do PERCATA estão em:
+
+- `docs/DESIGN-GUIDELINES.md`
+
+## E-mail (Gmail SMTP)
+
+Para usar envio de alertas com conta Google:
+
+1. Ative verificação em 2 etapas na conta Google.
+2. Gere uma senha de app.
+3. Configure no `.env.local`:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=seu-email@upe.br
+SMTP_PASS=sua-senha-de-app
+SMTP_SECURE=false
+SMTP_FROM="PERCATA <seu-email@upe.br>"
+```
+
+O status do canal e o envio de teste ficam em `Configurações > Notificações`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

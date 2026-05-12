@@ -1,0 +1,88 @@
+
+> web@0.1.0 dev
+> next dev --webpack --port 3000
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.4:3000
+- Environments: .env.local
+✓ Ready in 1769ms
+
+○ Compiling /login ...
+ GET /login?next=%2Fconfiguracoes 200 in 14.6s (next.js: 13.4s, proxy.ts: 11ms, application-code: 1178ms)
+ GET /login?next=%2Fconfiguracoes 200 in 81ms (next.js: 6ms, proxy.ts: 11ms, application-code: 64ms)
+○ Compiling / ...
+ GET / 200 in 1348ms (next.js: 5ms, proxy.ts: 1228ms, application-code: 116ms)
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 12.9s (next.js: 8.5s, proxy.ts: 439ms, application-code: 3.9s)
+○ Compiling /api/notifications/dispatch ...
+ POST /api/notifications/dispatch?batch=10 200 in 6.5s (next.js: 5.7s, proxy.ts: 304ms, application-code: 504ms)
+ POST /api/notifications/dispatch?batch=10 200 in 6.6s (next.js: 5.8s, proxy.ts: 293ms, application-code: 525ms)
+○ Compiling /admin/configuracoes ...
+ GET /admin/configuracoes 200 in 22.3s (next.js: 21.6s, proxy.ts: 506ms, application-code: 144ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1547ms (next.js: 206ms, proxy.ts: 803ms, application-code: 538ms)
+ POST /api/notifications/dispatch?batch=10 200 in 633ms (next.js: 7ms, proxy.ts: 252ms, application-code: 373ms)
+ POST /api/notifications/dispatch?batch=10 200 in 797ms (next.js: 4ms, proxy.ts: 367ms, application-code: 426ms)
+ GET /api/superadmin/org-structure 200 in 3.4s (next.js: 2.8s, proxy.ts: 249ms, application-code: 421ms)
+ GET /api/superadmin/org-structure 200 in 3.6s (next.js: 2.9s, proxy.ts: 219ms, application-code: 423ms)
+ GET /api/superadmin/org-structure?campusId=0b8daa36-0a77-4432-9482-b9bc44852fb0 200 in 806ms (next.js: 8ms, proxy.ts: 241ms, application-code: 557ms)
+ GET /api/superadmin/org-structure?campusId=0b8daa36-0a77-4432-9482-b9bc44852fb0 200 in 843ms (next.js: 14ms, proxy.ts: 298ms, application-code: 531ms)
+ GET /api/superadmin/org-structure?campusId=0b8daa36-0a77-4432-9482-b9bc44852fb0 200 in 992ms (next.js: 19ms, proxy.ts: 757ms, application-code: 216ms)
+ GET /api/notifications/status 200 in 3.0s (next.js: 2.4s, proxy.ts: 240ms, application-code: 391ms)
+ POST /api/notifications/dispatch?batch=10 200 in 746ms (next.js: 13ms, proxy.ts: 337ms, application-code: 397ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1057ms (next.js: 14ms, proxy.ts: 488ms, application-code: 554ms)
+○ Compiling /api/admin/users/audit ...
+ GET /api/admin/users/audit?limit=25 200 in 8.5s (next.js: 7.5s, proxy.ts: 448ms, application-code: 577ms)
+ GET /api/admin/users/login-events?limit=30 200 in 8.6s (next.js: 7.7s, proxy.ts: 292ms, application-code: 618ms)
+○ Compiling /api/admin/users/auth-users ...
+ GET /api/admin/users/auth-users?limit=3000 200 in 5.4s (next.js: 4.1s, proxy.ts: 619ms, application-code: 721ms)
+○ Compiling /admin/consolidacao ...
+ GET /admin/consolidacao 200 in 11.4s (next.js: 10.7s, proxy.ts: 508ms, application-code: 155ms)
+ GET /api/admin/users/audit?limit=25 200 in 11.8s (next.js: 10.7s, proxy.ts: 523ms, application-code: 515ms)
+ GET /api/admin/users/login-events?limit=30 200 in 11.8s (next.js: 10.6s, proxy.ts: 635ms, application-code: 517ms)
+ GET /api/admin/users/auth-users?limit=3000 200 in 984ms (next.js: 9ms, proxy.ts: 651ms, application-code: 324ms)
+ POST /api/notifications/dispatch?batch=10 200 in 925ms (next.js: 265ms, proxy.ts: 276ms, application-code: 384ms)
+ POST /api/notifications/dispatch?batch=10 200 in 847ms (next.js: 15ms, proxy.ts: 356ms, application-code: 476ms)
+ POST /api/notifications/dispatch?batch=10 200 in 919ms (next.js: 10ms, proxy.ts: 473ms, application-code: 436ms)
+ POST /api/notifications/dispatch?batch=10 200 in 862ms (next.js: 11ms, proxy.ts: 313ms, application-code: 539ms)
+ POST /api/notifications/dispatch?batch=10 200 in 752ms (next.js: 3ms, proxy.ts: 309ms, application-code: 440ms)
+ POST /api/notifications/dispatch?batch=10 200 in 781ms (next.js: 17ms, proxy.ts: 335ms, application-code: 429ms)
+○ Compiling /triagem/orcamento ...
+ GET /triagem/orcamento 200 in 14.3s (next.js: 13.8s, proxy.ts: 294ms, application-code: 182ms)
+ GET / 200 in 101ms (next.js: 20ms, proxy.ts: 22ms, application-code: 59ms)
+ GET /triagem/orcamento 200 in 543ms (next.js: 6ms, proxy.ts: 473ms, application-code: 64ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1124ms (next.js: 233ms, proxy.ts: 558ms, application-code: 333ms)
+ POST /api/notifications/dispatch?batch=10 200 in 597ms (next.js: 1823µs, proxy.ts: 233ms, application-code: 362ms)
+ POST /api/notifications/dispatch?batch=10 200 in 666ms (next.js: 4ms, proxy.ts: 220ms, application-code: 443ms)
+ GET /triagem 200 in 3.3s (next.js: 3.0s, proxy.ts: 211ms, application-code: 81ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1307ms (next.js: 190ms, proxy.ts: 711ms, application-code: 407ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1272ms (next.js: 9ms, proxy.ts: 754ms, application-code: 510ms)
+ POST /api/notifications/dispatch?batch=10 200 in 854ms (next.js: 15ms, proxy.ts: 378ms, application-code: 461ms)
+ POST /api/notifications/dispatch?batch=10 200 in 895ms (next.js: 14ms, proxy.ts: 398ms, application-code: 483ms)
+ POST /api/notifications/dispatch?batch=10 200 in 791ms (next.js: 14ms, proxy.ts: 323ms, application-code: 454ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1049ms (next.js: 17ms, proxy.ts: 566ms, application-code: 466ms)
+ POST /api/notifications/dispatch?batch=10 200 in 646ms (next.js: 5ms, proxy.ts: 276ms, application-code: 365ms)
+ POST /api/notifications/dispatch?batch=10 200 in 816ms (next.js: 14ms, proxy.ts: 363ms, application-code: 439ms)
+ POST /api/notifications/dispatch?batch=10 200 in 921ms (next.js: 19ms, proxy.ts: 374ms, application-code: 527ms)
+ POST /api/notifications/dispatch?batch=10 200 in 828ms (next.js: 14ms, proxy.ts: 393ms, application-code: 421ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1233ms (next.js: 20ms, proxy.ts: 719ms, application-code: 494ms)
+ POST /api/notifications/dispatch?batch=10 200 in 825ms (next.js: 14ms, proxy.ts: 369ms, application-code: 442ms)
+ POST /api/notifications/dispatch?batch=10 200 in 848ms (next.js: 20ms, proxy.ts: 367ms, application-code: 462ms)
+ POST /api/notifications/dispatch?batch=10 200 in 649ms (next.js: 3ms, proxy.ts: 277ms, application-code: 369ms)
+ POST /api/notifications/dispatch?batch=10 200 in 780ms (next.js: 11ms, proxy.ts: 337ms, application-code: 432ms)
+ POST /api/notifications/dispatch?batch=10 200 in 814ms (next.js: 11ms, proxy.ts: 368ms, application-code: 436ms)
+ POST /api/notifications/dispatch?batch=10 200 in 787ms (next.js: 7ms, proxy.ts: 407ms, application-code: 373ms)
+ POST /api/notifications/dispatch?batch=10 200 in 768ms (next.js: 9ms, proxy.ts: 321ms, application-code: 438ms)
+ POST /api/notifications/dispatch?batch=10 200 in 900ms (next.js: 18ms, proxy.ts: 394ms, application-code: 488ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1020ms (next.js: 14ms, proxy.ts: 490ms, application-code: 516ms)
+ POST /api/notifications/dispatch?batch=10 200 in 771ms (next.js: 17ms, proxy.ts: 362ms, application-code: 392ms)
+ POST /api/notifications/dispatch?batch=10 200 in 849ms (next.js: 3ms, proxy.ts: 408ms, application-code: 438ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1902ms (next.js: 5ms, proxy.ts: 1460ms, application-code: 437ms)
+ POST /api/notifications/dispatch?batch=10 200 in 878ms (next.js: 20ms, proxy.ts: 318ms, application-code: 540ms)
+ POST /api/notifications/dispatch?batch=10 200 in 987ms (next.js: 9ms, proxy.ts: 540ms, application-code: 438ms)
+ POST /api/notifications/dispatch?batch=10 200 in 848ms (next.js: 4ms, proxy.ts: 416ms, application-code: 427ms)
+ POST /api/notifications/dispatch?batch=10 200 in 665ms (next.js: 4ms, proxy.ts: 257ms, application-code: 405ms)
+ POST /api/notifications/dispatch?batch=10 200 in 1157ms (next.js: 30ms, proxy.ts: 678ms, application-code: 449ms)
+ GET /dashboard 200 in 422ms (next.js: 31ms, proxy.ts: 323ms, application-code: 68ms)
+ POST /api/notifications/dispatch?batch=10 200 in 749ms (next.js: 8ms, proxy.ts: 399ms, application-code: 342ms)
+ POST /api/notifications/dispatch?batch=10 200 in 874ms (next.js: 20ms, proxy.ts: 305ms, application-code: 549ms)

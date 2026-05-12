@@ -1,0 +1,56 @@
+
+> web@0.1.0 dev
+> next dev --webpack --port 3010
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3010
+- Network:       http://192.168.1.4:3010
+- Environments: .env.local
+✓ Ready in 1725ms
+
+○ Compiling /login ...
+ GET /login?next=%2Fadmin%2Fconfiguracoes 200 in 14.8s (next.js: 13.5s, proxy.ts: 11ms, application-code: 1298ms)
+○ Compiling / ...
+ GET / 200 in 7.8s (next.js: 6.6s, proxy.ts: 382ms, application-code: 835ms)
+ GET / 200 in 198ms (next.js: 8ms, proxy.ts: 25ms, application-code: 165ms)
+ GET / 200 in 81ms (next.js: 7ms, proxy.ts: 16ms, application-code: 58ms)
+ GET / 200 in 138ms (next.js: 4ms, proxy.ts: 11ms, application-code: 123ms)
+ GET / 200 in 93ms (next.js: 4ms, proxy.ts: 9ms, application-code: 80ms)
+ GET / 200 in 139ms (next.js: 4ms, proxy.ts: 9ms, application-code: 126ms)
+○ Compiling /verificar-dfd ...
+ GET /verificar-dfd 200 in 8.0s (next.js: 7.2s, proxy.ts: 9ms, application-code: 725ms)
+ GET /verificar-dfd 200 in 237ms (next.js: 9ms, proxy.ts: 177ms, application-code: 51ms)
+ GET /verificar-dfd 200 in 63ms (next.js: 7ms, proxy.ts: 17ms, application-code: 39ms)
+ GET /verificar-dfd 200 in 68ms (next.js: 7ms, proxy.ts: 14ms, application-code: 47ms)
+ GET /verificar-dfd 200 in 55ms (next.js: 6ms, proxy.ts: 9ms, application-code: 41ms)
+ GET /verificar-dfd 200 in 59ms (next.js: 6ms, proxy.ts: 12ms, application-code: 42ms)
+○ Compiling /login ...
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 4.3s (next.js: 3.6s, proxy.ts: 10ms, application-code: 727ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 77ms (next.js: 8ms, proxy.ts: 21ms, application-code: 49ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 54ms (next.js: 6ms, proxy.ts: 11ms, application-code: 37ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 132ms (next.js: 5ms, proxy.ts: 13ms, application-code: 114ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 2.3s (next.js: 26ms, proxy.ts: 34ms, application-code: 2.3s)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 3.9s (next.js: 300ms, proxy.ts: 183ms, application-code: 3.4s)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 128ms (next.js: 12ms, proxy.ts: 17ms, application-code: 99ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 159ms (next.js: 17ms, proxy.ts: 30ms, application-code: 113ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 57ms (next.js: 6ms, proxy.ts: 11ms, application-code: 40ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 86ms (next.js: 9ms, proxy.ts: 12ms, application-code: 66ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 150ms (next.js: 5ms, proxy.ts: 8ms, application-code: 137ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 70ms (next.js: 6ms, proxy.ts: 11ms, application-code: 53ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 131ms (next.js: 11ms, proxy.ts: 7ms, application-code: 113ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 67ms (next.js: 8ms, proxy.ts: 13ms, application-code: 46ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 66ms (next.js: 6ms, proxy.ts: 10ms, application-code: 50ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 62ms (next.js: 5ms, proxy.ts: 9ms, application-code: 48ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 113ms (next.js: 7ms, proxy.ts: 20ms, application-code: 86ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 43ms (next.js: 4ms, proxy.ts: 8ms, application-code: 31ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 80ms (next.js: 5ms, proxy.ts: 12ms, application-code: 62ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 74ms (next.js: 6ms, proxy.ts: 9ms, application-code: 59ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 101ms (next.js: 5ms, proxy.ts: 19ms, application-code: 76ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 66ms (next.js: 13ms, proxy.ts: 12ms, application-code: 41ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 52ms (next.js: 6ms, proxy.ts: 11ms, application-code: 35ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 97ms (next.js: 14ms, proxy.ts: 16ms, application-code: 67ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 46ms (next.js: 4ms, proxy.ts: 8ms, application-code: 35ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 91ms (next.js: 10ms, proxy.ts: 23ms, application-code: 58ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 65ms (next.js: 4ms, proxy.ts: 12ms, application-code: 50ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 59ms (next.js: 4ms, proxy.ts: 7ms, application-code: 49ms)
+ GET /login?next=%2Ftriagem%2Forcamento 200 in 67ms (next.js: 6ms, proxy.ts: 11ms, application-code: 51ms)
