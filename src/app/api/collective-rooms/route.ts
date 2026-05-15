@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error: any) {
-    return apiError(error?.message || "Erro ao listar salas coletivas.", 500);
+    return apiError(error?.message || "Erro ao listar DFDs coletivas.", 500);
   }
 }
 
@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
     const unitType = body?.unit_type === "laboratorio" ? "laboratorio" : "departamento";
     const cycleYear = Math.max(2000, Math.min(2100, Number(body?.cycle_year || new Date().getFullYear())));
 
-    if (!title) return apiError("Informe o titulo da sala.", 400);
-    if (!unitId) return apiError("Informe a unidade da sala.", 400);
+    if (!title) return apiError("Informe o titulo da DFD coletiva.", 400);
+    if (!unitId) return apiError("Informe a unidade da DFD coletiva.", 400);
     if (!actorHasUnit(actor, unitId, unitType)) {
       return apiError("Voce nao possui vinculo com esta unidade.", 403);
     }
@@ -97,11 +97,11 @@ export async function POST(request: NextRequest) {
       roomId: room.id,
       actorId: actor.id,
       eventType: "room_created",
-      message: "Sala coletiva criada.",
+      message: "DFD coletiva criada.",
     });
 
     return NextResponse.json({ room }, { status: 201 });
   } catch (error: any) {
-    return apiError(error?.message || "Erro ao criar sala coletiva.", 500);
+    return apiError(error?.message || "Erro ao criar DFD coletiva.", 500);
   }
 }

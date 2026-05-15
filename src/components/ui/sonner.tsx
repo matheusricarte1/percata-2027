@@ -37,12 +37,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast:
             "cn-toast group rounded-2xl border border-[#D9E0E8] bg-white/95 text-[#2E3A4A] shadow-[0_18px_50px_-28px_rgba(17,24,39,0.45)] backdrop-blur-xl",
-          title: "font-display text-sm font-semibold text-[#164073]",
+          title: "font-display text-sm font-semibold text-[var(--upe-blue-upe)]",
           description: "text-xs leading-5 text-[#5B6675]",
           actionButton:
-            "rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white",
+            "rounded-xl bg-[var(--upe-blue-upe)] px-3 py-2 text-xs font-semibold text-white",
           cancelButton:
-            "rounded-xl bg-[#E8EDF2] px-3 py-2 text-xs font-semibold text-[#164073]",
+            "rounded-xl bg-[var(--upe-accent-washed-blue)] px-3 py-2 text-xs font-semibold text-[var(--upe-blue-upe)]",
         },
       }}
       {...props}

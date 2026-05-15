@@ -254,7 +254,7 @@ export function AppShell({
                       className={cn(
                         "rounded-full px-3 py-1.5 text-[11px] font-semibold transition",
                         selected
-                          ? "bg-[#164073] text-white shadow-sm"
+                          ? "bg-[var(--upe-blue-upe)] text-white shadow-sm"
                           : "text-[#323130] hover:bg-white",
                       )}
                       aria-label={`Alternar para ${campus.nome}`}
@@ -273,7 +273,7 @@ export function AppShell({
           <div
             className={cn(
               "rounded-full h-10 px-4 flex items-center gap-3 w-64 focus-within:w-80 transition-all duration-300",
-              "bg-white border border-[#D2D0CE] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#C7D7EA]",
+              "bg-white border border-[#D2D0CE] focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--upe-accent-washed-blue)]",
               searchWrapperClassName,
             )}
           >
@@ -304,7 +304,7 @@ export function AppShell({
           </div>
         </header>
 
-        <div className={cn("app-shell-scroll bg-[#F3F2F1]", contentClassName)}>
+        <div className={cn("app-shell-scroll bg-[var(--md-surface)]", contentClassName)}>
           <div className="max-w-7xl mx-auto">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div

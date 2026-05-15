@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getPublicSiteOrigin, toPublicSiteUrl } from "@/lib/site-url";
 import { createClient } from "@/utils/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -20,10 +21,6 @@ function normalizeEmail(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase();
 }
 
-function isUpeEmail(email: string): boolean {
-  return email.endsWith("@upe.br");
-}
-
 async function isEmailInSystemList(
   supabase: Awaited<ReturnType<typeof createClient>>,
   email: string,
@@ -32,7 +29,7 @@ async function isEmailInSystemList(
   if (!normalized) return false;
 
   const [profileCheck, legacyCheck, legacyMapCheck] = await Promise.all([
-    supabase.from("profiles").select("id").ilike("email", normalized).limit(1),
+    supabase.from("profiles").select("id,is_active").ilike("email", normalized).limit(1),
     supabase
       .from("legacy_user_directory")
       .select("id")
@@ -45,7 +42,8 @@ async function isEmailInSystemList(
       .limit(1),
   ]);
 
-  const inProfiles = !profileCheck.error && (profileCheck.data || []).length > 0;
+  const inProfiles =
+    !profileCheck.error && (profileCheck.data || []).some((row: any) => row.is_active !== false);
   const inLegacy = !legacyCheck.error && (legacyCheck.data || []).length > 0;
   const inLegacyMapping =
     !legacyMapCheck.error && (legacyMapCheck.data || []).length > 0;
@@ -172,8 +170,17 @@ async function logLoginEvent(
 }
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams, origin } = requestUrl;
   const code = searchParams.get("code");
+  const publicOrigin = getPublicSiteOrigin(origin);
+
+  if (code && origin !== publicOrigin) {
+    return NextResponse.redirect(
+      toPublicSiteUrl(`${requestUrl.pathname}${requestUrl.search}`, origin),
+    );
+  }
+
   // if "next" is in param, use it as the redirect URL
   const rawNext = searchParams.get("next") ?? "/dashboard";
   const next =
@@ -198,20 +205,16 @@ export async function GET(request: Request) {
         if (!authUser || !email) {
           await supabase.auth.signOut();
           return NextResponse.redirect(
-            `${origin}/auth/auth-code-error?error=Conta%20Google%20sem%20e-mail%20válido.`,
+            `${publicOrigin}/auth/auth-code-error?error=Conta%20Google%20sem%20e-mail%20válido.`,
           );
         }
 
-        const allowedByDomain = isUpeEmail(email);
-        const allowedByList = allowedByDomain
-          ? false
-          : await isEmailInSystemList(supabase, email);
-        const isAllowed = allowedByDomain || allowedByList;
+        const isAllowed = await isEmailInSystemList(supabase, email);
 
         if (!isAllowed) {
           await supabase.auth.signOut();
           return NextResponse.redirect(
-            `${origin}/auth/auth-code-error?error=Acesso%20restrito.%20Use%20e-mail%20%40upe.br%20ou%20cadastro%20prévio%20na%20lista%20institucional.`,
+            `${publicOrigin}/auth/auth-code-error?error=Acesso%20restrito.%20Solicite%20ativação%20prévia%20do%20seu%20usuário%20pela%20administração.`,
           );
         }
 
@@ -222,15 +225,15 @@ export async function GET(request: Request) {
       } catch (syncError) {
         console.error("Falha ao sincronizar identidade do usuário:", syncError);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${publicOrigin}${next}`);
     }
     // Se houve erro na troca do código, aí sim mostramos o erro
     return NextResponse.redirect(
-      `${origin}/auth/auth-code-error?error=${error.message}`,
+      `${publicOrigin}/auth/auth-code-error?error=${error.message}`,
     );
   }
 
   // Se não veio código, mas você tem o #access_token (visível ao navegador),
   // o dashboard vai conseguir te logar. Vamos tentar!
-  return NextResponse.redirect(`${origin}${next}`);
+  return NextResponse.redirect(`${publicOrigin}${next}`);
 }

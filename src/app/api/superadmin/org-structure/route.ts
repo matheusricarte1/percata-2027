@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
 import { isSuperadminEmail, normalizeRole } from "@/lib/access";
 import {
   buildChefiaAssignmentMap,
@@ -47,18 +47,11 @@ type ActionPayload =
     };
 
 function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error("Variáveis Supabase de service role não configuradas.");
-  }
-  return createServiceClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  return createSupabaseAdminClient();
 }
 
 function hasServiceCredentials() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return hasSupabaseAdminCredentials();
 }
 
 async function requireSuperadmin() {

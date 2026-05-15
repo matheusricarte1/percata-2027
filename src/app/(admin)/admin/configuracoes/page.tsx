@@ -68,7 +68,14 @@ type ChefiaOption = {
   campus_id: string | null;
 };
 
-type AdminTab = "ajustes" | "estrutura" | "usuarios" | "exportacao" | "kits" | "campanhas";
+type AdminTab =
+  | "ajustes"
+  | "acesso"
+  | "estrutura"
+  | "usuarios"
+  | "exportacao"
+  | "kits"
+  | "campanhas";
 
 type TabItem = {
   key: AdminTab;
@@ -79,6 +86,7 @@ type TabItem = {
 
 const TABS: TabItem[] = [
   { key: "ajustes", label: "Ajustes", icon: Gear },
+  { key: "acesso", label: "Acesso", icon: ShieldCheck, superadminOnly: true },
   { key: "estrutura", label: "Estrutura", icon: Buildings, superadminOnly: true },
   { key: "usuarios", label: "Usuários", icon: Users },
   { key: "exportacao", label: "Exportação", icon: Files },
@@ -366,6 +374,8 @@ export default function ConfiguracoesAdminPage() {
 
       {activeTab === "ajustes" && <SettingsPanel scope="Administração" />}
 
+      {activeTab === "acesso" && isSuperadmin && <SystemAccessLockPanel />}
+
       {activeTab === "estrutura" && isSuperadmin && (
         <StructureSettingsPanel
           loadingData={loadingData}
@@ -407,6 +417,131 @@ function ModuleLoading({ label }: { label: string }) {
     <div className="rounded-2xl border border-[#D2D0CE] bg-white p-6 text-sm font-semibold text-slate-500">
       Carregando módulo de {label}...
     </div>
+  );
+}
+
+function SystemAccessLockPanel() {
+  const [enabled, setEnabled] = useState(false);
+  const [message, setMessage] = useState(
+    "O sistema esta temporariamente bloqueado para manutenção. Aguarde a liberação pelo superadmin.",
+  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  async function loadLock() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/superadmin/access-lock", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Falha ao carregar bloqueio.");
+      setEnabled(Boolean(payload?.value?.enabled));
+      setMessage(String(payload?.value?.message || "").trim() || message);
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao carregar bloqueio global.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadLock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function saveLock(nextEnabled: boolean) {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/superadmin/access-lock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled, message }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Falha ao atualizar bloqueio.");
+      setEnabled(Boolean(payload?.value?.enabled));
+      setMessage(String(payload?.value?.message || "").trim() || message);
+      toast.success(nextEnabled ? "Acesso bloqueado para todos, exceto superadmin." : "Acesso liberado.");
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao atualizar bloqueio global.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-[22px] border border-[#E1E8F0] bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+            Controle global
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+            Bloqueio de acesso
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[#52627A]">
+            Quando ativo, usuários solicitantes, chefias e admins são bloqueados
+            nas rotas internas. O superadmin continua acessando o sistema para
+            manutenção e liberação.
+          </p>
+        </div>
+        <div
+          className={`rounded-2xl border px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] ${
+            enabled
+              ? "border-[#F4B7B7] bg-[#FFF1F1] text-[#A91520]"
+              : "border-[#CFE6DE] bg-[#F2FBF7] text-[#2E6B52]"
+          }`}
+        >
+          {enabled ? "Bloqueado" : "Liberado"}
+        </div>
+      </div>
+
+      <label className="mt-6 block">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+          Mensagem exibida
+        </span>
+        <textarea
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          className="mt-2 min-h-[92px] w-full resize-none rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] px-4 py-3 text-sm font-medium text-[#2E3A4A] outline-none focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          maxLength={240}
+          disabled={loading || saving}
+        />
+      </label>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4">
+        <div className="flex items-center gap-3">
+          <WarningCircle
+            size={24}
+            weight="fill"
+            className={enabled ? "text-[#A91520]" : "text-[#164073]"}
+          />
+          <p className="text-sm font-semibold text-[#17233C]">
+            {enabled
+              ? "O bloqueio global está ativo."
+              : "O sistema está liberado para os usuários."}
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => saveLock(!enabled)}
+          disabled={loading || saving}
+          className={
+            enabled
+              ? "bg-[#164073] text-white hover:bg-[#0F2E57]"
+              : "bg-[#A91520] text-white hover:bg-[#7F1018]"
+          }
+        >
+          {saving
+            ? "Atualizando..."
+            : enabled
+              ? "Liberar acesso"
+              : "Bloquear acesso geral"}
+        </Button>
+      </div>
+    </section>
   );
 }
 

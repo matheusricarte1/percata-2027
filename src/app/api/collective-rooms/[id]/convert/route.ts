@@ -16,11 +16,11 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const admin = createSupabaseAdminClient();
     const room = await loadRoomOrNull(admin, id);
-    if (!room) return apiError("Sala coletiva nao encontrada.", 404);
+    if (!room) return apiError("DFD coletiva nao encontrada.", 404);
 
     const dfds = await convertRoomToOfficialDfds({ admin, actor, room });
     return NextResponse.json({ dfds });
   } catch (error: any) {
-    return apiError(error?.message || "Erro ao converter sala coletiva.", 500);
+    return apiError(error?.message || "Erro ao converter DFD coletiva.", 500);
   }
 }

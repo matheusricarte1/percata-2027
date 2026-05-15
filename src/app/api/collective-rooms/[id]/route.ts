@@ -22,12 +22,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const admin = createSupabaseAdminClient();
     const room = await loadRoomOrNull(admin, id);
-    if (!room) return apiError("Sala coletiva nao encontrada.", 404);
+    if (!room) return apiError("DFD coletiva nao encontrada.", 404);
     if (!assertCanSeeRoom(actor, room)) return apiError("Acesso negado.", 403);
 
     return NextResponse.json(await buildRoomDetail(admin, actor, room));
   } catch (error: any) {
-    return apiError(error?.message || "Erro ao carregar sala coletiva.", 500);
+    return apiError(error?.message || "Erro ao carregar DFD coletiva.", 500);
   }
 }
 
@@ -38,17 +38,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const admin = createSupabaseAdminClient();
     const room = await loadRoomOrNull(admin, id);
-    if (!room) return apiError("Sala coletiva nao encontrada.", 404);
+    if (!room) return apiError("DFD coletiva nao encontrada.", 404);
     if (!actorIsChefiaForUnit(actor, room.unit_id)) return apiError("Acesso negado.", 403);
     if (room.status === "convertida") {
-      return apiError("Sala convertida nao pode ser editada.", 409);
+      return apiError("DFD coletiva convertida nao pode ser editada.", 409);
     }
 
     const body = await request.json().catch(() => ({}));
     const patch: Record<string, unknown> = {};
     if ("title" in body) {
       const title = sanitizeText(body.title, 160);
-      if (!title) return apiError("Informe o titulo da sala.", 400);
+      if (!title) return apiError("Informe o titulo da DFD coletiva.", 400);
       patch.title = title;
     }
     if ("description" in body) patch.description = sanitizeLongText(body.description, 4000);
@@ -75,12 +75,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       roomId: room.id,
       actorId: actor.id,
       eventType: "room_updated",
-      message: "Dados da sala atualizados.",
+      message: "Dados da DFD coletiva atualizados.",
       metadata: patch,
     });
 
     return NextResponse.json({ room: updated });
   } catch (error: any) {
-    return apiError(error?.message || "Erro ao atualizar sala coletiva.", 500);
+    return apiError(error?.message || "Erro ao atualizar DFD coletiva.", 500);
   }
 }

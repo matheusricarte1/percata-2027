@@ -471,7 +471,7 @@ export async function convertRoomToOfficialDfds(params: {
           [room.description, room.scope]
             .map((value) => String(value || "").trim())
             .filter(Boolean)
-            .join("\n\n") || "DFD coletiva gerada a partir de sala setorial.",
+            .join("\n\n") || "DFD coletiva gerada a partir de demanda setorial.",
         solicitante_id: actor.id,
         campus: campusLegacy,
         campus_id: room.campus_id || actor.campus_id || null,

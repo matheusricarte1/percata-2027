@@ -203,6 +203,29 @@ function getAssetBaseUrl() {
   return normalized.startsWith("http") ? normalized.replace(/\/$/, "") : `https://${normalized.replace(/\/$/, "")}`;
 }
 
+function getBrandLogoUrl(): string | null {
+  const configured = process.env.EMAIL_BRAND_LOGO_URL?.trim();
+  if (configured) return configured;
+  const assetBase = getAssetBaseUrl();
+  if (!assetBase) return null;
+  return `${assetBase}/brands/percata-logo.png`;
+}
+
+function renderBrandMark() {
+  const logoUrl = getBrandLogoUrl();
+  if (!logoUrl) {
+    return `
+      <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#DCEAF0;font-weight:800;">
+        ${PRODUCT_NAME}
+      </p>`;
+  }
+
+  return `
+    <div style="display:inline-block;border-radius:10px;background:#FFFFFF;padding:8px 10px;">
+      <img src="${escapeHtml(logoUrl)}" alt="${PRODUCT_NAME}" width="132" style="display:block;width:132px;max-width:132px;height:auto;border:0;" />
+    </div>`;
+}
+
 function getFlatImageUrl(slot: EmailTemplatePreset["imageSlot"]): string | null {
   if (!slot) return null;
   const envKey = `EMAIL_FLAT_${slot.toUpperCase().replace(/-/g, "_")}_URL`;
@@ -338,10 +361,8 @@ function buildMasterEmail(input: SendEmailInput): { html: string; text: string }
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td>
-                      <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#DCEAF0;font-weight:800;">
-                        ${PRODUCT_NAME}
-                      </p>
-                      <p style="margin:7px 0 0 0;font-size:24px;line-height:1.18;color:#FFFFFF;font-weight:800;">
+                      ${renderBrandMark()}
+                      <p style="margin:12px 0 0 0;font-size:24px;line-height:1.18;color:#FFFFFF;font-weight:800;">
                         ${escapeHtml(heading)}
                       </p>
                     </td>

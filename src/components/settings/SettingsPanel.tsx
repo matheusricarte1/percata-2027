@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Gear,
   PaintBrush,
@@ -13,26 +14,14 @@ import {
 import { toast } from "sonner";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { Switch } from "@/components/ui/switch";
-
-type ThemeMode = "system" | "light" | "dark";
-type DensityMode = "compact" | "comfortable";
-type ProfileVisibility = "campus" | "papel" | "privado";
-type AccentColor = "upe" | "teal" | "gold" | "slate";
-
-type UserSettings = {
-  themeMode: ThemeMode;
-  densityMode: DensityMode;
-  accentColor: AccentColor;
-  reducedMotion: boolean;
-  showAnimations: boolean;
-  notifyAprovacao: boolean;
-  notifyDevolucao: boolean;
-  notifyHomologacao: boolean;
-  notifyEmail: boolean;
-  profileVisibility: ProfileVisibility;
-  showEmail: boolean;
-  showAvatar: boolean;
-};
+import {
+  DEFAULT_USER_SETTINGS,
+  mapUserSettingsRow,
+  normalizeUserSettings,
+  toUserSettingsUpsert,
+  type AccentColor,
+  type UserSettings,
+} from "@/lib/user-settings";
 
 type EmailStatus = {
   provider: "resend" | "smtp" | "none";
@@ -47,21 +36,6 @@ type EmailStatus = {
     failed: number;
     sent: number;
   } | null;
-};
-
-const DEFAULT_SETTINGS: UserSettings = {
-  themeMode: "system",
-  densityMode: "comfortable",
-  accentColor: "upe",
-  reducedMotion: false,
-  showAnimations: true,
-  notifyAprovacao: true,
-  notifyDevolucao: true,
-  notifyHomologacao: true,
-  notifyEmail: true,
-  profileVisibility: "campus",
-  showEmail: true,
-  showAvatar: true,
 };
 
 const STORAGE_PREFIX = "percata:user-settings:v1";
@@ -98,47 +72,6 @@ const COLOR_OPTIONS: Array<{
   },
 ];
 
-function normalizeSettings(input: Partial<UserSettings> | null | undefined): UserSettings {
-  const themeMode: ThemeMode =
-    input?.themeMode === "light" || input?.themeMode === "dark" || input?.themeMode === "system"
-      ? input.themeMode
-      : DEFAULT_SETTINGS.themeMode;
-  const densityMode: DensityMode =
-    input?.densityMode === "compact" || input?.densityMode === "comfortable"
-      ? input.densityMode
-      : DEFAULT_SETTINGS.densityMode;
-  const profileVisibility: ProfileVisibility =
-    input?.profileVisibility === "campus" ||
-    input?.profileVisibility === "papel" ||
-    input?.profileVisibility === "privado"
-      ? input.profileVisibility
-      : DEFAULT_SETTINGS.profileVisibility;
-  const accentColor: AccentColor =
-    input?.accentColor === "teal" ||
-    input?.accentColor === "gold" ||
-    input?.accentColor === "slate" ||
-    input?.accentColor === "upe"
-      ? input.accentColor
-      : DEFAULT_SETTINGS.accentColor;
-
-  return {
-    themeMode,
-    densityMode,
-    accentColor,
-    reducedMotion: Boolean(input?.reducedMotion ?? DEFAULT_SETTINGS.reducedMotion),
-    showAnimations: Boolean(input?.showAnimations ?? DEFAULT_SETTINGS.showAnimations),
-    notifyAprovacao: Boolean(input?.notifyAprovacao ?? DEFAULT_SETTINGS.notifyAprovacao),
-    notifyDevolucao: Boolean(input?.notifyDevolucao ?? DEFAULT_SETTINGS.notifyDevolucao),
-    notifyHomologacao: Boolean(
-      input?.notifyHomologacao ?? DEFAULT_SETTINGS.notifyHomologacao,
-    ),
-    notifyEmail: Boolean(input?.notifyEmail ?? DEFAULT_SETTINGS.notifyEmail),
-    profileVisibility,
-    showEmail: Boolean(input?.showEmail ?? DEFAULT_SETTINGS.showEmail),
-    showAvatar: Boolean(input?.showAvatar ?? DEFAULT_SETTINGS.showAvatar),
-  };
-}
-
 function isMissingSettingsTableError(error: any): boolean {
   const message = String(error?.message || error || "").toLowerCase();
   return (
@@ -157,11 +90,11 @@ function toStorageKey(userId: string) {
 function loadLocalSettings(userId: string): UserSettings {
   try {
     const raw = window.localStorage.getItem(toStorageKey(userId));
-    if (!raw) return DEFAULT_SETTINGS;
+    if (!raw) return DEFAULT_USER_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return normalizeSettings(parsed);
+    return normalizeUserSettings(parsed);
   } catch {
-    return DEFAULT_SETTINGS;
+    return DEFAULT_USER_SETTINGS;
   }
 }
 
@@ -178,7 +111,7 @@ function saveLocalSettings(userId: string, settings: UserSettings) {
 }
 
 export function SettingsPanel({ scope }: { scope: string }) {
-  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -237,7 +170,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
         const { data, error } = await supabase
           .from("user_settings")
           .select(
-            "theme_mode,density_mode,reduced_motion,show_animations,notify_aprovacao,notify_devolucao,notify_homologacao,notify_email,profile_visibility,show_email,show_avatar",
+            "theme_mode,density_mode,accent_color,reduced_motion,show_animations,notify_aprovacao,notify_devolucao,notify_homologacao,notify_email,profile_visibility,show_email,show_avatar",
           )
           .eq("user_id", user.id)
           .maybeSingle();
@@ -257,21 +190,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
 
         if (data) {
           const local = loadLocalSettings(user.id);
-          const mapped = normalizeSettings({
-            ...local,
-            themeMode: (data.theme_mode as ThemeMode) || "system",
-            densityMode: (data.density_mode as DensityMode) || "comfortable",
-            reducedMotion: Boolean(data.reduced_motion),
-            showAnimations: Boolean(data.show_animations),
-            notifyAprovacao: Boolean(data.notify_aprovacao),
-            notifyDevolucao: Boolean(data.notify_devolucao),
-            notifyHomologacao: Boolean(data.notify_homologacao),
-            notifyEmail: Boolean(data.notify_email),
-            profileVisibility:
-              (data.profile_visibility as ProfileVisibility) || "campus",
-            showEmail: Boolean(data.show_email),
-            showAvatar: Boolean(data.show_avatar),
-          });
+          const mapped = mapUserSettingsRow(data, local);
           setSettings(mapped);
           saveLocalSettings(user.id, mapped);
         } else {
@@ -316,7 +235,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
 
   const update = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     setSettings((prev) => {
-      const next = normalizeSettings({ ...prev, [key]: value });
+      const next = normalizeUserSettings({ ...prev, [key]: value });
       if (key === "reducedMotion" && value === true) {
         next.showAnimations = false;
       }
@@ -353,24 +272,11 @@ export function SettingsPanel({ scope }: { scope: string }) {
     setSaving(true);
 
     try {
-      const sanitized = normalizeSettings(settings);
+      const sanitized = normalizeUserSettings(settings);
       saveLocalSettings(userId, sanitized);
       if (syncMode === "supabase") {
         const { error } = await supabase.from("user_settings").upsert(
-          {
-            user_id: userId,
-            theme_mode: sanitized.themeMode,
-            density_mode: sanitized.densityMode,
-            reduced_motion: sanitized.reducedMotion,
-            show_animations: sanitized.showAnimations,
-            notify_aprovacao: sanitized.notifyAprovacao,
-            notify_devolucao: sanitized.notifyDevolucao,
-            notify_homologacao: sanitized.notifyHomologacao,
-            notify_email: sanitized.notifyEmail,
-            profile_visibility: sanitized.profileVisibility,
-            show_email: sanitized.showEmail,
-            show_avatar: sanitized.showAvatar,
-          },
+          toUserSettingsUpsert(userId, sanitized),
           { onConflict: "user_id" },
         );
 
@@ -394,21 +300,21 @@ export function SettingsPanel({ scope }: { scope: string }) {
   };
 
   const resetSettings = () => {
-    setSettings(DEFAULT_SETTINGS);
-    if (userId) saveLocalSettings(userId, DEFAULT_SETTINGS);
+    setSettings(DEFAULT_USER_SETTINGS);
+    if (userId) saveLocalSettings(userId, DEFAULT_USER_SETTINGS);
     toast.success("Preferências restauradas. Clique em salvar para sincronizar.");
   };
 
   return (
     <div className="space-y-5 p-0">
-      <div className="overflow-hidden rounded-[22px] border border-[#C7D7EA] bg-[#F7FBFF] p-6 shadow-sm">
+      <div className="overflow-hidden rounded-[22px] border border-[var(--upe-accent-washed-blue)] bg-[var(--md-surface)] p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#164073] text-white shadow-sm">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--upe-blue-upe)] text-white shadow-sm">
             <Gear size={28} weight="fill" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--upe-blue-medium)]">
               Experiência do usuário
             </p>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-[#17233C]">
@@ -419,7 +325,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
             </p>
           </div>
           </div>
-          <div className="rounded-2xl border border-[#D6E3F2] bg-white/75 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#47739F]">
+          <div className="rounded-2xl border border-[var(--upe-accent-washed-blue)] bg-white/75 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-medium)]">
             {syncLabel}
           </div>
         </div>
@@ -482,7 +388,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
               <button
                 type="button"
                 onClick={() => loadEmailStatus()}
-                className="inline-flex h-8 items-center rounded-lg border border-[#D9E0E8] bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#164073] hover:bg-[#E8EDF2]"
+                className="inline-flex h-8 items-center rounded-lg border border-[#D9E0E8] bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-upe)] hover:bg-[var(--upe-accent-washed-blue)]"
               >
                 Atualizar
               </button>
@@ -494,7 +400,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
                 <div className="space-y-1.5">
                   <p>
                     Status:{" "}
-                    <span className={emailStatus.configured ? "text-[#164073] font-semibold" : "text-[#A91520] font-semibold"}>
+                    <span className={emailStatus.configured ? "text-[var(--upe-blue-upe)] font-semibold" : "text-[#A91520] font-semibold"}>
                       {emailStatus.configured
                         ? `Ativo via ${emailStatus.provider.toUpperCase()}`
                         : "Não configurado"}
@@ -504,7 +410,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
                   {emailStatus.redirectTo ? (
                     <p>
                       Redirecionamento:{" "}
-                      <span className="font-semibold text-[#164073]">{emailStatus.redirectTo}</span>
+                      <span className="font-semibold text-[var(--upe-blue-upe)]">{emailStatus.redirectTo}</span>
                     </p>
                   ) : null}
                   {emailStatus.reason ? <p className="text-[#A91520]">{emailStatus.reason}</p> : null}
@@ -526,7 +432,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
                 type="button"
                 onClick={sendEmailTest}
                 disabled={sendingEmailTest || !userEmail || !emailStatus?.configured}
-                className="inline-flex h-9 items-center rounded-lg bg-[#164073] px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#0F2E57] disabled:opacity-60"
+                className="inline-flex h-9 items-center rounded-lg bg-[var(--upe-blue-upe)] px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white hover:bg-[var(--upe-blue-deep)] disabled:opacity-60"
               >
                 {sendingEmailTest ? "Enviando..." : "Enviar teste para meu e-mail"}
               </button>
@@ -607,14 +513,14 @@ export function SettingsPanel({ scope }: { scope: string }) {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#D9E0E8] bg-white px-4 py-3 shadow-sm">
         <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#3E4C5F]">
-          <Lightning size={14} weight="fill" className="text-[#164073]" />
+          <Lightning size={14} weight="fill" className="text-[var(--upe-blue-upe)]" />
           {loading ? "Carregando suas preferências..." : "Tudo pronto para salvar."}
         </p>
         <button
           type="button"
           onClick={resetSettings}
           disabled={loading || saving || !userId}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073] shadow-sm hover:bg-[#F4F7FA] disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-upe)] shadow-sm hover:bg-[#F4F7FA] disabled:opacity-60"
         >
           <ArrowCounterClockwise size={16} weight="fill" />
           Restaurar padrão
@@ -623,7 +529,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
           type="button"
           onClick={save}
           disabled={loading || saving || !userId}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm hover:bg-[#0F2E57] disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--upe-blue-upe)] px-4 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm hover:bg-[var(--upe-blue-deep)] disabled:opacity-60"
         >
           <FloppyDiskBack size={16} weight="fill" />
           {saving ? "Salvando..." : "Salvar configurações"}
@@ -645,8 +551,15 @@ function SettingCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-[#E1E8F0] bg-white p-5 shadow-sm">
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EDF4FB] text-[#164073]">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="rounded-[20px] border border-[#E1E8F0] bg-white p-5 shadow-sm"
+    >
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--upe-accent-washed-blue)] text-[var(--upe-blue-upe)]">
         {icon}
       </div>
       <h2 className="mt-4 font-display text-lg font-semibold tracking-tight text-[#17233C]">
@@ -654,7 +567,7 @@ function SettingCard({
       </h2>
       <p className="mt-1 text-sm font-medium text-[#52627A]">{desc}</p>
       <div className="mt-5">{children}</div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -672,15 +585,20 @@ function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-[#E8EDF2] bg-[#FAFBFC] px-3 py-3">
+    <motion.div
+      layout
+      whileHover={disabled ? undefined : { y: -1 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+      className="rounded-2xl border border-[#E8EDF2] bg-[#FAFBFC] px-3 py-3"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[#164073]">{label}</p>
+          <p className="text-sm font-semibold text-[var(--upe-blue-upe)]">{label}</p>
           <p className="mt-0.5 text-xs text-[#5B6675]">{desc}</p>
         </div>
         <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -696,19 +614,22 @@ function SegmentButton({
   icon?: React.ReactNode;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       aria-pressed={active}
       onClick={onClick}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.16 }}
       className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition ${
         active
-          ? "border-[#164073] bg-[#164073] text-white"
+          ? "border-[var(--upe-blue-upe)] bg-[var(--upe-blue-upe)] text-white"
           : "border-[#D9E0E8] bg-white text-[#3E4C5F] hover:bg-[#F4F7FA]"
       }`}
     >
       {icon}
       {label}
-    </button>
+    </motion.button>
   );
 }
 
@@ -722,12 +643,16 @@ function ColorOptionButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      layout
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
       className={`rounded-2xl border p-4 text-left transition ${
         active
-          ? "border-[#164073] bg-[#F7FBFF] shadow-sm ring-2 ring-[#164073]/10"
+          ? "border-[var(--upe-blue-upe)] bg-[var(--md-surface)] shadow-sm ring-2 ring-[var(--upe-accent-washed-blue)]"
           : "border-[#E1E8F0] bg-white hover:bg-[#FAFBFC]"
       }`}
     >
@@ -740,15 +665,15 @@ function ColorOptionButton({
           />
         ))}
       </div>
-      <p className="mt-4 text-sm font-semibold text-[#164073]">{option.label}</p>
+      <p className="mt-4 text-sm font-semibold text-[var(--upe-blue-upe)]">{option.label}</p>
       <p className="mt-1 text-xs leading-5 text-[#52627A]">{option.desc}</p>
       <span
         className={`mt-4 inline-flex h-7 items-center rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] ${
-          active ? "bg-[#164073] text-white" : "bg-[#EEF3F8] text-[#47739F]"
+          active ? "bg-[var(--upe-blue-upe)] text-white" : "bg-[var(--upe-accent-washed-blue)] text-[var(--upe-blue-medium)]"
         }`}
       >
         {active ? "Em uso" : "Aplicar"}
       </span>
-    </button>
+    </motion.button>
   );
 }

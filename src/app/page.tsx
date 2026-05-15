@@ -1,46 +1,28 @@
 "use client";
 
 import React from "react";
-import {
-  ArrowRight,
-  Lightning,
-  TreeStructure,
-  ShieldChevron,
-} from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { getSafeUser, supabase } from "@/lib/supabase";
-import { fetchActiveCycleYear } from "@/lib/cycle";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
+import { getAuthCallbackUrl } from "@/lib/site-url";
+import { getSafeUser, supabase } from "@/lib/supabase";
 
 function GoogleGIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <path
-        fill="#EA4335"
-        d="M12 10.2v4.17h5.92c-.24 1.34-1.6 3.92-5.92 3.92-3.56 0-6.46-2.95-6.46-6.59S8.44 5.1 12 5.1c2.03 0 3.39.86 4.16 1.6l2.83-2.74C17.18 2.29 14.84 1.2 12 1.2 6.94 1.2 2.84 5.3 2.84 10.37S6.94 19.54 12 19.54c6.93 0 9.16-4.86 9.16-7.38 0-.5-.05-.86-.12-1.23H12z"
-      />
-      <path
-        fill="#34A853"
-        d="M3.92 6.74l3.42 2.51C8.26 7.23 9.97 5.1 12 5.1c2.03 0 3.39.86 4.16 1.6l2.83-2.74C17.18 2.29 14.84 1.2 12 1.2 8.38 1.2 5.23 3.26 3.92 6.74z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M12 19.54c2.77 0 5.1-.92 6.8-2.64l-3.14-2.57c-.84.6-1.97 1.02-3.66 1.02-3.52 0-6.4-2.95-6.4-6.58 0-.78.14-1.53.4-2.22L2.5 3.95A9.18 9.18 0 0 0 1.84 10.37c0 5.07 4.1 9.17 10.16 9.17z"
-      />
-      <path
-        fill="#4285F4"
-        d="M21.16 12.16c0-.61-.05-1.05-.12-1.48H12v3.7h5.92c-.28 1.38-1.13 2.44-2.26 3.01l3.14 2.57c1.83-1.69 2.89-4.18 2.89-7.8z"
-      />
-    </svg>
+    <img
+      src="/brands/google-g-2025.png"
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      className="h-7 w-7 object-contain sm:h-8 sm:w-8"
+    />
   );
 }
 
 export default function LandingPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [loadingGoogle, setLoadingGoogle] = React.useState(false);
-  const [cycleYear, setCycleYear] = React.useState<number>(new Date().getFullYear());
 
   React.useEffect(() => {
     const checkUser = async () => {
@@ -52,28 +34,12 @@ export default function LandingPage() {
     checkUser();
   }, [router]);
 
-  React.useEffect(() => {
-    let alive = true;
-    async function loadCycleYear() {
-      try {
-        const year = await fetchActiveCycleYear();
-        if (alive) setCycleYear(year);
-      } catch {
-        // fallback local year
-      }
-    }
-    loadCycleYear();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   const handleGoogleLogin = async () => {
     setLoadingGoogle(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getAuthCallbackUrl(window.location.origin),
         queryParams: {
           prompt: "select_account consent",
         },
@@ -86,165 +52,151 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col md:flex-row overflow-hidden font-sans selection:bg-upe-accent-washed-blue/40 selection:text-upe-blue-deep">
-      <div className="md:w-[55%] bg-[#164073] relative flex flex-col justify-center p-12 lg:p-24 overflow-hidden">
-        <div className="absolute top-0 right-0 w-full h-full pointer-events-none">
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.1, 0.2, 0.1],
-            }}
-            transition={{ duration: 10, repeat: Infinity }}
-            className="absolute -top-20 -right-20 w-[600px] h-[600px] bg-upe-blue-medium rounded-full blur-[150px]"
-          />
-          <motion.div
-            animate={{
-              scale: [1, 1.1, 1],
-              opacity: [0.05, 0.1, 0.05],
-            }}
-            transition={{ duration: 15, repeat: Infinity, delay: 2 }}
-            className="absolute -bottom-40 -left-20 w-[800px] h-[800px] bg-amber-400 rounded-full blur-[200px]"
-          />
-        </div>
+    <main className="relative min-h-screen overflow-hidden bg-[#eef3f9] font-sans text-[#1e2430]">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 46% 30%, rgba(255,255,255,0.98) 0 18%, rgba(255,255,255,0.64) 34%, transparent 58%), linear-gradient(132deg, rgba(236,32,41,0.2) 0%, rgba(255,255,255,0.78) 38%, rgba(226,232,240,0.82) 72%, rgba(15,46,87,0.18) 100%)",
+        }}
+      />
 
-        <div className="relative z-10 space-y-12">
+      <motion.div
+        aria-hidden="true"
+        className="absolute inset-[-24%] opacity-90 blur-[95px]"
+        animate={reduceMotion ? undefined : { rotate: [0, 360] }}
+        transition={{ duration: 46, repeat: Infinity, ease: "linear" }}
+      >
+        <div className="absolute left-[5%] top-[18%] h-[58%] w-[30%] rounded-full bg-[#ec2029]" />
+        <div className="absolute bottom-[8%] right-[9%] h-[38%] w-[34%] rounded-full bg-[#0f2e57]" />
+        <div className="absolute right-[26%] top-[5%] h-[30%] w-[32%] rounded-full bg-white" />
+        <div className="absolute bottom-[20%] left-[36%] h-[28%] w-[34%] rounded-full bg-[#d9e4ef]" />
+      </motion.div>
+
+      <motion.div
+        aria-hidden="true"
+        className="absolute inset-[-30%] rounded-full opacity-45 blur-[130px]"
+        animate={reduceMotion ? undefined : { rotate: [360, 0], scale: [1, 1.08, 1] }}
+        transition={{ duration: 58, repeat: Infinity, ease: "linear" }}
+        style={{
+          background:
+            "conic-gradient(from 45deg at 50% 50%, rgba(236,32,41,0.42), rgba(255,255,255,0.22), rgba(15,46,87,0.34), rgba(255,255,255,0.2), rgba(236,32,41,0.42))",
+        }}
+      />
+
+      <motion.div
+        aria-hidden="true"
+        className="absolute -left-[360px] -top-[190px] h-[1320px] w-[850px] rounded-full bg-[#ec2029]/95 blur-[26px] shadow-[100px_0_210px_rgba(236,32,41,0.38)]"
+        animate={reduceMotion ? undefined : { x: [0, 18, 0], scale: [1, 1.025, 1] }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.img
+        aria-hidden="true"
+        src="/brands/percata-logo.png"
+        alt=""
+        className="absolute -left-[235px] top-[180px] h-[680px] w-auto opacity-[0.11] blur-[18px]"
+        animate={reduceMotion ? undefined : { rotate: [-4, 5, -4], y: [0, -22, 0], opacity: [0.07, 0.12, 0.07] }}
+        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute -right-[130px] -top-[190px] h-[940px] w-[1080px] rounded-full opacity-45 blur-[10px]"
+        animate={reduceMotion ? undefined : { rotate: [0, 360], scale: [1, 1.03, 1] }}
+        transition={{ duration: 68, repeat: Infinity, ease: "linear" }}
+        style={{
+          background:
+            "repeating-radial-gradient(circle at center, rgba(255,255,255,0.6) 0 1px, transparent 1px 10px)",
+          maskImage:
+            "linear-gradient(120deg, transparent 0%, black 26%, black 75%, transparent 100%)",
+        }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute -bottom-[370px] right-[-120px] h-[660px] w-[790px] rotate-[-20deg] rounded-tl-[100%] bg-[#0f2e57] blur-[34px] shadow-[-70px_-70px_180px_rgba(15,46,87,0.38)]"
+        animate={reduceMotion ? undefined : { x: [0, -18, 0], y: [0, -18, 0], rotate: [-20, -13, -20] }}
+        transition={{ duration: 19, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute -bottom-[210px] right-[90px] h-[560px] w-[1040px] rotate-[-18deg] rounded-tl-[100%] bg-white/78 blur-[28px] shadow-[0_-42px_110px_rgba(15,46,87,0.16)]"
+        animate={reduceMotion ? undefined : { x: [0, 18, 0], y: [0, 12, 0], rotate: [-18, -24, -18] }}
+        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute left-[22%] top-[19%] h-[410px] w-[470px] rounded-full bg-[#ec2029]/24 blur-[120px]"
+        animate={reduceMotion ? undefined : { x: [0, 48, 0, -48, 0], y: [0, -34, -68, -34, 0], opacity: [0.32, 0.72, 0.44, 0.64, 0.32], scale: [1, 1.12, 1.04, 1.16, 1] }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute right-[16%] top-[8%] h-[390px] w-[470px] rounded-full bg-white/72 blur-[105px]"
+        animate={reduceMotion ? undefined : { x: [0, -42, -84, -42, 0], y: [0, 28, 0, -28, 0], opacity: [0.5, 0.9, 0.62, 0.82, 0.5] }}
+        transition={{ duration: 21, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <section className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10">
+        <div className="flex w-full max-w-[650px] flex-col items-center gap-10 sm:gap-12">
           <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-6"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 28, scale: 0.97 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.82, ease: [0.16, 1, 0.3, 1] }}
+            className="relative flex min-h-[390px] w-full flex-col items-center justify-center overflow-hidden rounded-[22px] border border-white/80 bg-white/64 px-8 py-10 shadow-[0_46px_130px_rgba(30,36,48,0.27),0_18px_52px_rgba(236,32,41,0.13),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl sm:min-h-[430px] sm:px-14 sm:py-12"
           >
-            <div className="w-20 h-20 bg-white rounded-[32px] flex items-center justify-center shadow-2xl text-[#164073] rotate-3 hover:rotate-0 transition-transform duration-500">
-              <Lightning size={48} weight="fill" />
-            </div>
-            <div className="space-y-1">
-              <h1 className="font-display text-6xl font-semibold text-white tracking-tighter">
-                PERCATA
-              </h1>
-              <div className="flex items-center gap-2">
-                <span className="h-[2px] w-8 bg-upe-blue-medium rounded-full" />
-                <span className="text-[11px] font-semibold tracking-[0.6em] text-upe-accent-washed-blue uppercase">
-                  Ciclo {cycleYear}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-8 max-w-xl"
-          >
-            <h2 className="font-display text-6xl font-semibold text-white leading-[1] uppercase tracking-tighter">
-              Planejamento <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-upe-accent-washed-blue to-upe-blue-medium">
-                Institucional
-              </span>{" "}
-              <br />
-              Redefinido.
-            </h2>
-            <p className="text-upe-accent-washed-blue/80 text-xl font-medium leading-relaxed pr-10">
-              Uma plataforma simples para registrar necessidades de ensino,
-              pesquisa e extensão, com organização e transparência.
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex gap-16 pt-12 border-t border-white/5"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <ShieldChevron
-                  size={24}
-                  weight="duotone"
-                  className="text-upe-blue-gray-blue"
-                />
-                <p className="text-3xl font-semibold text-white tracking-tighter">
-                  100%
-                </p>
-              </div>
-              <p className="text-[10px] font-semibold text-upe-accent-washed-blue uppercase tracking-widest leading-none">
-                Transparência (Lei 14.133)
-              </p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <TreeStructure
-                  size={24}
-                  weight="duotone"
-                  className="text-upe-blue-gray-blue"
-                />
-                <p className="text-3xl font-semibold text-white tracking-tighter">
-                  PCA
-                </p>
-              </div>
-              <p className="text-[10px] font-semibold text-upe-accent-washed-blue uppercase tracking-widest leading-none">
-                Fluxo Organizado
-              </p>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      <div className="md:w-[45%] bg-white flex flex-col justify-center p-8 lg:p-24 relative">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full mx-auto space-y-10"
-        >
-          <div className="space-y-4">
-            <h3 className="font-display text-4xl font-semibold text-[#164073] uppercase tracking-tighter leading-none">
-              Acesso Seguro
-            </h3>
-            <p className="text-slate-500 text-base font-medium leading-relaxed">
-              O acesso ao PERCATA é exclusivo via Google institucional.
-            </p>
-          </div>
-
-          <div className="rounded-[24px] border border-[#D9E0E8] bg-[#FAFBFC] p-5 space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#164073]">
-              Regras de acesso
-            </p>
-            <ul className="space-y-2 text-sm text-[#3E4C5F]">
-              <li>1. E-mails `@upe.br` são permitidos automaticamente.</li>
-              <li>
-                2. E-mails externos só entram se estiverem cadastrados na lista
-                institucional.
-              </li>
-              <li>3. Não há login por senha neste ambiente.</li>
-            </ul>
-          </div>
-
-          <Button
-            onClick={handleGoogleLogin}
-            disabled={loadingGoogle}
-            variant="outline"
-            className="w-full h-14 rounded-xl border border-[#DADCE0] bg-white text-[#3C4043] font-medium text-base hover:bg-[#F8F9FA] hover:border-[#DADCE0] shadow-none"
-          >
-            <span className="mr-3 inline-flex items-center">
-              <GoogleGIcon />
-            </span>
-            <span className="flex-1 text-center">
-              {loadingGoogle
-                ? "Conectando com Google..."
-                : "Sign in with Google"}
-            </span>
-            <ArrowRight
-              size={18}
-              weight="bold"
-              className="ml-3 text-[#5F6368] opacity-80"
+            <motion.div
+              aria-hidden="true"
+              className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-[#ec2029]/18 blur-3xl"
+              animate={reduceMotion ? undefined : { scale: [1, 1.2, 1], opacity: [0.35, 0.65, 0.35] }}
+              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
             />
-          </Button>
+            <motion.div
+              aria-hidden="true"
+              className="absolute -bottom-28 right-8 h-64 w-80 rounded-full bg-[#164073]/12 blur-3xl"
+              animate={reduceMotion ? undefined : { x: [0, -16, 0], opacity: [0.3, 0.58, 0.3] }}
+              transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.div
+              aria-hidden="true"
+              className="absolute -right-32 top-20 h-20 w-[520px] rotate-[-18deg] bg-white/55 blur-2xl"
+              animate={reduceMotion ? undefined : { x: [0, -42, 0], opacity: [0.18, 0.46, 0.18] }}
+              transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.img
+              src="/brands/percata-logo.png"
+              alt="PERCATA - Sistema de Planejamento e Administração"
+              className="relative z-10 h-auto w-full max-w-[470px] object-contain drop-shadow-[0_20px_34px_rgba(30,36,48,0.12)]"
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              transition={{ delay: 0.16, duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
+            />
 
-          <p className="text-[11px] text-center text-slate-400 font-semibold leading-relaxed px-4 uppercase tracking-tight">
-            Todo acesso é validado por domínio institucional e por lista de
-            autorização do sistema.
-          </p>
-        </motion.div>
-      </div>
-    </div>
+            <motion.button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loadingGoogle}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              whileHover={reduceMotion ? undefined : { y: -4, scale: 1.012 }}
+              whileTap={reduceMotion ? undefined : { y: 0, scale: 0.99 }}
+              transition={{ delay: 0.28, duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
+              className="relative z-10 mt-14 flex h-[70px] w-full max-w-[500px] items-center justify-center gap-4 rounded-[12px] border border-[#DADCE0] bg-white/92 text-[18px] font-semibold text-[#202124] shadow-[0_18px_38px_rgba(30,36,48,0.2),0_4px_12px_rgba(30,36,48,0.08),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-md outline-none transition-colors hover:bg-white focus-visible:ring-4 focus-visible:ring-[#164073]/30 disabled:cursor-wait disabled:opacity-75 sm:mt-16 sm:h-[76px] sm:gap-7 sm:text-[24px]"
+            >
+              <GoogleGIcon />
+              <span className="whitespace-nowrap">{loadingGoogle ? "Conectando..." : "Entrar com Google"}</span>
+            </motion.button>
+          </motion.div>
+
+          <motion.img
+            src="/brands/upe-wordmark-login.png"
+            alt="Universidade de Pernambuco"
+            className="h-auto w-[310px] max-w-[82vw] object-contain mix-blend-multiply drop-shadow-[0_12px_22px_rgba(30,36,48,0.13)]"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={{ delay: 0.42, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          />
+        </div>
+      </section>
+    </main>
   );
 }

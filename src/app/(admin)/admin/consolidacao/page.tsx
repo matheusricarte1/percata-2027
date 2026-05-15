@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { downloadWorkbookFromSheets } from "@/lib/export-excel";
 import {
   buildCsv,
   buildDfdItemDetailRows,
@@ -1193,7 +1193,7 @@ export default function ConsolidationPage() {
     toast.success("CSV completo exportado.");
   };
 
-  const exportXLSX = () => {
+  const exportXLSX = async () => {
     if (displayItems.length === 0) {
       toast.info("Sem linhas para exportar.");
       return;
@@ -1203,36 +1203,39 @@ export default function ConsolidationPage() {
     const dfdRows = buildDfdSheetRows(dfds as any);
     const sourceRows = buildSourceItemRows(rawItems, dfds);
 
-    const wb = XLSX.utils.book_new();
-    const wsRows = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, wsRows, "Consolidacao");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dfdRows), "DFDs_Aprovadas");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sourceRows), "Itens_Origem");
-
-    const wsMeta = XLSX.utils.json_to_sheet([
-      { chave: "gerado_em", valor: new Date().toISOString() },
-      { chave: "filtro_dfd", valor: selectedDfdId },
-      { chave: "filtro_busca", valor: itemSearchTerm || "N/A" },
-      { chave: "filtro_acao_inteligente", valor: smartFilter },
-      { chave: "filtro_natureza_despesa", valor: naturezaDespesaLabel(naturezaFilter) },
-      { chave: "filtro_grupo", valor: grupoFilter },
-      { chave: "filtro_classe", valor: classeFilter },
-      { chave: "filtro_tipo", valor: tipoFilter },
-      { chave: "filtro_servidor", valor: servidorFilter },
-      { chave: "filtro_local_uso", valor: localUsoFilter },
-      { chave: "somente_pareto", valor: highlightOnly ? "SIM" : "NAO" },
-      { chave: "total_dfds_aprovadas", valor: dfds.length },
-      { chave: "total_itens_consolidados", valor: items.length },
-      { chave: "total_itens_exibidos", valor: displayItems.length },
-      { chave: "total_valor_exibido", valor: Number(visibleValue.toFixed(2)) },
-    ]);
-    XLSX.utils.book_append_sheet(wb, wsMeta, "Contexto");
-
-    XLSX.writeFile(
-      wb,
-      `consolidacao_pca_${new Date().toLocaleDateString("pt-BR").replaceAll("/", "-")}.xlsx`,
-    );
-    toast.success("Planilha XLSX exportada.");
+    try {
+      await downloadWorkbookFromSheets(
+        [
+          { name: "Consolidacao", rows },
+          { name: "DFDs_Aprovadas", rows: dfdRows },
+          { name: "Itens_Origem", rows: sourceRows },
+          {
+            name: "Contexto",
+            rows: [
+              { chave: "gerado_em", valor: new Date().toISOString() },
+              { chave: "filtro_dfd", valor: selectedDfdId },
+              { chave: "filtro_busca", valor: itemSearchTerm || "N/A" },
+              { chave: "filtro_acao_inteligente", valor: smartFilter },
+              { chave: "filtro_natureza_despesa", valor: naturezaDespesaLabel(naturezaFilter) },
+              { chave: "filtro_grupo", valor: grupoFilter },
+              { chave: "filtro_classe", valor: classeFilter },
+              { chave: "filtro_tipo", valor: tipoFilter },
+              { chave: "filtro_servidor", valor: servidorFilter },
+              { chave: "filtro_local_uso", valor: localUsoFilter },
+              { chave: "somente_pareto", valor: highlightOnly ? "SIM" : "NAO" },
+              { chave: "total_dfds_aprovadas", valor: dfds.length },
+              { chave: "total_itens_consolidados", valor: items.length },
+              { chave: "total_itens_exibidos", valor: displayItems.length },
+              { chave: "total_valor_exibido", valor: Number(visibleValue.toFixed(2)) },
+            ],
+          },
+        ],
+        `consolidacao_pca_${new Date().toLocaleDateString("pt-BR").replaceAll("/", "-")}.xlsx`,
+      );
+      toast.success("Planilha XLSX exportada.");
+    } catch (error: any) {
+      toast.error(error?.message || "Falha ao exportar XLSX.");
+    }
   };
 
   return (

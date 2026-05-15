@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Bell, Check, Clock } from "@phosphor-icons/react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { getSafeUser, supabase } from "@/lib/supabase";
 
@@ -34,6 +35,7 @@ export function NotificationBell({
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -116,34 +118,45 @@ export function NotificationBell({
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "relative flex h-10 w-10 items-center justify-center rounded-full text-[#2E3A4A] transition hover:bg-[#E8EDF2]",
+          "relative flex h-10 w-10 items-center justify-center rounded-full text-[#2E3A4A] transition hover:bg-[var(--upe-accent-washed-blue)]",
           className,
         )}
       >
         <Bell size={20} />
         {showUnreadCount && unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#EC2029] px-1 text-[9px] font-semibold text-white">
+          <span className="absolute right-1.5 top-1.5 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--upe-red-upe)] px-1 text-[9px] font-semibold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
-      {open && (
-        <>
-          <button
-            type="button"
-            aria-label="Fechar painel de notificações"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setOpen(false)}
-          />
+      <AnimatePresence initial={false}>
+        {open && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Fechar painel de notificações"
+              className="fixed inset-0 z-40 cursor-default"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={reduceMotion ? undefined : { opacity: 1 }}
+              exit={reduceMotion ? undefined : { opacity: 0 }}
+              transition={{ duration: 0.14 }}
+              onClick={() => setOpen(false)}
+            />
 
-          <div className="absolute right-0 z-50 mt-2 w-[360px] overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white shadow-[var(--elevation-4)]">
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: -8, scale: 0.98 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 z-50 mt-2 w-[360px] overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white shadow-[var(--elevation-4)]"
+          >
             <div className="flex items-center justify-between border-b border-[#E8EDF2] px-4 py-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
                   Alertas do Usuário
                 </p>
-                <h3 className="text-sm font-semibold text-[#164073]">Notificações</h3>
+                <h3 className="text-sm font-semibold text-[var(--upe-blue-upe)]">Notificações</h3>
               </div>
               <button
                 type="button"
@@ -164,11 +177,15 @@ export function NotificationBell({
               ) : (
                 <div className="divide-y divide-[#E8EDF2]">
                   {notifications.map((notification) => (
-                    <div
+                    <motion.div
                       key={notification.id}
+                      layout
+                      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className={cn(
                         "px-4 py-3 transition",
-                        !notification.read && "bg-[#F8FBFF]",
+                        !notification.read && "bg-[var(--md-surface)]",
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -183,10 +200,10 @@ export function NotificationBell({
                               {notification.type || "info"}
                             </span>
                             {!notification.read && (
-                              <span className="h-2 w-2 rounded-full bg-[#EC2029]" />
+                              <span className="h-2 w-2 rounded-full bg-[var(--upe-red-upe)]" />
                             )}
                           </div>
-                          <p className="mt-2 text-sm font-semibold text-[#164073]">
+                          <p className="mt-2 text-sm font-semibold text-[var(--upe-blue-upe)]">
                             {notification.title}
                           </p>
                           <p className="mt-1 text-xs leading-relaxed text-[#5B6675]">
@@ -202,22 +219,22 @@ export function NotificationBell({
                           <button
                             type="button"
                             onClick={() => markAsRead(notification.id)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#D9E0E8] text-[#4D79A8] transition hover:bg-[#E8EDF2]"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#D9E0E8] text-[var(--upe-blue-medium)] transition hover:bg-[var(--upe-accent-washed-blue)]"
                             aria-label="Marcar notificação como lida"
                           >
                             <Check size={14} />
                           </button>
                         )}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         </>
       )}
+      </AnimatePresence>
     </div>
   );
 }
-

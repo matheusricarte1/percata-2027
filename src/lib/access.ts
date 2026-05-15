@@ -1,9 +1,11 @@
-export const SUPERADMIN_EMAIL = "matheus.ricarte@upe.br";
+export const SUPERADMIN_EMAIL = (
+  process.env.NEXT_PUBLIC_SUPERADMIN_EMAIL || ""
+).trim().toLowerCase();
 
 export type UserRole = "solicitante" | "chefia" | "admin" | "superadmin";
 
 export function isSuperadminEmail(email: string | null | undefined): boolean {
-  return (email || "").toLowerCase() === SUPERADMIN_EMAIL;
+  return Boolean(SUPERADMIN_EMAIL) && (email || "").toLowerCase() === SUPERADMIN_EMAIL;
 }
 
 export function normalizeRole(

@@ -1,8 +1,21 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getHomeForRole, normalizeRole } from "@/lib/access";
+import {
+  ACCESS_LOCK_KEY,
+  ACCESS_LOCK_PATH,
+  normalizeAccessLock,
+  shouldBlockForAccessLock,
+} from "@/lib/system-access";
 
-const PUBLIC_PATHS = ["/", "/login", "/verificar-dfd", "/api/dfd/verify", "/api/dev/audit-login"];
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  ACCESS_LOCK_PATH,
+  "/verificar-dfd",
+  "/api/dfd/verify",
+  "/api/dev/audit-login",
+];
 const SOLICITANTE_PATHS = ["/minhas-dfds", "/nova-dfd", "/catalogo", "/historico", "/dfd"];
 
 function isSolicitantePath(pathname: string): boolean {
@@ -17,26 +30,37 @@ function normalizeEmail(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase();
 }
 
-function isUpeEmail(email: string): boolean {
-  return email.endsWith("@upe.br");
-}
-
 async function isAllowedLoginEmail(supabase: any, email: string): Promise<boolean> {
   const normalized = normalizeEmail(email);
   if (!normalized) return false;
-  if (isUpeEmail(normalized)) return true;
 
   const [profileRes, legacyRes, legacyMapRes] = await Promise.all([
-    supabase.from("profiles").select("id").ilike("email", normalized).limit(1),
+    supabase.from("profiles").select("id,is_active").ilike("email", normalized).limit(1),
     supabase.from("legacy_user_directory").select("id").ilike("email", normalized).limit(1),
     supabase.from("legacy_user_profile_links").select("id").eq("legacy_email", normalized).limit(1),
   ]);
 
-  const inProfiles = !profileRes.error && (profileRes.data || []).length > 0;
+  const inProfiles =
+    !profileRes.error && (profileRes.data || []).some((row: any) => row.is_active !== false);
   const inLegacy = !legacyRes.error && (legacyRes.data || []).length > 0;
   const inLegacyMapping = !legacyMapRes.error && (legacyMapRes.data || []).length > 0;
 
   return inProfiles || inLegacy || inLegacyMapping;
+}
+
+function isAccessLockBypassPath(pathname: string): boolean {
+  return pathname === ACCESS_LOCK_PATH || pathname === "/login" || pathname.startsWith("/auth/");
+}
+
+async function loadAccessLock(supabase: any) {
+  const { data, error } = await supabase
+    .from("app_system_settings")
+    .select("value")
+    .eq("key", ACCESS_LOCK_KEY)
+    .maybeSingle();
+
+  if (error) return normalizeAccessLock(null);
+  return normalizeAccessLock(data?.value);
 }
 
 export async function proxy(request: NextRequest) {
@@ -71,6 +95,21 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = pathname.startsWith("/auth/");
   const isOnboardingRoute = pathname === "/onboarding";
   const isPublicRoute = PUBLIC_PATHS.includes(pathname) || isAuthRoute;
+  const preAuthAccessLock = await loadAccessLock(supabase);
+
+  if (!user && preAuthAccessLock.enabled && !isAccessLockBypassPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: preAuthAccessLock.message, code: "GLOBAL_ACCESS_LOCK" },
+        { status: 423 },
+      );
+    }
+
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = ACCESS_LOCK_PATH;
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
 
   if (!user && !isPublicRoute) {
     const redirectUrl = request.nextUrl.clone();
@@ -92,7 +131,7 @@ export async function proxy(request: NextRequest) {
         redirectUrl.pathname = "/auth/auth-code-error";
         redirectUrl.searchParams.set(
           "error",
-          "Acesso restrito. Use e-mail @upe.br ou cadastro prévio na lista institucional.",
+          "Acesso restrito. Solicite ativação prévia do seu usuário pela administração.",
         );
         return NextResponse.redirect(redirectUrl);
       }
@@ -108,6 +147,21 @@ export async function proxy(request: NextRequest) {
 
     const role = normalizeRole(profile?.role, user.email);
     const homeForRole = getHomeForRole(role);
+    const accessLock = preAuthAccessLock;
+
+    if (shouldBlockForAccessLock(accessLock, role, pathname)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { error: accessLock.message, code: "GLOBAL_ACCESS_LOCK" },
+          { status: 423 },
+        );
+      }
+
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = ACCESS_LOCK_PATH;
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
 
     if (!profileError) {
       const needsOnboarding =

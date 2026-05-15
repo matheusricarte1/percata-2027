@@ -3,6 +3,7 @@ import { getEmailProviderStatus, sendSystemEmail } from "@/lib/email";
 import { createClient } from "@/utils/supabase/server";
 import { normalizeRole } from "@/lib/access";
 import { sanitizeEmail } from "@/lib/settings-sanitize";
+import { toPublicSiteUrl } from "@/lib/site-url";
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
       ],
       contextLabel: "Teste de infraestrutura",
       actionLabel: "Acessar PERCATA",
-      actionUrl: `${request.nextUrl.origin}/dashboard`,
+      actionUrl: toPublicSiteUrl("/dashboard", request.nextUrl.origin).toString(),
     });
 
     if (!result.ok) {

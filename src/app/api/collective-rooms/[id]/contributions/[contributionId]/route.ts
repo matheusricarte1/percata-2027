@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id, contributionId } = await context.params;
     const admin = createSupabaseAdminClient();
     const room = await loadRoomOrNull(admin, id);
-    if (!room) return apiError("Sala coletiva nao encontrada.", 404);
+    if (!room) return apiError("DFD coletiva nao encontrada.", 404);
     const contribution = await loadContribution(admin, contributionId);
     if (!contribution || contribution.room_id !== room.id) {
       return apiError("Contribuicao nao encontrada.", 404);
@@ -107,7 +107,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const { id, contributionId } = await context.params;
     const admin = createSupabaseAdminClient();
     const room = await loadRoomOrNull(admin, id);
-    if (!room) return apiError("Sala coletiva nao encontrada.", 404);
+    if (!room) return apiError("DFD coletiva nao encontrada.", 404);
     const contribution = await loadContribution(admin, contributionId);
     if (!contribution || contribution.room_id !== room.id) {
       return apiError("Contribuicao nao encontrada.", 404);

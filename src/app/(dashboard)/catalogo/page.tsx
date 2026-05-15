@@ -34,6 +34,7 @@ import {
   analyzeCatalogSearchQuery,
   rerankCatalogSearchResults,
 } from "@/lib/catalog-search-ranking";
+import { classifyGnd } from "@/lib/dfd-gnd";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useRouter } from "next/navigation";
@@ -100,6 +101,39 @@ function toFavoriteItemId(value: unknown): number | null {
   if (!Number.isFinite(parsed)) return null;
   if (!Number.isInteger(parsed) || parsed <= 0) return null;
   return parsed;
+}
+
+function getCatalogExpenseBadge(value?: string | number | null) {
+  const classification = classifyGnd(value);
+  if (!classification) {
+    return {
+      label: "Natureza não identificada",
+      detail: "Sem GND preferencial",
+      className: "border-slate-200 bg-slate-50 text-slate-600",
+    };
+  }
+
+  if (classification.expenseClass === "custeio") {
+    return {
+      label: "Corrente",
+      detail: `GND ${classification.gnd} · ${classification.elementLabel}`,
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    };
+  }
+
+  if (classification.expenseClass === "investimento") {
+    return {
+      label: "Capital",
+      detail: `GND ${classification.gnd} · ${classification.elementLabel}`,
+      className: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    };
+  }
+
+  return {
+    label: "Outra natureza",
+    detail: `GND ${classification.gnd} · ${classification.elementLabel}`,
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  };
 }
 
 const categories = [
@@ -557,7 +591,7 @@ export default function CatalogoPage() {
         setCollectiveRooms(rooms);
         setSelectedCollectiveRoomId((current) => current || rooms[0]?.id || "");
       } catch (error: any) {
-        if (active) toast.error(error?.message || "Erro ao carregar salas coletivas.");
+        if (active) toast.error(error?.message || "Erro ao carregar DFDs coletivas.");
       }
     }
     loadCollectiveRooms();
@@ -574,7 +608,7 @@ export default function CatalogoPage() {
       return;
     }
     if (!selectedCollectiveRoomId) {
-      toast.warning("Selecione uma sala coletiva aberta.");
+      toast.warning("Selecione uma DFD coletiva aberta.");
       return;
     }
 
@@ -612,12 +646,12 @@ export default function CatalogoPage() {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error || "Erro ao enviar item.");
       }
-      toast.success("Itens enviados para a sala coletiva.");
+      toast.success("Itens enviados para a DFD coletiva.");
       clearCarrinho();
       setCartSidebarOpen(false);
       router.push(`/dfds-coletivas/${selectedCollectiveRoomId}`);
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao enviar itens para a sala coletiva.");
+      toast.error(error?.message || "Erro ao enviar itens para a DFD coletiva.");
     } finally {
       setSendingToCollectiveRoom(false);
     }
@@ -1634,6 +1668,9 @@ function ProductCard({
       : descriptionSize === "wide"
         ? "text-[14px]"
         : "text-[15px]";
+  const expenseBadge = getCatalogExpenseBadge(
+    product.gnd || product.gnd_derivado || product.codigo_natureza_despesa,
+  );
 
   return (
     <motion.div
@@ -1702,6 +1739,18 @@ function ProductCard({
       <p className="text-[10px] uppercase tracking-widest text-black/45 font-semibold">
         Codigo e-Fisco: {product.efiscoCode}
       </p>
+
+      <div
+        className={cn(
+          "rounded-xl border px-3 py-2 text-[10px] font-semibold uppercase tracking-widest",
+          expenseBadge.className,
+        )}
+      >
+        <span>{expenseBadge.label}</span>
+        <p className="mt-1 normal-case tracking-normal text-[11px] font-medium opacity-85">
+          {expenseBadge.detail}
+        </p>
+      </div>
 
       <div className="w-full h-1.5 rounded-full bg-[#E8EDF2] overflow-hidden">
         <div

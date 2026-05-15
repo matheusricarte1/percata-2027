@@ -11,7 +11,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-white shadow-[var(--elevation-2)] hover:bg-[#0F2E57]",
+          "bg-primary text-white shadow-[var(--elevation-2)] hover:bg-[var(--upe-blue-deep)]",
         secondary:
           "bg-secondary text-white shadow-[var(--elevation-1)] hover:bg-[#4A4458]",
         outline:

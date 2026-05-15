@@ -315,6 +315,17 @@ html[data-route-pending="1"] {
     font-family: "Inter", sans-serif;
   }
 
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
   h1,
   h2,
   h3,
@@ -389,7 +400,7 @@ html[data-route-pending="1"] {
   .app-bar {
     @apply flex items-center justify-between px-8 fixed top-0 right-0 z-40 border-b border-black/5;
     height: var(--app-bar-height, 72px);
-    background: rgba(243, 242, 241, 0.95);
+    background: color-mix(in srgb, var(--md-surface) 95%, transparent);
     backdrop-filter: blur(12px);
     width: calc(100% - var(--sidebar-width, 100px));
   }
@@ -444,11 +455,11 @@ html[data-route-pending="1"] {
   }
 
   .btn-m3-primary:hover {
-    @apply bg-[#0F2E57] -translate-y-1 shadow-[var(--elevation-4)];
+    @apply bg-[var(--upe-blue-deep)] -translate-y-1 shadow-[var(--elevation-4)];
   }
 
   .badge-m3 {
-    @apply absolute top-1 right-2 bg-[#B3261E] text-white text-xs font-bold px-2 py-1 rounded-full border-2 border-[var(--md-surface)];
+    @apply absolute top-1 right-2 bg-[var(--upe-red-upe)] text-white text-xs font-bold px-2 py-1 rounded-full border-2 border-[var(--md-surface)];
   }
 
   .slider-crit {

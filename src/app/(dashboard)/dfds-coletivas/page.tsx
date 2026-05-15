@@ -119,7 +119,7 @@ export default function DfdsColetivasPage() {
       if (search.trim()) params.set("q", search.trim());
       const response = await fetch(`/api/collective-rooms?${params.toString()}`);
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Erro ao carregar salas.");
+      if (!response.ok) throw new Error(payload?.error || "Erro ao carregar DFDs coletivas.");
       const nextRooms = (payload.rooms || []) as RoomListItem[];
       setRooms(
         statusFilter === "ativas"
@@ -127,7 +127,7 @@ export default function DfdsColetivasPage() {
           : nextRooms,
       );
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao carregar salas coletivas.");
+      toast.error(error?.message || "Erro ao carregar DFDs coletivas.");
     } finally {
       setLoading(false);
     }
@@ -174,7 +174,7 @@ export default function DfdsColetivasPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Erro ao criar sala.");
-      toast.success("Sala coletiva criada.");
+      toast.success("DFD coletiva criada.");
       setDraft({
         title: "",
         description: "",
@@ -183,7 +183,7 @@ export default function DfdsColetivasPage() {
       });
       await loadRooms();
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao criar sala coletiva.");
+      toast.error(error?.message || "Erro ao criar DFD coletiva.");
     } finally {
       setCreating(false);
     }
@@ -214,11 +214,11 @@ export default function DfdsColetivasPage() {
                 DFDs coletivas do setor
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-[#5B6472]">
-                Salas temáticas abertas para que membros do mesmo setor adicionem itens e a chefia converta em DFD oficial.
+                DFDs coletivas abertas para que membros do mesmo setor adicionem itens e a chefia converta em DFD oficial.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <Metric label="Salas" value={totals.rooms} />
+              <Metric label="DFDs" value={totals.rooms} />
               <Metric label="Participantes" value={totals.participants} />
               <Metric label="Itens" value={totals.items} />
             </div>
@@ -235,7 +235,7 @@ export default function DfdsColetivasPage() {
                 <Plus size={18} weight="bold" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-[#164073]">Nova sala</h2>
+                <h2 className="text-base font-semibold text-[#164073]">Nova DFD coletiva</h2>
                 <p className="text-xs text-[#6B7280]">Aberta imediatamente ao setor.</p>
               </div>
             </div>
@@ -295,7 +295,7 @@ export default function DfdsColetivasPage() {
                 }
                 rows={4}
                 className="mt-1 w-full resize-none rounded-md border border-[#CBD5E1] px-3 py-2 text-sm normal-case tracking-normal outline-none focus:border-[#164073]"
-                placeholder="Critérios do que deve entrar nesta sala."
+                placeholder="Critérios do que deve entrar nesta DFD coletiva."
               />
             </label>
 
@@ -305,7 +305,7 @@ export default function DfdsColetivasPage() {
               className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#164073] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={16} weight="bold" />
-              {creating ? "Criando..." : "Criar sala coletiva"}
+              {creating ? "Criando..." : "Criar DFD coletiva"}
             </button>
           </form>
 
@@ -349,10 +349,10 @@ export default function DfdsColetivasPage() {
                 <div className="rounded-lg border border-dashed border-[#CBD5E1] p-10 text-center">
                   <UsersThree size={36} className="mx-auto text-[#6B7280]" />
                   <p className="mt-3 text-sm font-semibold text-[#164073]">
-                    Nenhuma sala coletiva encontrada
+                    Nenhuma DFD coletiva encontrada
                   </p>
                   <p className="mt-1 text-xs text-[#6B7280]">
-                    Crie uma sala temática para começar a composição setorial.
+                    Crie uma DFD coletiva para começar a composição setorial.
                   </p>
                 </div>
               ) : (

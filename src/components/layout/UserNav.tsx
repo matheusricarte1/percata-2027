@@ -12,6 +12,11 @@ import {
   Flask,
 } from "@phosphor-icons/react";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface UserData {
   id: string;
@@ -257,10 +262,10 @@ export function UserNav() {
             <img
               src={userData.avatar}
               alt={userData.name}
-              className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm group-hover:border-[#4D79A8]/30 transition-all"
+              className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm group-hover:border-[var(--upe-blue-medium)] transition-all"
             />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#164073] to-[#2D5D94] flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--upe-blue-upe)] to-[var(--upe-blue-medium)] flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
               {userData.initials}
             </div>
           )}
@@ -297,7 +302,7 @@ export function UserNav() {
                 className="w-12 h-12 rounded-2xl shadow-lg object-cover"
               />
             ) : (
-                <div className="w-12 h-12 rounded-2xl shadow-lg bg-gradient-to-br from-[#164073] to-[#2D5D94] text-white flex items-center justify-center font-bold">
+                <div className="w-12 h-12 rounded-2xl shadow-lg bg-gradient-to-br from-[var(--upe-blue-upe)] to-[var(--upe-blue-medium)] text-white flex items-center justify-center font-bold">
                   {userData.initials}
                 </div>
               )}
@@ -316,7 +321,7 @@ export function UserNav() {
               <button
                 type="button"
                 onClick={handleOpenProfile}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black/60 hover:bg-black/5 hover:text-[#164073] rounded-2xl transition-all group"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black/60 hover:bg-black/5 hover:text-[var(--upe-blue-upe)] rounded-2xl transition-all group"
               >
                 <User
                   size={20}
@@ -328,7 +333,7 @@ export function UserNav() {
               <button
                 type="button"
                 onClick={handleOpenSettings}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black/60 hover:bg-black/5 hover:text-[#164073] rounded-2xl transition-all group"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black/60 hover:bg-black/5 hover:text-[var(--upe-blue-upe)] rounded-2xl transition-all group"
               >
                 <GearSix
                   size={20}
@@ -355,14 +360,8 @@ export function UserNav() {
       )}
       </div>
 
-      {profileOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[90] bg-black/20"
-            onClick={() => setProfileOpen(false)}
-          />
-          <div className="fixed inset-0 z-[91] flex items-start justify-center overflow-y-auto p-4 pt-12 md:items-center md:pt-4">
-            <div className="max-h-[calc(100vh-4rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#E8EDF2] bg-white p-5 shadow-xl md:p-7">
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-2xl border border-[#E8EDF2] bg-white p-5 shadow-xl sm:max-w-2xl md:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
                   {showAvatar && userData.avatar ? (
@@ -372,7 +371,7 @@ export function UserNav() {
                       className="h-24 w-24 rounded-[22px] border border-[#D9E0E8] object-cover shadow-sm"
                     />
                   ) : (
-                    <div className="h-24 w-24 rounded-[22px] border border-[#D9E0E8] bg-[#164073] text-white text-2xl font-semibold inline-flex items-center justify-center shadow-sm">
+                    <div className="h-24 w-24 rounded-[22px] border border-[#D9E0E8] bg-[var(--upe-blue-upe)] text-white text-2xl font-semibold inline-flex items-center justify-center shadow-sm">
                       {userData.initials}
                     </div>
                   )}
@@ -381,9 +380,9 @@ export function UserNav() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
                       Perfil do Usuário
                     </p>
-                    <h3 className="mt-1 text-2xl font-semibold tracking-tight text-[#164073]">
+                    <DialogTitle className="mt-1 text-2xl font-semibold tracking-tight text-[var(--upe-blue-upe)]">
                       {userData.name}
-                    </h3>
+                    </DialogTitle>
                     <p className="mt-1 inline-flex items-center gap-1 text-sm text-[#5B6675]">
                       <Envelope size={14} />
                       {displayEmail}
@@ -405,7 +404,7 @@ export function UserNav() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
                     Campus
                   </p>
-                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#164073]">
+                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--upe-blue-upe)]">
                     <Buildings size={16} weight="duotone" />
                     {profileLoading ? "Carregando..." : summary.campusName}
                   </p>
@@ -415,7 +414,7 @@ export function UserNav() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
                     Setor / Departamento
                   </p>
-                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#164073]">
+                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--upe-blue-upe)]">
                     <User size={16} weight="duotone" />
                     {profileLoading ? "Carregando..." : summary.departmentName}
                   </p>
@@ -439,7 +438,7 @@ export function UserNav() {
                     summary.labs.map((lab) => (
                       <span
                         key={lab}
-                        className="inline-flex items-center gap-1 rounded-full border border-[#D9E0E8] bg-white px-3 py-1.5 text-xs font-semibold text-[#164073]"
+                        className="inline-flex items-center gap-1 rounded-full border border-[#D9E0E8] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--upe-blue-upe)]"
                       >
                         <Flask size={12} weight="duotone" />
                         {lab}
@@ -453,15 +452,13 @@ export function UserNav() {
                 <button
                   type="button"
                   onClick={handleOpenSettings}
-                  className="h-10 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#0F2E57]"
+                  className="h-10 rounded-xl bg-[var(--upe-blue-upe)] px-4 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[var(--upe-blue-deep)]"
                 >
                   Abrir Configurações
                 </button>
               </div>
-            </div>
-          </div>
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

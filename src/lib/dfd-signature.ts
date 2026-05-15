@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, createHmac } from "crypto";
 
 type DfdLike = {
   id: string;
@@ -48,8 +48,27 @@ export function buildDfdSignaturePayload(dfd: DfdLike, items: DfdItemLike[]) {
   });
 }
 
-export function computeDfdSignature(payload: string) {
+function getDfdSignatureSecret() {
+  const secret = process.env.DFD_SIGNATURE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("DFD_SIGNATURE_SECRET não configurado.");
+  }
+  return secret || "percata-local-signature-secret";
+}
+
+export function computeDfdSignature(payload: string, secret = getDfdSignatureSecret()) {
+  return createHmac("sha256", secret).update(payload).digest("hex");
+}
+
+export function computeLegacyDfdSignature(payload: string) {
   return createHash("sha256").update(payload).digest("hex");
+}
+
+export function canAcceptLegacyDfdSignature(createdAt: string | null | undefined) {
+  if (!createdAt) return false;
+  const created = new Date(createdAt).getTime();
+  const cutoff = Date.parse("2026-05-13T17:13:36.000Z");
+  return Number.isFinite(created) && created < cutoff;
 }
 
 export function isValidDfdSignature(signature: string | null | undefined) {

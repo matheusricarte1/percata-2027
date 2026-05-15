@@ -3,6 +3,7 @@ import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/su
 import { getEmailProviderStatus, sendSystemEmail } from "@/lib/email";
 import { createClient } from "@/utils/supabase/server";
 import { normalizeRole } from "@/lib/access";
+import { toPublicSiteUrl } from "@/lib/site-url";
 
 const DEFAULT_BATCH_SIZE = 20;
 
@@ -75,13 +76,10 @@ export async function POST(request: NextRequest) {
       : DEFAULT_BATCH_SIZE;
 
     const supabaseAdmin = createSupabaseAdminClient();
-    const { data: queued, error: queueError } = await supabaseAdmin
-      .from("email_alert_queue")
-      .select("id,email_to,subject,body,attempts,status")
-      .in("status", ["pending", "failed"])
-      .lt("attempts", 5)
-      .order("created_at", { ascending: true })
-      .limit(batchSize);
+    const { data: queued, error: queueError } = await supabaseAdmin.rpc(
+      "claim_email_alert_queue",
+      { batch_size: batchSize },
+    );
 
     if (queueError) {
       if (isMissingEmailQueueError(queueError)) {
@@ -111,18 +109,13 @@ export async function POST(request: NextRequest) {
     let failed = 0;
 
     for (const item of queued) {
-      await supabaseAdmin
-        .from("email_alert_queue")
-        .update({ status: "processing", attempts: Number(item.attempts || 0) + 1 })
-        .eq("id", item.id);
-
       const result = await sendSystemEmail({
         to: item.email_to,
         subject: item.subject,
         text: item.body,
         contextLabel: "Notificação institucional",
         actionLabel: "Abrir PERCATA",
-        actionUrl: `${request.nextUrl.origin}/dashboard`,
+        actionUrl: toPublicSiteUrl("/dashboard", request.nextUrl.origin).toString(),
       });
 
       if (result.ok) {

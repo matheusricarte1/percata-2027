@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import * as XLSX from "xlsx";
+import { downloadWorkbookFromSheets } from "@/lib/export-excel";
 import {
   buildCsv,
   buildDfdItemDetailRows,
@@ -270,7 +270,7 @@ export default function ExportacaoPage() {
     toast.success("CSV completo exportado com DFDs e itens.");
   };
 
-  const downloadXlsx = () => {
+  const downloadXlsx = async () => {
     if (dfds.length === 0 && dfdItems.length === 0 && consolidado.length === 0) {
       toast.info("Não há dados para exportar.");
       return;
@@ -313,22 +313,27 @@ export default function ExportacaoPage() {
       { chave: "observacao_xlsx", valor: "DFDs_Completas, Itens_Completos, DFD_Item_Linha e cadastros auxiliares incluem todas as colunas retornadas pelo banco, acrescidas de campos de relatório." },
     ];
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(consolidatedRows), "Consolidado");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dfdRows), "DFDs_Completas");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemRows), "Itens_Completos");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fullRows), "DFD_Item_Linha");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumoGnd), "Resumo_GND");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumoStatus), "Resumo_Status");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumoUnidade), "Resumo_Unidades");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(metadados), "Metadados");
-    Object.entries(lookupSheets).forEach(([sheetName, rows]) => {
-      if (rows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName);
-      }
-    });
-    XLSX.writeFile(wb, `pca_consolidacao_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    toast.success("XLSX exportado com sucesso.");
+    try {
+      await downloadWorkbookFromSheets(
+        [
+          { name: "Consolidado", rows: consolidatedRows },
+          { name: "DFDs_Completas", rows: dfdRows },
+          { name: "Itens_Completos", rows: itemRows },
+          { name: "DFD_Item_Linha", rows: fullRows },
+          { name: "Resumo_GND", rows: resumoGnd },
+          { name: "Resumo_Status", rows: resumoStatus },
+          { name: "Resumo_Unidades", rows: resumoUnidade },
+          { name: "Metadados", rows: metadados },
+          ...Object.entries(lookupSheets)
+            .filter(([, rows]) => rows.length > 0)
+            .map(([name, rows]) => ({ name, rows })),
+        ],
+        `pca_consolidacao_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      toast.success("XLSX exportado com sucesso.");
+    } catch (error: any) {
+      toast.error(error?.message || "Falha ao exportar XLSX.");
+    }
   };
 
   return (

@@ -109,8 +109,11 @@ async function insertAuditLog(params: {
   if (error && !isMissingAuditTableError(error)) throw error;
 }
 
-function isProtectedSuperadmin(email: string | null | undefined) {
-  return String(email || "").toLowerCase() === SUPERADMIN_EMAIL;
+function isProtectedSuperadmin(email: string | null | undefined, role: string | null | undefined) {
+  return (
+    role === "superadmin" ||
+    (Boolean(SUPERADMIN_EMAIL) && String(email || "").toLowerCase() === SUPERADMIN_EMAIL)
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -153,7 +156,7 @@ export async function POST(request: NextRequest) {
           { status: 403 },
         );
       }
-      if (isProtectedSuperadmin(target.email)) {
+      if (isProtectedSuperadmin(target.email, target.role)) {
         return NextResponse.json(
           { error: "O papel do superadmin institucional é protegido." },
           { status: 400 },
@@ -230,7 +233,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === "reset_onboarding") {
-      if (isProtectedSuperadmin(target.email)) {
+      if (isProtectedSuperadmin(target.email, target.role)) {
         return NextResponse.json(
           { error: "Reset de onboarding bloqueado para superadmin institucional." },
           { status: 400 },

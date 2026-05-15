@@ -15,6 +15,14 @@ import {
 } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { classifyGnd } from "@/lib/dfd-gnd";
+import {
+  COLLECTIVE_CATALOG_SEARCH_LIMIT,
+  buildCollectiveCatalogFallbackFilter,
+  buildCollectiveCatalogPageState,
+  buildCollectiveCatalogSearchArgs,
+  sanitizeCollectiveCatalogSearch,
+} from "@/lib/collective-catalog-search";
 
 type RoomStatus = "aberta" | "em_revisao" | "convertida" | "arquivada";
 
@@ -108,8 +116,11 @@ export default function DfdColetivaDetailPage() {
   const [savingMeta, setSavingMeta] = useState(false);
   const [converting, setConverting] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogPage, setCatalogPage] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [catalogHasMore, setCatalogHasMore] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [contributionDraft, setContributionDraft] = useState({
     quantidade: 1,
@@ -123,10 +134,10 @@ export default function DfdColetivaDetailPage() {
     try {
       const response = await fetch(`/api/collective-rooms/${roomId}`);
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Erro ao carregar sala.");
+      if (!response.ok) throw new Error(payload?.error || "Erro ao carregar DFD coletiva.");
       setDetail(payload);
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao carregar sala coletiva.");
+      toast.error(error?.message || "Erro ao carregar DFD coletiva.");
     } finally {
       setLoading(false);
     }
@@ -137,37 +148,72 @@ export default function DfdColetivaDetailPage() {
   }, [loadDetail, roomId]);
 
   useEffect(() => {
-    if (!catalogSearch.trim()) {
+    const searchTerm = sanitizeCollectiveCatalogSearch(catalogSearch);
+    const timer = window.setTimeout(() => {
+      setCatalogQuery(searchTerm);
+      setCatalogPage(0);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [catalogSearch]);
+
+  useEffect(() => {
+    const searchTerm = sanitizeCollectiveCatalogSearch(catalogQuery);
+    if (!searchTerm) {
       setCatalogItems([]);
+      setCatalogHasMore(false);
       return;
     }
-    const timer = window.setTimeout(async () => {
+
+    let active = true;
+    async function fetchCatalogPage() {
       setCatalogLoading(true);
+      const offset = catalogPage * COLLECTIVE_CATALOG_SEARCH_LIMIT;
       try {
-        const { data, error } = await supabase.rpc("buscar_catalogo_inteligente", {
-          query_text: catalogSearch.trim(),
-          categoria_filtro: "todos",
-          limit_val: 8,
-          offset_val: 0,
-        });
+        const { data, error } = await supabase.rpc(
+          "buscar_catalogo_inteligente",
+          buildCollectiveCatalogSearchArgs(searchTerm, offset),
+        );
         if (error) throw error;
-        setCatalogItems((data || []) as CatalogItem[]);
+        if ((data || []).length > 0) {
+          if (!active) return;
+          const rows = (data || []) as CatalogItem[];
+          setCatalogItems(rows);
+          setCatalogHasMore(buildCollectiveCatalogPageState(catalogPage, rows.length).hasNext);
+          return;
+        }
       } catch {
+        // Continua para a consulta direta abaixo.
+      }
+
+      try {
         const { data, error } = await supabase
           .from("catalogo")
           .select(
             "id,codigo_efisco,descricao,tipo_objeto,codigo_grupo,nome_grupo,codigo_classe,nome_classe,codigo_natureza_preferencial,gnd_preferencial,unidade_medida",
           )
-          .ilike("descricao", `%${catalogSearch.trim()}%`)
-          .limit(8);
+          .or(buildCollectiveCatalogFallbackFilter(searchTerm))
+          .order("id", { ascending: true })
+          .range(offset, offset + COLLECTIVE_CATALOG_SEARCH_LIMIT - 1);
         if (error) toast.error("Falha ao buscar no catálogo.");
-        setCatalogItems((data || []) as CatalogItem[]);
+        if (!active) return;
+        const rows = (data || []) as CatalogItem[];
+        setCatalogItems(rows);
+        setCatalogHasMore(buildCollectiveCatalogPageState(catalogPage, rows.length).hasNext);
       } finally {
-        setCatalogLoading(false);
+        if (active) setCatalogLoading(false);
       }
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [catalogSearch]);
+    }
+
+    fetchCatalogPage();
+    return () => {
+      active = false;
+    };
+  }, [catalogPage, catalogQuery]);
+
+  const catalogPageState = buildCollectiveCatalogPageState(
+    catalogPage,
+    catalogItems.length,
+  );
 
   const canEdit = Boolean(detail?.room.can_edit_metadata);
   const isOpen = detail?.room.status === "aberta";
@@ -189,11 +235,11 @@ export default function DfdColetivaDetailPage() {
         }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Erro ao salvar sala.");
-      toast.success("Sala atualizada.");
+      if (!response.ok) throw new Error(payload?.error || "Erro ao salvar DFD coletiva.");
+      toast.success("DFD coletiva atualizada.");
       await loadDetail();
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao salvar sala.");
+      toast.error(error?.message || "Erro ao salvar DFD coletiva.");
     } finally {
       setSavingMeta(false);
     }
@@ -230,7 +276,7 @@ export default function DfdColetivaDetailPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Erro ao adicionar item.");
-      toast.success("Item adicionado à sala.");
+      toast.success("Item adicionado à DFD coletiva.");
       setSelectedItem(null);
       setCatalogSearch("");
       setCatalogItems([]);
@@ -247,7 +293,7 @@ export default function DfdColetivaDetailPage() {
   }
 
   async function removeContribution(contribution: Contribution) {
-    if (!window.confirm("Remover esta contribuição da sala?")) return;
+    if (!window.confirm("Remover esta contribuição da DFD coletiva?")) return;
     try {
       const response = await fetch(
         `/api/collective-rooms/${roomId}/contributions/${contribution.id}`,
@@ -302,7 +348,7 @@ export default function DfdColetivaDetailPage() {
   }
 
   async function convertRoom() {
-    if (!window.confirm("Gerar DFD oficial a partir desta sala?")) return;
+    if (!window.confirm("Gerar DFD oficial a partir desta DFD coletiva?")) return;
     setConverting(true);
     try {
       const response = await fetch(`/api/collective-rooms/${roomId}/convert`, {
@@ -313,7 +359,7 @@ export default function DfdColetivaDetailPage() {
       toast.success(`${payload.dfds?.length || 0} DFD(s) gerada(s).`);
       await loadDetail();
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao converter sala.");
+      toast.error(error?.message || "Erro ao converter DFD coletiva.");
     } finally {
       setConverting(false);
     }
@@ -342,7 +388,7 @@ export default function DfdColetivaDetailPage() {
     return (
       <main className="min-h-screen bg-[#F7F7F5] p-6">
         <div className="mx-auto max-w-4xl rounded-lg border border-[#DAD7D2] bg-white p-8 text-center">
-          <p className="font-semibold text-[#164073]">Sala coletiva não encontrada.</p>
+          <p className="font-semibold text-[#164073]">DFD coletiva não encontrada.</p>
           <button
             onClick={() => router.push("/dfds-coletivas")}
             className="mt-4 rounded-md bg-[#164073] px-4 py-2 text-sm font-semibold text-white"
@@ -516,27 +562,77 @@ export default function DfdColetivaDetailPage() {
                       {catalogLoading && (
                         <p className="text-sm text-[#6B7280]">Buscando catálogo...</p>
                       )}
-                      {catalogItems.map((item) => (
-                        <button
-                          key={`${item.id}-${item.codigo_efisco || item.codigo_tce}`}
-                          type="button"
-                          onClick={() => setSelectedItem(item)}
-                          className={cn(
-                            "rounded-md border p-3 text-left transition",
-                            selectedItem?.id === item.id
-                              ? "border-[#164073] bg-[#E8EDF2]"
-                              : "border-[#E5E7EB] bg-white hover:bg-[#F8FAFC]",
-                          )}
-                        >
-                          <p className="text-sm font-semibold text-[#164073]">
-                            {item.descricao}
+                      {catalogItems.map((item) => {
+                        const expenseBadge = getCatalogExpenseBadge(
+                          item.gnd_preferencial ||
+                            deriveGndFromNatureza(item.codigo_natureza_preferencial),
+                        );
+
+                        return (
+                          <button
+                            key={`${item.id}-${item.codigo_efisco || item.codigo_tce}`}
+                            type="button"
+                            onClick={() => setSelectedItem(item)}
+                            className={cn(
+                              "rounded-md border p-3 text-left transition",
+                              selectedItem?.id === item.id
+                                ? "border-[#164073] bg-[#E8EDF2]"
+                                : "border-[#E5E7EB] bg-white hover:bg-[#F8FAFC]",
+                            )}
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <p className="text-sm font-semibold text-[#164073]">
+                                {item.descricao}
+                              </p>
+                              <span
+                                className={cn(
+                                  "inline-flex shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider",
+                                  expenseBadge.className,
+                                )}
+                              >
+                                {expenseBadge.label}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-[#6B7280]">
+                              {item.codigo_efisco || item.codigo_tce || item.id} ·{" "}
+                              {item.nome_classe || item.classe || item.nome_grupo || item.grupo || "Sem classe"}
+                            </p>
+                            <p className="mt-1 text-xs font-medium text-[#4B5563]">
+                              {expenseBadge.detail}
+                            </p>
+                          </button>
+                        );
+                      })}
+                      {!catalogLoading && catalogQuery && catalogItems.length === 0 && (
+                        <div className="rounded-md border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-4 text-sm text-[#6B7280]">
+                          Nenhum item encontrado. Tente termos mais gerais, parte do código e-Fisco ou uma palavra da classe.
+                        </div>
+                      )}
+                      {(catalogPageState.hasPrevious || catalogHasMore || catalogItems.length > 0) && (
+                        <div className="flex flex-col gap-2 rounded-md border border-[#E5E7EB] bg-[#F8FAFC] p-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs font-semibold text-[#6B7280]">
+                            Página {catalogPageState.displayPage} · {catalogItems.length} resultado(s)
                           </p>
-                          <p className="mt-1 text-xs text-[#6B7280]">
-                            {item.codigo_efisco || item.codigo_tce || item.id} ·{" "}
-                            {item.nome_classe || item.classe || item.nome_grupo || item.grupo || "Sem classe"}
-                          </p>
-                        </button>
-                      ))}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCatalogPage((current) => Math.max(0, current - 1))}
+                              disabled={!catalogPageState.hasPrevious || catalogLoading}
+                              className="rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-xs font-semibold text-[#164073] transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Anterior
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCatalogPage((current) => current + 1)}
+                              disabled={!catalogHasMore || catalogLoading}
+                              className="rounded-md border border-[#CBD5E1] bg-white px-3 py-2 text-xs font-semibold text-[#164073] transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Próxima
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <form onSubmit={addContribution} className="rounded-md bg-[#F8FAFC] p-4">
@@ -771,6 +867,39 @@ function deriveGndFromNatureza(value?: string | null) {
     return `${digits[0]}.${digits[1]}.${digits.slice(2, 4)}.${digits.slice(4, 6)}`;
   }
   return "";
+}
+
+function getCatalogExpenseBadge(value?: string | null) {
+  const classification = classifyGnd(value);
+  if (!classification) {
+    return {
+      label: "Sem GND",
+      detail: "Natureza da despesa não identificada",
+      className: "border-slate-200 bg-slate-50 text-slate-600",
+    };
+  }
+
+  if (classification.expenseClass === "custeio") {
+    return {
+      label: "Corrente",
+      detail: `GND ${classification.gnd} · ${classification.elementLabel}`,
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    };
+  }
+
+  if (classification.expenseClass === "investimento") {
+    return {
+      label: "Capital",
+      detail: `GND ${classification.gnd} · ${classification.elementLabel}`,
+      className: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    };
+  }
+
+  return {
+    label: "Outra natureza",
+    detail: `GND ${classification.gnd} · ${classification.elementLabel}`,
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  };
 }
 
 function Metric({ label, value }: { label: string; value: number | string }) {

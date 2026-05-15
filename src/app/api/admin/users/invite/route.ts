@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { normalizeRole, type UserRole } from "@/lib/access";
+import { getAuthCallbackUrl } from "@/lib/site-url";
 import { sanitizeEmail, sanitizePlainText, sanitizeUuid } from "@/lib/settings-sanitize";
 
 type InvitePayload = {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const inviteRes = await admin.auth.admin.inviteUserByEmail(email, {
       data: fullName ? { full_name: fullName } : undefined,
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: getAuthCallbackUrl(origin),
     });
 
     if (

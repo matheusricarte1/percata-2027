@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   buildDfdSignaturePayload,
+  canAcceptLegacyDfdSignature,
+  computeLegacyDfdSignature,
   computeDfdSignature,
   isValidDfdSignature,
 } from "@/lib/dfd-signature";
@@ -53,7 +55,12 @@ export async function GET(request: NextRequest) {
 
     const payload = buildDfdSignaturePayload(dfd, items || []);
     const expectedSignature = computeDfdSignature(payload);
-    const valid = expectedSignature === sig.toLowerCase();
+    const legacySignature = canAcceptLegacyDfdSignature(dfd.created_at)
+      ? computeLegacyDfdSignature(payload)
+      : null;
+    const providedSignature = sig.toLowerCase();
+    const valid =
+      expectedSignature === providedSignature || legacySignature === providedSignature;
 
     return NextResponse.json({
       valid,
@@ -61,6 +68,8 @@ export async function GET(request: NextRequest) {
       numeroProtocolo: dfd.numero_protocolo || null,
       status: dfd.status || null,
       updatedAt: dfd.created_at || null,
+      signatureVersion:
+        valid && legacySignature === providedSignature ? "legacy-sha256" : "hmac-sha256",
       checkedAt: new Date().toISOString(),
     });
   } catch (error: any) {

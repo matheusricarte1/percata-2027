@@ -19,10 +19,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const admin = createSupabaseAdminClient();
     const room = await loadRoomOrNull(admin, id);
-    if (!room) return apiError("Sala coletiva nao encontrada.", 404);
+    if (!room) return apiError("DFD coletiva nao encontrada.", 404);
     if (!actorHasUnit(actor, room.unit_id, room.unit_type)) return apiError("Acesso negado.", 403);
     if (room.status !== "aberta") {
-      return apiError("A sala precisa estar aberta para receber contribuicoes.", 409);
+      return apiError("A DFD coletiva precisa estar aberta para receber contribuicoes.", 409);
     }
 
     const body = await request.json().catch(() => ({}));

@@ -13,6 +13,11 @@ export default function AuthErrorPage() {
   return (
     <div className="min-h-screen bg-[#FDFBFF] flex items-center justify-center p-6">
       <div className="max-w-md w-full glass-card p-10 text-center space-y-6 shadow-2xl">
+        <img
+          src="/brands/percata-logo.png"
+          alt="PERCATA"
+          className="mx-auto h-auto w-full max-w-[260px] object-contain"
+        />
         <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-inner">
           <Warning size={40} weight="fill" />
         </div>
