@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  Buildings,
+  FunnelSimple,
   MagnifyingGlass,
+  Package,
   Plus,
   UsersThree,
 } from "@phosphor-icons/react";
@@ -202,41 +205,38 @@ export default function DfdsColetivasPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#F7F7F5] px-5 py-6 text-[#1F2933]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
-        <section className="rounded-lg border border-[#DAD7D2] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <main className="min-h-screen bg-[#F8FAFC] px-5 py-7 text-[#111827]">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-7">
+        <section className="rounded-lg border border-[#E2E8F0] bg-white p-7 shadow-[0_18px_55px_rgba(15,23,42,0.07)]">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5B6472]">
-                Meu Espaço
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold text-[#164073]">
+              <h1 className="text-3xl font-semibold text-[#0F1F3D]">
                 DFDs coletivas do setor
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-[#5B6472]">
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[#526070]">
                 DFDs coletivas abertas para que membros do mesmo setor adicionem itens e a chefia converta em DFD oficial.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <Metric label="DFDs" value={totals.rooms} />
-              <Metric label="Participantes" value={totals.participants} />
-              <Metric label="Itens" value={totals.items} />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Metric icon={<Buildings size={30} weight="duotone" />} label="DFDs" value={totals.rooms} />
+              <Metric icon={<UsersThree size={30} weight="duotone" />} label="Participantes" value={totals.participants} />
+              <Metric icon={<Package size={30} weight="duotone" />} label="Itens" value={totals.items} />
             </div>
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[360px_1fr]">
+        <section className="grid gap-6 lg:grid-cols-[390px_1fr]">
           <form
             onSubmit={createRoom}
-            className="rounded-lg border border-[#DAD7D2] bg-white p-5 shadow-sm"
+            className="rounded-lg border border-[#E2E8F0] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]"
           >
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#E8EDF2] text-[#164073]">
-                <Plus size={18} weight="bold" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[#0B4AA2] text-[#0B4AA2]">
+                <Plus size={22} weight="bold" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-[#164073]">Nova DFD coletiva</h2>
-                <p className="text-xs text-[#6B7280]">Aberta imediatamente ao setor.</p>
+                <h2 className="text-lg font-semibold text-[#0F1F3D]">Nova DFD coletiva</h2>
+                <p className="text-sm text-[#667085]">Crie uma demanda temática</p>
               </div>
             </div>
 
@@ -248,7 +248,7 @@ export default function DfdsColetivasPage() {
                   setDraft((current) => ({ ...current, title: event.target.value }))
                 }
                 required
-                className="mt-1 w-full rounded-md border border-[#CBD5E1] px-3 py-2 text-sm normal-case tracking-normal outline-none focus:border-[#164073]"
+                className="mt-2 w-full rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
                 placeholder="Ex.: Equipamentos para salas de aula"
               />
             </label>
@@ -260,7 +260,7 @@ export default function DfdsColetivasPage() {
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, unitKey: event.target.value }))
                 }
-                className="mt-1 w-full rounded-md border border-[#CBD5E1] px-3 py-2 text-sm normal-case tracking-normal outline-none focus:border-[#164073]"
+                className="mt-2 w-full rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
               >
                 {units.map((unit) => (
                   <option key={unitKey(unit)} value={unitKey(unit)}>
@@ -281,7 +281,8 @@ export default function DfdsColetivasPage() {
                   }))
                 }
                 rows={4}
-                className="mt-1 w-full resize-none rounded-md border border-[#CBD5E1] px-3 py-2 text-sm normal-case tracking-normal outline-none focus:border-[#164073]"
+                maxLength={500}
+                className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
                 placeholder="Contexto da demanda coletiva."
               />
             </label>
@@ -294,7 +295,8 @@ export default function DfdsColetivasPage() {
                   setDraft((current) => ({ ...current, scope: event.target.value }))
                 }
                 rows={4}
-                className="mt-1 w-full resize-none rounded-md border border-[#CBD5E1] px-3 py-2 text-sm normal-case tracking-normal outline-none focus:border-[#164073]"
+                maxLength={500}
+                className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
                 placeholder="Critérios do que deve entrar nesta DFD coletiva."
               />
             </label>
@@ -302,39 +304,45 @@ export default function DfdsColetivasPage() {
             <button
               type="submit"
               disabled={creating || units.length === 0}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#164073] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={16} weight="bold" />
               {creating ? "Criando..." : "Criar DFD coletiva"}
             </button>
           </form>
 
-          <section className="rounded-lg border border-[#DAD7D2] bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-[#E2E8F0] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="relative flex-1">
                 <MagnifyingGlass
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]"
+                  size={20}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#667085]"
                 />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  className="w-full rounded-md border border-[#CBD5E1] py-2 pl-9 pr-3 text-sm outline-none focus:border-[#164073]"
+                  className="w-full rounded-md border border-[#CBD5E1] py-3 pl-12 pr-4 text-sm outline-none focus:border-[#0B4AA2]"
                   placeholder="Buscar por tema, descrição ou escopo"
                 />
               </div>
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-md border border-[#CBD5E1] px-3 py-2 text-sm outline-none focus:border-[#164073]"
-              >
-                <option value="ativas">Ativas e histórico</option>
-                <option value="aberta">Abertas</option>
-                <option value="em_revisao">Em revisão</option>
-                <option value="convertida">Convertidas</option>
-                <option value="arquivada">Arquivadas</option>
-                <option value="todas">Todas</option>
-              </select>
+              <div className="relative">
+                <FunnelSimple
+                  size={18}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#0B4AA2]"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="min-w-[190px] appearance-none rounded-md border border-[#CBD5E1] bg-white py-3 pl-10 pr-8 text-sm font-medium outline-none focus:border-[#0B4AA2]"
+                >
+                  <option value="ativas">Ativas e histórico</option>
+                  <option value="aberta">Abertas</option>
+                  <option value="em_revisao">Em revisão</option>
+                  <option value="convertida">Convertidas</option>
+                  <option value="arquivada">Arquivadas</option>
+                  <option value="todas">Todas</option>
+                </select>
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3">
@@ -346,14 +354,24 @@ export default function DfdsColetivasPage() {
                   />
                 ))
               ) : rooms.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-[#CBD5E1] p-10 text-center">
-                  <UsersThree size={36} className="mx-auto text-[#6B7280]" />
-                  <p className="mt-3 text-sm font-semibold text-[#164073]">
+                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-10 text-center">
+                  <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-[#EAF2FF] text-[#0B4AA2]">
+                    <Package size={64} weight="duotone" />
+                  </div>
+                  <p className="mt-6 text-lg font-semibold text-[#0F1F3D]">
                     Nenhuma DFD coletiva encontrada
                   </p>
-                  <p className="mt-1 text-xs text-[#6B7280]">
-                    Crie uma DFD coletiva para começar a composição setorial.
+                  <p className="mt-2 max-w-md text-sm text-[#667085]">
+                    Crie uma nova DFD coletiva ou ajuste seus filtros para ver as demandas existentes.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => document.querySelector<HTMLInputElement>('input[placeholder="Ex.: Equipamentos para salas de aula"]')?.focus()}
+                    className="mt-5 inline-flex items-center justify-center gap-2 rounded-md border border-[#0B4AA2] px-5 py-3 text-sm font-semibold text-[#0B4AA2]"
+                  >
+                    <Plus size={16} weight="bold" />
+                    Criar nova DFD coletiva
+                  </button>
                 </div>
               ) : (
                 rooms.map((room) => <RoomCard key={room.id} room={room} />)
@@ -371,13 +389,22 @@ function unitKey(unit?: UnitOption | null) {
   return `${unit.unit_type}:${unit.unit_id}`;
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+}) {
   return (
-    <div className="min-w-[96px] rounded-md border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
-        {label}
-      </p>
-      <p className="text-lg font-semibold text-[#164073]">{value}</p>
+    <div className="flex min-w-[160px] items-center gap-4 rounded-lg border border-[#D8E0EA] bg-[#FBFCFF] px-5 py-4">
+      <div className="text-[#0B4AA2]">{icon}</div>
+      <div>
+        <p className="text-xs font-semibold uppercase text-[#667085]">{label}</p>
+        <p className="text-2xl font-semibold text-[#0F1F3D]">{value}</p>
+      </div>
     </div>
   );
 }
@@ -387,7 +414,7 @@ function RoomCard({ room }: { room: RoomListItem }) {
   return (
     <Link
       href={`/dfds-coletivas/${room.id}`}
-      className="group rounded-lg border border-[#E5E7EB] bg-white p-4 no-underline transition hover:border-[#164073] hover:bg-[#F8FAFC]"
+      className="group rounded-lg border border-[#E5E7EB] bg-white p-5 no-underline transition hover:border-[#0B4AA2] hover:bg-[#FBFCFF]"
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
@@ -409,11 +436,11 @@ function RoomCard({ room }: { room: RoomListItem }) {
               </span>
             )}
           </div>
-          <h3 className="mt-2 truncate text-base font-semibold text-[#164073]">
+          <h3 className="mt-2 truncate text-base font-semibold text-[#0B3473]">
             {room.title}
           </h3>
           <p className="mt-1 line-clamp-2 text-sm text-[#5B6472]">
-            {room.description || room.scope || "Sala sem descrição."}
+            {room.description || room.scope || "DFD coletiva sem descrição."}
           </p>
           <p className="mt-2 text-xs font-medium text-[#6B7280]">
             {room.unit_name} · Atualizada em{" "}
@@ -434,8 +461,8 @@ function RoomCard({ room }: { room: RoomListItem }) {
           />
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-end text-xs font-semibold uppercase tracking-wider text-[#164073]">
-        Abrir sala <ArrowRight size={14} className="ml-1" weight="bold" />
+      <div className="mt-3 flex items-center justify-end text-xs font-semibold uppercase tracking-wider text-[#0B4AA2]">
+        Abrir DFD coletiva <ArrowRight size={14} className="ml-1" weight="bold" />
       </div>
     </Link>
   );
@@ -443,11 +470,11 @@ function RoomCard({ room }: { room: RoomListItem }) {
 
 function MiniMetric({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-md bg-[#F3F4F6] px-2 py-2 text-center">
+    <div className="rounded-md bg-[#F3F6FA] px-2 py-2 text-center">
       <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6B7280]">
         {label}
       </p>
-      <p className="truncate text-xs font-semibold text-[#164073]">{value}</p>
+      <p className="truncate text-xs font-semibold text-[#0B3473]">{value}</p>
     </div>
   );
 }
