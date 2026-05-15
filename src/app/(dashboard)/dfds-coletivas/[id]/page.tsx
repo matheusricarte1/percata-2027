@@ -5,11 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Dispatch,
   FormEvent,
+  MouseEvent,
   ReactNode,
+  RefObject,
   SetStateAction,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -142,6 +145,21 @@ type CatalogItem = {
   unidade_medida?: string | null;
 };
 
+type CartDraftItem = ContributionDraft & {
+  cartId: string;
+  item: CatalogItem;
+  addedAt: number;
+};
+
+type FlyingCartItem = {
+  id: string;
+  label: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+};
+
 const STATUS_LABELS: Record<RoomStatus, string> = {
   aberta: "Aberta",
   em_revisao: "Em revisão",
@@ -194,14 +212,13 @@ export default function DfdColetivaDetailPage() {
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [catalogHasMore, setCatalogHasMore] = useState(false);
   const [catalogFilter, setCatalogFilter] = useState<CatalogExpenseFilter>("todos");
-  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [cartItems, setCartItems] = useState<CartDraftItem[]>([]);
+  const [activeCartId, setActiveCartId] = useState<string | null>(null);
   const [selectionDrawerOpen, setSelectionDrawerOpen] = useState(false);
-  const [contributionDraft, setContributionDraft] = useState<ContributionDraft>({
-    quantidade: 1,
-    valor_unitario_estimado: "",
-    link_referencia: "",
-    justificativa_item: "",
-  });
+  const [savingCart, setSavingCart] = useState(false);
+  const [flyingCartItems, setFlyingCartItems] = useState<FlyingCartItem[]>([]);
+  const [cartPulseKey, setCartPulseKey] = useState(0);
+  const cartTargetRef = useRef<HTMLButtonElement | null>(null);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -342,9 +359,25 @@ export default function DfdColetivaDetailPage() {
 
   const canEdit = Boolean(detail?.room.can_edit_metadata);
   const isOpen = detail?.room.status === "aberta";
-  const selectedSubtotal =
-    Number(contributionDraft.quantidade || 0) *
-    Number(contributionDraft.valor_unitario_estimado || 0);
+  const activeCartItem = useMemo(
+    () =>
+      cartItems.find((item) => item.cartId === activeCartId) ||
+      cartItems[cartItems.length - 1] ||
+      null,
+    [activeCartId, cartItems],
+  );
+  const cartItemKeys = useMemo(
+    () => new Set(cartItems.map((cartItem) => getCatalogItemKey(cartItem.item))),
+    [cartItems],
+  );
+  const activeCatalogItemKey = activeCartItem
+    ? getCatalogItemKey(activeCartItem.item)
+    : null;
+  const selectedSubtotal = activeCartItem ? getDraftSubtotal(activeCartItem) : 0;
+  const pendingCartValue = useMemo(
+    () => cartItems.reduce((acc, item) => acc + getDraftSubtotal(item), 0),
+    [cartItems],
+  );
 
   async function saveMetadata(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -393,52 +426,124 @@ export default function DfdColetivaDetailPage() {
     }
   }
 
-  async function addContribution(event: FormEvent) {
-    event.preventDefault();
-    if (!selectedItem) {
-      toast.warning("Escolha um item do catálogo.");
+  function addItemToCart(item: CatalogItem, event?: MouseEvent<HTMLButtonElement>) {
+    const key = getCatalogItemKey(item);
+    const existing = cartItems.find((cartItem) => getCatalogItemKey(cartItem.item) === key);
+
+    if (event) {
+      launchCartAnimation(event, item.descricao);
+    }
+
+    if (existing) {
+      setActiveCartId(existing.cartId);
+      setSelectionDrawerOpen(true);
+      setCartPulseKey((current) => current + 1);
+      toast.info("Item já está no carrinho.");
       return;
     }
+
+    const nextItem = createCartDraftItem(item);
+    setCartItems((current) => [...current, nextItem]);
+    setActiveCartId(nextItem.cartId);
+    setSelectionDrawerOpen(true);
+    setCartPulseKey((current) => current + 1);
+  }
+
+  function launchCartAnimation(event: MouseEvent<HTMLButtonElement>, label: string) {
+    const source = event.currentTarget.getBoundingClientRect();
+    const target = cartTargetRef.current?.getBoundingClientRect();
+    const item: FlyingCartItem = {
+      id: createClientId("fly"),
+      label,
+      startX: source.left + source.width / 2,
+      startY: source.top + source.height / 2,
+      endX: target ? target.left + target.width / 2 : window.innerWidth / 2,
+      endY: target ? target.top + target.height / 2 : window.innerHeight - 48,
+    };
+    setFlyingCartItems((current) => [...current, item]);
+  }
+
+  function updateActiveCartDraft(update: SetStateAction<ContributionDraft>) {
+    if (!activeCartItem) return;
+    setCartItems((current) =>
+      current.map((cartItem) => {
+        if (cartItem.cartId !== activeCartItem.cartId) return cartItem;
+        const nextDraft = resolveContributionDraftUpdate(cartItem, update);
+        return { ...cartItem, ...nextDraft };
+      }),
+    );
+  }
+
+  function removeCartItem(cartId: string) {
+    setCartItems((current) => current.filter((cartItem) => cartItem.cartId !== cartId));
+    setActiveCartId((current) => {
+      if (current !== cartId) return current;
+      const nextItem = cartItems.find((cartItem) => cartItem.cartId !== cartId);
+      return nextItem?.cartId || null;
+    });
+  }
+
+  async function addContribution(event: FormEvent) {
+    event.preventDefault();
+    if (cartItems.length === 0) {
+      toast.warning("Adicione pelo menos um item ao carrinho.");
+      return;
+    }
+
+    const invalidItem = cartItems.find(
+      (cartItem) =>
+        Number(cartItem.quantidade || 0) <= 0 ||
+        Number(cartItem.valor_unitario_estimado || 0) <= 0 ||
+        cartItem.justificativa_item.trim().length === 0,
+    );
+    if (invalidItem) {
+      setActiveCartId(invalidItem.cartId);
+      setSelectionDrawerOpen(true);
+      toast.warning("Preencha quantidade, valor unitário e justificativa dos itens no carrinho.");
+      return;
+    }
+
+    setSavingCart(true);
     try {
-      const response = await fetch(`/api/collective-rooms/${roomId}/contributions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item: {
-            ...selectedItem,
-            codigo_item_efisco: selectedItem.codigo_efisco || selectedItem.codigo_tce,
-            codigo_tce: selectedItem.codigo_efisco || selectedItem.codigo_tce,
-            gnd:
-              selectedItem.gnd_preferencial ||
-              deriveGndFromNatureza(selectedItem.codigo_natureza_preferencial),
-            gnd_derivado:
-              selectedItem.gnd_preferencial ||
-              deriveGndFromNatureza(selectedItem.codigo_natureza_preferencial),
-            codigo_natureza_despesa: selectedItem.codigo_natureza_preferencial,
-            quantidade: contributionDraft.quantidade,
-            valor_unitario_estimado: Number(contributionDraft.valor_unitario_estimado || 0),
-            link_referencia: contributionDraft.link_referencia,
-            justificativa_item: contributionDraft.justificativa_item,
-          },
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Erro ao adicionar item.");
-      toast.success("Item adicionado à DFD coletiva.");
-      setSelectedItem(null);
+      for (const cartItem of cartItems) {
+        const selectedItem = cartItem.item;
+        const response = await fetch(`/api/collective-rooms/${roomId}/contributions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item: {
+              ...selectedItem,
+              codigo_item_efisco: selectedItem.codigo_efisco || selectedItem.codigo_tce,
+              codigo_tce: selectedItem.codigo_efisco || selectedItem.codigo_tce,
+              gnd:
+                selectedItem.gnd_preferencial ||
+                deriveGndFromNatureza(selectedItem.codigo_natureza_preferencial),
+              gnd_derivado:
+                selectedItem.gnd_preferencial ||
+                deriveGndFromNatureza(selectedItem.codigo_natureza_preferencial),
+              codigo_natureza_despesa: selectedItem.codigo_natureza_preferencial,
+              quantidade: cartItem.quantidade,
+              valor_unitario_estimado: Number(cartItem.valor_unitario_estimado || 0),
+              link_referencia: cartItem.link_referencia,
+              justificativa_item: cartItem.justificativa_item,
+            },
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error || "Erro ao adicionar item.");
+      }
+      toast.success(`${cartItems.length} item(ns) adicionados à DFD coletiva.`);
+      setCartItems([]);
+      setActiveCartId(null);
       setCatalogSearch("");
       setCatalogItems([]);
-      setContributionDraft({
-        quantidade: 1,
-        valor_unitario_estimado: "",
-        link_referencia: "",
-        justificativa_item: "",
-      });
       setActiveStage("consolidar");
       setSelectionDrawerOpen(false);
       await loadDetail();
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao adicionar item.");
+      toast.error(error?.message || "Erro ao adicionar itens.");
+    } finally {
+      setSavingCart(false);
     }
   }
 
@@ -524,7 +629,6 @@ export default function DfdColetivaDetailPage() {
     setCatalogQuery("");
     setCatalogItems([]);
     setCatalogPage(0);
-    setSelectedItem(null);
     setSelectionDrawerOpen(false);
   }
 
@@ -659,11 +763,9 @@ export default function DfdColetivaDetailPage() {
               rawCatalogItems={catalogItems}
               catalogLoading={catalogLoading}
               catalogQuery={catalogQuery}
-              selectedItem={selectedItem}
-              setSelectedItem={(item) => {
-                setSelectedItem(item);
-                setSelectionDrawerOpen(true);
-              }}
+              cartItemKeys={cartItemKeys}
+              activeCatalogItemKey={activeCatalogItemKey}
+              addItemToCart={addItemToCart}
               catalogPageState={catalogPageState}
               catalogHasMore={catalogHasMore}
               setCatalogPage={setCatalogPage}
@@ -756,24 +858,36 @@ export default function DfdColetivaDetailPage() {
         {activeStage === "adicionar" && (
           <>
             <SelectionFloatingBar
-              selectedItem={selectedItem}
-              itemCount={detail.items.length}
+              activeCartItem={activeCartItem}
+              pendingCount={cartItems.length}
+              consolidatedCount={detail.items.length}
               totalValue={totalValue}
-              selectedSubtotal={selectedSubtotal}
+              pendingCartValue={pendingCartValue}
+              cartPulseKey={cartPulseKey}
+              cartTargetRef={cartTargetRef}
               onOpen={() => setSelectionDrawerOpen(true)}
               onContinue={() => setActiveStage("consolidar")}
+            />
+            <FlyingCartItems
+              items={flyingCartItems}
+              onComplete={(id) =>
+                setFlyingCartItems((current) => current.filter((item) => item.id !== id))
+              }
             />
             <SelectedItemDrawer
               open={selectionDrawerOpen}
               onClose={() => setSelectionDrawerOpen(false)}
-              selectedItem={selectedItem}
-              contributionDraft={contributionDraft}
-              setContributionDraft={setContributionDraft}
+              cartItems={cartItems}
+              activeCartItem={activeCartItem}
+              setActiveCartId={setActiveCartId}
+              updateActiveCartDraft={updateActiveCartDraft}
+              removeCartItem={removeCartItem}
               addContribution={addContribution}
               subtotal={selectedSubtotal}
-              disabled={!isOpen}
+              disabled={!isOpen || savingCart}
+              savingCart={savingCart}
               detail={detail}
-              totalValue={totalValue}
+              pendingCartValue={pendingCartValue}
               onContinue={() => {
                 setSelectionDrawerOpen(false);
                 setActiveStage("consolidar");
@@ -937,8 +1051,9 @@ function CatalogPanel(props: {
   rawCatalogItems: CatalogItem[];
   catalogLoading: boolean;
   catalogQuery: string;
-  selectedItem: CatalogItem | null;
-  setSelectedItem: (item: CatalogItem) => void;
+  cartItemKeys: Set<string>;
+  activeCatalogItemKey: string | null;
+  addItemToCart: (item: CatalogItem, event: MouseEvent<HTMLButtonElement>) => void;
   catalogPageState: ReturnType<typeof buildCollectiveCatalogPageState>;
   catalogHasMore: boolean;
   setCatalogPage: (updater: (current: number) => number) => void;
@@ -1029,21 +1144,30 @@ function CatalogPanel(props: {
             item.gnd_preferencial ||
               deriveGndFromNatureza(item.codigo_natureza_preferencial),
           );
-          const selected = props.selectedItem?.id === item.id;
+          const itemKey = getCatalogItemKey(item);
+          const selected = props.cartItemKeys.has(itemKey);
+          const active = props.activeCatalogItemKey === itemKey;
           return (
             <button
               key={`${item.id}-${item.codigo_efisco || item.codigo_tce}`}
               type="button"
-              onClick={() => props.setSelectedItem(item)}
+              onClick={(event) => props.addItemToCart(item, event)}
               className={cn(
-                "grid gap-2 rounded-md border p-4 text-left transition",
-                selected
+                "group relative grid gap-2 overflow-hidden rounded-md border p-4 text-left transition",
+                active
                   ? "border-[#0B63CE] bg-[#F7FBFF] shadow-[0_0_0_1px_#0B63CE]"
+                  : selected
+                    ? "border-[#7DB8FF] bg-[#F7FBFF]"
                   : "border-[#E2E8F0] bg-white hover:border-[#BBD6FF] hover:bg-[#FBFCFF]",
               )}
             >
+              {selected && (
+                <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border border-[#BBD6FF] bg-white px-2 py-1 text-[10px] font-semibold uppercase text-[#0B4AA2] shadow-sm">
+                  <ShoppingCart size={12} weight="fill" /> No carrinho
+                </span>
+              )}
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className={cn("min-w-0", selected && "pr-24")}>
                   <p className="text-sm font-semibold leading-5 text-[#0B3473]">
                     {item.descricao}
                   </p>
@@ -1099,22 +1223,34 @@ function CatalogPanel(props: {
 }
 
 function SelectionFloatingBar({
-  selectedItem,
-  itemCount,
+  activeCartItem,
+  pendingCount,
+  consolidatedCount,
   totalValue,
-  selectedSubtotal,
+  pendingCartValue,
+  cartPulseKey,
+  cartTargetRef,
   onOpen,
   onContinue,
 }: {
-  selectedItem: CatalogItem | null;
-  itemCount: number;
+  activeCartItem: CartDraftItem | null;
+  pendingCount: number;
+  consolidatedCount: number;
   totalValue: number;
-  selectedSubtotal: number;
+  pendingCartValue: number;
+  cartPulseKey: number;
+  cartTargetRef: RefObject<HTMLButtonElement | null>;
   onOpen: () => void;
   onContinue: () => void;
 }) {
-  const hasSelection = Boolean(selectedItem);
-  const visible = hasSelection || itemCount > 0;
+  const hasPendingItems = pendingCount > 0;
+  const visible = hasPendingItems || consolidatedCount > 0;
+  const title = hasPendingItems
+    ? `${pendingCount} item(ns) no carrinho`
+    : `${consolidatedCount} item(ns) na DFD coletiva`;
+  const description = hasPendingItems
+    ? `Pendente: ${formatCurrency(pendingCartValue)}`
+    : `Total consolidado: ${formatCurrency(totalValue)}`;
 
   return (
     <AnimatePresence>
@@ -1128,23 +1264,33 @@ function SelectionFloatingBar({
         >
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-full border border-[#DDE5EF] bg-white p-2 shadow-[0_18px_48px_rgba(15,23,42,0.18)] sm:flex-row sm:items-center sm:justify-between">
             <button
+              ref={cartTargetRef}
               type="button"
               onClick={onOpen}
               className="flex min-w-0 flex-1 items-center gap-3 rounded-full px-4 py-2 text-left transition hover:bg-[#F8FAFC]"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#0B4AA2]">
+              <motion.span
+                key={cartPulseKey}
+                initial={{ scale: 0.92, rotate: 0 }}
+                animate={{ scale: [0.92, 1.14, 1], rotate: [0, -8, 6, 0] }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#0B4AA2]"
+              >
                 <ShoppingCart size={20} weight="fill" />
-              </span>
+                {hasPendingItems && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#063F8F] px-1 text-[10px] font-bold text-white">
+                    {pendingCount}
+                  </span>
+                )}
+              </motion.span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold text-[#0F172A]">
-                  {hasSelection
-                    ? selectedItem?.descricao
-                    : `${itemCount} item(ns) na DFD coletiva`}
+                  {activeCartItem ? activeCartItem.item.descricao : title}
                 </span>
                 <span className="mt-0.5 block text-xs text-[#526070]">
-                  {hasSelection
-                    ? `Subtotal da seleção: ${formatCurrency(selectedSubtotal)}`
-                    : `Total consolidado: ${formatCurrency(totalValue)}`}
+                  {activeCartItem
+                    ? `${description} · Editando item selecionado`
+                    : description}
                 </span>
               </span>
             </button>
@@ -1154,12 +1300,12 @@ function SelectionFloatingBar({
                 onClick={onOpen}
                 className="h-10 rounded-full border border-[#CBD5E1] px-4 text-sm font-semibold text-[#0B4AA2] transition hover:bg-[#F7FBFF]"
               >
-                {hasSelection ? "Preencher" : "Ver resumo"}
+                {hasPendingItems ? "Revisar" : "Ver resumo"}
               </button>
               <button
                 type="button"
                 onClick={onContinue}
-                disabled={itemCount === 0}
+                disabled={consolidatedCount === 0}
                 className="h-10 rounded-full bg-[#063F8F] px-5 text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Consolidar
@@ -1172,29 +1318,79 @@ function SelectionFloatingBar({
   );
 }
 
+function FlyingCartItems({
+  items,
+  onComplete,
+}: {
+  items: FlyingCartItem[];
+  onComplete: (id: string) => void;
+}) {
+  return (
+    <AnimatePresence>
+      {items.map((item) => (
+        <motion.div
+          key={item.id}
+          initial={{
+            opacity: 0,
+            scale: 0.78,
+            x: item.startX,
+            y: item.startY,
+          }}
+          animate={{
+            opacity: [0, 1, 1, 0],
+            scale: [0.78, 1, 0.82, 0.38],
+            x: [item.startX, (item.startX + item.endX) / 2, item.endX],
+            y: [item.startY, Math.min(item.startY, item.endY) - 120, item.endY],
+          }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+          onAnimationComplete={() => onComplete(item.id)}
+          className="pointer-events-none fixed left-0 top-0 z-[75]"
+        >
+          <motion.div
+            initial={{ opacity: 0.45, scaleX: 0.6 }}
+            animate={{ opacity: [0.45, 0.2, 0], scaleX: [0.6, 1.6, 2.2] }}
+            transition={{ duration: 0.74, ease: "easeOut" }}
+            className="absolute -left-10 top-1/2 h-1 w-12 -translate-y-1/2 rounded-full bg-gradient-to-r from-[#0B63CE] to-transparent blur-[1px]"
+          />
+          <div className="max-w-[240px] truncate rounded-full border border-[#BBD6FF] bg-white px-3 py-2 text-xs font-semibold text-[#0B3473] shadow-[0_12px_28px_rgba(11,74,162,0.2)]">
+            + {item.label}
+          </div>
+        </motion.div>
+      ))}
+    </AnimatePresence>
+  );
+}
+
 function SelectedItemDrawer({
   open,
   onClose,
-  selectedItem,
-  contributionDraft,
-  setContributionDraft,
+  cartItems,
+  activeCartItem,
+  setActiveCartId,
+  updateActiveCartDraft,
+  removeCartItem,
   addContribution,
   subtotal,
   disabled,
+  savingCart,
   detail,
-  totalValue,
+  pendingCartValue,
   onContinue,
 }: {
   open: boolean;
   onClose: () => void;
-  selectedItem: CatalogItem | null;
-  contributionDraft: ContributionDraft;
-  setContributionDraft: Dispatch<SetStateAction<ContributionDraft>>;
+  cartItems: CartDraftItem[];
+  activeCartItem: CartDraftItem | null;
+  setActiveCartId: (cartId: string) => void;
+  updateActiveCartDraft: (update: SetStateAction<ContributionDraft>) => void;
+  removeCartItem: (cartId: string) => void;
   addContribution: (event: FormEvent) => void;
   subtotal: number;
   disabled: boolean;
+  savingCart: boolean;
   detail: RoomDetail;
-  totalValue: number;
+  pendingCartValue: number;
   onContinue: () => void;
 }) {
   return (
@@ -1235,18 +1431,73 @@ function SelectedItemDrawer({
             </div>
 
             <div className="grid grid-cols-2 gap-3 border-b border-[#DDE5EF] bg-white px-5 py-4">
-              <DrawerMetric label="Itens consolidados" value={detail.items.length} />
-              <DrawerMetric label="Total estimado" value={formatCurrency(totalValue)} />
+              <DrawerMetric label="No carrinho" value={cartItems.length} />
+              <DrawerMetric label="Subtotal pendente" value={formatCurrency(pendingCartValue)} />
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
+              <section className="rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+                <SectionTitle icon={<ShoppingCart size={18} weight="fill" />} title="Itens no carrinho" />
+                {cartItems.length === 0 ? (
+                  <p className="mt-4 rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-4 text-center text-sm text-[#667085]">
+                    Escolha itens no catálogo para montar o carrinho antes de enviar.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-2">
+                    <AnimatePresence initial={false}>
+                      {cartItems.map((cartItem) => {
+                        const active = activeCartItem?.cartId === cartItem.cartId;
+                        return (
+                          <motion.div
+                            key={cartItem.cartId}
+                            layout
+                            initial={{ opacity: 0, x: 24, scale: 0.98 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 24, scale: 0.98 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className={cn(
+                              "grid grid-cols-[1fr_auto] gap-3 rounded-md border p-3 transition",
+                              active
+                                ? "border-[#0B63CE] bg-[#F7FBFF] shadow-[0_0_0_1px_#0B63CE]"
+                                : "border-[#E2E8F0] bg-white hover:border-[#BBD6FF]",
+                            )}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setActiveCartId(cartItem.cartId)}
+                              className="min-w-0 text-left"
+                            >
+                              <p className="line-clamp-2 text-sm font-semibold leading-5 text-[#0B3473]">
+                                {cartItem.item.descricao}
+                              </p>
+                              <p className="mt-1 text-xs text-[#526070]">
+                                Qtd. {cartItem.quantidade} · {formatCurrency(getDraftSubtotal(cartItem))}
+                              </p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeCartItem(cartItem.cartId)}
+                              aria-label="Remover item do carrinho"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-[#B42318] transition hover:bg-[#FEF3F2]"
+                            >
+                              <X size={15} weight="bold" />
+                            </button>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </section>
+
               <SelectedItemPanel
-                selectedItem={selectedItem}
-                contributionDraft={contributionDraft}
-                setContributionDraft={setContributionDraft}
+                cartItem={activeCartItem}
+                setContributionDraft={updateActiveCartDraft}
                 addContribution={addContribution}
                 subtotal={subtotal}
                 disabled={disabled}
+                savingCart={savingCart}
+                cartCount={cartItems.length}
               />
 
               <section className="mt-4 rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
@@ -1286,14 +1537,28 @@ function SelectedItemDrawer({
             </div>
 
             <div className="border-t border-[#DDE5EF] bg-white p-5">
-              <button
-                type="button"
-                onClick={onContinue}
-                disabled={detail.items.length === 0}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Consolidar itens <ArrowRight size={17} weight="bold" />
-              </button>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <form onSubmit={addContribution}>
+                  <button
+                    type="submit"
+                    disabled={disabled || cartItems.length === 0}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingCart ? "Enviando..." : "Adicionar carrinho"} <Plus size={17} weight="bold" />
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  onClick={onContinue}
+                  disabled={detail.items.length === 0}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#CBD5E1] bg-white text-sm font-semibold text-[#0B4AA2] transition hover:bg-[#F7FBFF] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Consolidar <ArrowRight size={17} weight="bold" />
+                </button>
+              </div>
+              <p className="mt-3 text-center text-xs text-[#667085]">
+                Itens do carrinho só entram na DFD coletiva após clicar em Adicionar carrinho.
+              </p>
             </div>
           </motion.aside>
         </>
@@ -1312,20 +1577,30 @@ function DrawerMetric({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function SelectedItemPanel({
-  selectedItem,
-  contributionDraft,
+  cartItem,
   setContributionDraft,
   addContribution,
   subtotal,
   disabled,
+  savingCart,
+  cartCount,
 }: {
-  selectedItem: CatalogItem | null;
-  contributionDraft: ContributionDraft;
+  cartItem: CartDraftItem | null;
   setContributionDraft: Dispatch<SetStateAction<ContributionDraft>>;
   addContribution: (event: FormEvent) => void;
   subtotal: number;
   disabled: boolean;
+  savingCart: boolean;
+  cartCount: number;
 }) {
+  const selectedItem = cartItem?.item || null;
+  const contributionDraft: ContributionDraft =
+    cartItem || {
+      quantidade: 1,
+      valor_unitario_estimado: "",
+      link_referencia: "",
+      justificativa_item: "",
+    };
   const badge = selectedItem
     ? getCatalogExpenseBadge(
         selectedItem.gnd_preferencial ||
@@ -1468,13 +1743,13 @@ function SelectedItemPanel({
 
         <button
           type="submit"
-          disabled={disabled || !selectedItem}
+          disabled={disabled || cartCount === 0}
           className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Plus size={17} weight="bold" /> Adicionar à sala
+          <Plus size={17} weight="bold" /> {savingCart ? "Enviando..." : "Adicionar carrinho à sala"}
         </button>
         <p className="mt-3 text-center text-xs text-[#667085]">
-          O item será incluído em Itens consolidados.
+          Todos os itens preenchidos do carrinho serão incluídos em Itens consolidados.
         </p>
       </form>
     </Panel>
@@ -2174,6 +2449,40 @@ function summarizeItemsByExpense(items: AggregatedItem[]): ExpenseBreakdown {
 
 function getItemSubtotal(item: AggregatedItem) {
   return Number(item.quantidade || 0) * Number(item.valor_unitario_estimado || 0);
+}
+
+function getDraftSubtotal(item: ContributionDraft) {
+  return Number(item.quantidade || 0) * Number(item.valor_unitario_estimado || 0);
+}
+
+function getCatalogItemKey(item: CatalogItem) {
+  return String(item.codigo_efisco || item.codigo_tce || item.id);
+}
+
+function createClientId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createCartDraftItem(item: CatalogItem): CartDraftItem {
+  return {
+    cartId: createClientId("cart"),
+    item,
+    addedAt: Date.now(),
+    quantidade: 1,
+    valor_unitario_estimado: "",
+    link_referencia: "",
+    justificativa_item: "",
+  };
+}
+
+function resolveContributionDraftUpdate(
+  current: ContributionDraft,
+  update: SetStateAction<ContributionDraft>,
+) {
+  return typeof update === "function" ? update(current) : update;
 }
 
 function formatCurrency(value: number) {
