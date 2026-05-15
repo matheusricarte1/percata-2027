@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Dispatch,
+  FormEvent,
+  ReactNode,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -40,6 +49,13 @@ type RoomStatus = "aberta" | "em_revisao" | "convertida" | "arquivada";
 type FlowStage = "adicionar" | "consolidar" | "revisao" | "finalizar";
 type ReviewTab = "itens" | "informacoes" | "anexos";
 type CatalogExpenseFilter = "todos" | "corrente" | "capital" | "consumo" | "permanente";
+
+type ContributionDraft = {
+  quantidade: number;
+  valor_unitario_estimado: string;
+  link_referencia: string;
+  justificativa_item: string;
+};
 
 type Participant = {
   user_id: string;
@@ -177,9 +193,9 @@ export default function DfdColetivaDetailPage() {
   const [catalogHasMore, setCatalogHasMore] = useState(false);
   const [catalogFilter, setCatalogFilter] = useState<CatalogExpenseFilter>("todos");
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [contributionDraft, setContributionDraft] = useState({
+  const [contributionDraft, setContributionDraft] = useState<ContributionDraft>({
     quantidade: 1,
-    valor_unitario_estimado: 0,
+    valor_unitario_estimado: "",
     link_referencia: "",
     justificativa_item: "",
   });
@@ -400,7 +416,7 @@ export default function DfdColetivaDetailPage() {
               deriveGndFromNatureza(selectedItem.codigo_natureza_preferencial),
             codigo_natureza_despesa: selectedItem.codigo_natureza_preferencial,
             quantidade: contributionDraft.quantidade,
-            valor_unitario_estimado: contributionDraft.valor_unitario_estimado,
+            valor_unitario_estimado: Number(contributionDraft.valor_unitario_estimado || 0),
             link_referencia: contributionDraft.link_referencia,
             justificativa_item: contributionDraft.justificativa_item,
           },
@@ -414,7 +430,7 @@ export default function DfdColetivaDetailPage() {
       setCatalogItems([]);
       setContributionDraft({
         quantidade: 1,
-        valor_unitario_estimado: 0,
+        valor_unitario_estimado: "",
         link_referencia: "",
         justificativa_item: "",
       });
@@ -1065,18 +1081,8 @@ function SelectedItemPanel({
   disabled,
 }: {
   selectedItem: CatalogItem | null;
-  contributionDraft: {
-    quantidade: number;
-    valor_unitario_estimado: number;
-    link_referencia: string;
-    justificativa_item: string;
-  };
-  setContributionDraft: React.Dispatch<React.SetStateAction<{
-    quantidade: number;
-    valor_unitario_estimado: number;
-    link_referencia: string;
-    justificativa_item: string;
-  }>>;
+  contributionDraft: ContributionDraft;
+  setContributionDraft: Dispatch<SetStateAction<ContributionDraft>>;
   addContribution: (event: FormEvent) => void;
   subtotal: number;
   disabled: boolean;
@@ -1170,7 +1176,7 @@ function SelectedItemPanel({
               onChange={(event) =>
                 setContributionDraft((current) => ({
                   ...current,
-                  valor_unitario_estimado: Number(event.target.value || 0),
+                  valor_unitario_estimado: event.target.value,
                 }))
               }
               className="mt-2 h-11 w-full rounded-md border border-[#CBD5E1] px-4 text-sm outline-none focus:border-[#0B63CE]"

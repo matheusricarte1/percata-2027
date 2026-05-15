@@ -8,6 +8,7 @@ import {
   canEditCollectiveRoom,
   parseCollectiveDistributionText,
   splitCollectiveItemsByExpenseClass,
+  stripCollectiveContributionProfileFields,
   summarizeCollectiveRoom,
   validateCollectiveUnitScope,
 } from "./collective-dfd.ts";
@@ -74,6 +75,21 @@ describe("collective-dfd", () => {
     });
 
     assert.notEqual(capital, custeio);
+  });
+
+  it("strips profile-only fields before database writes", () => {
+    const row = stripCollectiveContributionProfileFields({
+      user_id: "user-1",
+      user_name: "Ana",
+      user_email: "ana@example.edu",
+      user_avatar_url: "https://example.edu/ana.png",
+      codigo_item_efisco: "426654-4",
+      descricao: "Camisa em malha",
+    });
+
+    assert.equal("user_name" in row, false);
+    assert.equal("user_email" in row, false);
+    assert.equal(row.user_avatar_url, "https://example.edu/ana.png");
   });
 
   it("rejects collective generation across different units", () => {

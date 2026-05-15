@@ -335,3 +335,12 @@ export function parseCollectiveDistributionText(
     })
     .filter((entry): entry is ParsedCollectiveContributor => Boolean(entry));
 }
+
+export function stripCollectiveContributionProfileFields<
+  T extends { user_name?: unknown; user_email?: unknown },
+>(contribution: T) {
+  const dbRow = { ...contribution };
+  delete dbRow.user_name;
+  delete dbRow.user_email;
+  return dbRow;
+}

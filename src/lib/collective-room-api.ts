@@ -5,6 +5,7 @@ import {
   buildCollectiveContributionKey,
   formatContributorDistribution,
   splitCollectiveItemsByExpenseClass,
+  stripCollectiveContributionProfileFields,
   summarizeCollectiveRoom,
   type CollectiveContribution,
   type CollectiveRoomStatus,
@@ -379,6 +380,12 @@ export function contributionFromPayload(params: {
   };
 }
 
+export function toCollectiveContributionDbRow(
+  contribution: ReturnType<typeof contributionFromPayload>,
+) {
+  return stripCollectiveContributionProfileFields(contribution);
+}
+
 export async function upsertContribution(
   admin: SupabaseAdmin,
   contribution: ReturnType<typeof contributionFromPayload>,
@@ -414,7 +421,7 @@ export async function upsertContribution(
 
   const { data, error } = await admin
     .from("dfd_collective_contributions")
-    .insert(contribution)
+    .insert(toCollectiveContributionDbRow(contribution))
     .select("*")
     .single();
   if (error) throw error;
