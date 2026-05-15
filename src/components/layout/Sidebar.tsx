@@ -140,36 +140,41 @@ function buildSections(role: SidebarProps["role"], itemCount: number): NavSectio
     ],
   };
 
+  const solicitanteItems: NavItem[] = [
+    {
+      href: "/minhas-dfds",
+      icon: Files,
+      label: "Minhas Solicitações",
+    },
+    {
+      href: "/nova-dfd",
+      icon: Gear,
+      label: "Nova Solicitação",
+    },
+    {
+      href: "/catalogo",
+      icon: Package,
+      label: "Catálogo",
+      badge: itemCount > 0 ? itemCount.toString() : null,
+    },
+    {
+      href: "/historico",
+      icon: ClockCounterClockwise,
+      label: "Solicitações Anteriores",
+    },
+  ];
+
+  if (role === "solicitante") {
+    solicitanteItems.splice(3, 0, {
+      href: "/dfds-coletivas",
+      icon: UsersThree,
+      label: "DFDs Coletivas",
+    });
+  }
+
   const solicitanteSection: NavSection = {
     label: "Meu Espaço",
-    items: [
-      {
-        href: "/minhas-dfds",
-        icon: Files,
-        label: "Minhas Solicitações",
-      },
-      {
-        href: "/nova-dfd",
-        icon: Gear,
-        label: "Nova Solicitação",
-      },
-      {
-        href: "/catalogo",
-        icon: Package,
-        label: "Catálogo",
-        badge: itemCount > 0 ? itemCount.toString() : null,
-      },
-      {
-        href: "/dfds-coletivas",
-        icon: UsersThree,
-        label: "DFDs Coletivas",
-      },
-      {
-        href: "/historico",
-        icon: ClockCounterClockwise,
-        label: "Solicitações Anteriores",
-      },
-    ],
+    items: solicitanteItems,
   };
 
   const chefiaSection: NavSection = {
