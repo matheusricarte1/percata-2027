@@ -12,6 +12,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -31,6 +32,7 @@ import {
   PaperPlaneTilt,
   PencilSimple,
   Plus,
+  ShoppingCart,
   UsersThree,
   X,
 } from "@phosphor-icons/react";
@@ -193,6 +195,7 @@ export default function DfdColetivaDetailPage() {
   const [catalogHasMore, setCatalogHasMore] = useState(false);
   const [catalogFilter, setCatalogFilter] = useState<CatalogExpenseFilter>("todos");
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [selectionDrawerOpen, setSelectionDrawerOpen] = useState(false);
   const [contributionDraft, setContributionDraft] = useState<ContributionDraft>({
     quantidade: 1,
     valor_unitario_estimado: "",
@@ -227,9 +230,6 @@ export default function DfdColetivaDetailPage() {
     if (detail.room.status === "em_revisao") {
       setActiveStage("revisao");
       return;
-    }
-    if (detail.items.length > 0 && activeStage === "adicionar") {
-      setActiveStage("consolidar");
     }
   }, [activeStage, detail]);
 
@@ -435,6 +435,7 @@ export default function DfdColetivaDetailPage() {
         justificativa_item: "",
       });
       setActiveStage("consolidar");
+      setSelectionDrawerOpen(false);
       await loadDetail();
     } catch (error: any) {
       toast.error(error?.message || "Erro ao adicionar item.");
@@ -524,6 +525,7 @@ export default function DfdColetivaDetailPage() {
     setCatalogItems([]);
     setCatalogPage(0);
     setSelectedItem(null);
+    setSelectionDrawerOpen(false);
   }
 
   function exportCollectiveCsv() {
@@ -646,7 +648,7 @@ export default function DfdColetivaDetailPage() {
         />
 
         {activeStage === "adicionar" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_1fr_440px]">
+          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
             <SideRail detail={detail} />
             <CatalogPanel
               catalogSearch={catalogSearch}
@@ -658,20 +660,15 @@ export default function DfdColetivaDetailPage() {
               catalogLoading={catalogLoading}
               catalogQuery={catalogQuery}
               selectedItem={selectedItem}
-              setSelectedItem={setSelectedItem}
+              setSelectedItem={(item) => {
+                setSelectedItem(item);
+                setSelectionDrawerOpen(true);
+              }}
               catalogPageState={catalogPageState}
               catalogHasMore={catalogHasMore}
               setCatalogPage={setCatalogPage}
               catalogFilter={catalogFilter}
               setCatalogFilter={setCatalogFilter}
-            />
-            <SelectedItemPanel
-              selectedItem={selectedItem}
-              contributionDraft={contributionDraft}
-              setContributionDraft={setContributionDraft}
-              addContribution={addContribution}
-              subtotal={selectedSubtotal}
-              disabled={!isOpen}
             />
           </section>
         )}
@@ -754,6 +751,35 @@ export default function DfdColetivaDetailPage() {
               </div>
             </section>
           </section>
+        )}
+
+        {activeStage === "adicionar" && (
+          <>
+            <SelectionFloatingBar
+              selectedItem={selectedItem}
+              itemCount={detail.items.length}
+              totalValue={totalValue}
+              selectedSubtotal={selectedSubtotal}
+              onOpen={() => setSelectionDrawerOpen(true)}
+              onContinue={() => setActiveStage("consolidar")}
+            />
+            <SelectedItemDrawer
+              open={selectionDrawerOpen}
+              onClose={() => setSelectionDrawerOpen(false)}
+              selectedItem={selectedItem}
+              contributionDraft={contributionDraft}
+              setContributionDraft={setContributionDraft}
+              addContribution={addContribution}
+              subtotal={selectedSubtotal}
+              disabled={!isOpen}
+              detail={detail}
+              totalValue={totalValue}
+              onContinue={() => {
+                setSelectionDrawerOpen(false);
+                setActiveStage("consolidar");
+              }}
+            />
+          </>
         )}
       </div>
     </main>
@@ -1069,6 +1095,219 @@ function CatalogPanel(props: {
         )}
       </div>
     </Panel>
+  );
+}
+
+function SelectionFloatingBar({
+  selectedItem,
+  itemCount,
+  totalValue,
+  selectedSubtotal,
+  onOpen,
+  onContinue,
+}: {
+  selectedItem: CatalogItem | null;
+  itemCount: number;
+  totalValue: number;
+  selectedSubtotal: number;
+  onOpen: () => void;
+  onContinue: () => void;
+}) {
+  const hasSelection = Boolean(selectedItem);
+  const visible = hasSelection || itemCount > 0;
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 28 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className="fixed inset-x-0 bottom-5 z-[60] px-4"
+        >
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-full border border-[#DDE5EF] bg-white p-2 shadow-[0_18px_48px_rgba(15,23,42,0.18)] sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={onOpen}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-full px-4 py-2 text-left transition hover:bg-[#F8FAFC]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#0B4AA2]">
+                <ShoppingCart size={20} weight="fill" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-[#0F172A]">
+                  {hasSelection
+                    ? selectedItem?.descricao
+                    : `${itemCount} item(ns) na DFD coletiva`}
+                </span>
+                <span className="mt-0.5 block text-xs text-[#526070]">
+                  {hasSelection
+                    ? `Subtotal da seleção: ${formatCurrency(selectedSubtotal)}`
+                    : `Total consolidado: ${formatCurrency(totalValue)}`}
+                </span>
+              </span>
+            </button>
+            <div className="flex shrink-0 gap-2 px-1 pb-1 sm:pb-0">
+              <button
+                type="button"
+                onClick={onOpen}
+                className="h-10 rounded-full border border-[#CBD5E1] px-4 text-sm font-semibold text-[#0B4AA2] transition hover:bg-[#F7FBFF]"
+              >
+                {hasSelection ? "Preencher" : "Ver resumo"}
+              </button>
+              <button
+                type="button"
+                onClick={onContinue}
+                disabled={itemCount === 0}
+                className="h-10 rounded-full bg-[#063F8F] px-5 text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Consolidar
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function SelectedItemDrawer({
+  open,
+  onClose,
+  selectedItem,
+  contributionDraft,
+  setContributionDraft,
+  addContribution,
+  subtotal,
+  disabled,
+  detail,
+  totalValue,
+  onContinue,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedItem: CatalogItem | null;
+  contributionDraft: ContributionDraft;
+  setContributionDraft: Dispatch<SetStateAction<ContributionDraft>>;
+  addContribution: (event: FormEvent) => void;
+  subtotal: number;
+  disabled: boolean;
+  detail: RoomDetail;
+  totalValue: number;
+  onContinue: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[70] bg-[#0F172A]/35 backdrop-blur-[2px]"
+          />
+          <motion.aside
+            initial={{ x: 560 }}
+            animate={{ x: 0 }}
+            exit={{ x: 560 }}
+            transition={{ type: "spring", damping: 30, stiffness: 290 }}
+            className="fixed right-0 top-0 z-[80] flex h-screen w-full max-w-[540px] flex-col border-l border-[#DDE5EF] bg-[#F8FAFC] shadow-2xl"
+          >
+            <div className="flex h-[82px] items-center justify-between border-b border-[#DDE5EF] bg-white px-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">
+                  Resumo da seleção
+                </p>
+                <h2 className="mt-1 text-xl font-semibold text-[#0B3473]">
+                  Carrinho da DFD coletiva
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Fechar seleção"
+                className="flex h-10 w-10 items-center justify-center rounded-md border border-[#CBD5E1] bg-white text-[#0B4AA2] transition hover:bg-[#F7FBFF]"
+              >
+                <X size={18} weight="bold" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-b border-[#DDE5EF] bg-white px-5 py-4">
+              <DrawerMetric label="Itens consolidados" value={detail.items.length} />
+              <DrawerMetric label="Total estimado" value={formatCurrency(totalValue)} />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <SelectedItemPanel
+                selectedItem={selectedItem}
+                contributionDraft={contributionDraft}
+                setContributionDraft={setContributionDraft}
+                addContribution={addContribution}
+                subtotal={subtotal}
+                disabled={disabled}
+              />
+
+              <section className="mt-4 rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+                <SectionTitle icon={<Package size={18} weight="bold" />} title="Itens já adicionados" />
+                {detail.items.length === 0 ? (
+                  <p className="mt-4 rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-4 text-center text-sm text-[#667085]">
+                    Nenhum item consolidado ainda.
+                  </p>
+                ) : (
+                  <div className="mt-4 divide-y divide-[#EEF2F7]">
+                    {detail.items.slice(0, 5).map((item) => {
+                      const key = `${item.codigo_item_efisco || item.codigo_tce}-${item.gnd || item.gnd_derivado}`;
+                      return (
+                        <div key={key} className="py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-[#0F172A]">
+                              {item.descricao}
+                            </p>
+                            <strong className="shrink-0 text-sm text-[#0B4AA2]">
+                              {formatCurrency(getItemSubtotal(item))}
+                            </strong>
+                          </div>
+                          <p className="mt-1 text-xs text-[#526070]">
+                            Qtd. {item.quantidade} · {item.gnd || item.gnd_derivado || "GND não informado"}
+                          </p>
+                        </div>
+                      );
+                    })}
+                    {detail.items.length > 5 && (
+                      <p className="pt-3 text-xs font-semibold text-[#0B4AA2]">
+                        + {detail.items.length - 5} item(ns) no resumo completo
+                      </p>
+                    )}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <div className="border-t border-[#DDE5EF] bg-white p-5">
+              <button
+                type="button"
+                onClick={onContinue}
+                disabled={detail.items.length === 0}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Consolidar itens <ArrowRight size={17} weight="bold" />
+              </button>
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function DrawerMetric({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border border-[#DDE5EF] bg-[#FBFCFF] p-3">
+      <p className="text-xs text-[#526070]">{label}</p>
+      <p className="mt-1 text-base font-semibold text-[#0F172A]">{value}</p>
+    </div>
   );
 }
 
