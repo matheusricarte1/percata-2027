@@ -30,6 +30,7 @@ import { resolveCampusBranding } from "@/lib/campus-branding";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { buildDfdPrintExportCsv } from "@/lib/dfd-print-export";
+import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
 
 type DfdStatus = "rascunho" | "triagem" | "aprovada" | "devolvida" | "pactuando" | "concluida";
 
@@ -104,6 +105,7 @@ export default function DfdDetailsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [markingKit, setMarkingKit] = useState(false);
   const [sendingToChefia, setSendingToChefia] = useState(false);
+  const [submissionAnimationOpen, setSubmissionAnimationOpen] = useState(false);
   const [deletingDfd, setDeletingDfd] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -208,6 +210,7 @@ export default function DfdDetailsPage() {
       }
 
       toast.success("DFD enviada para análise.");
+      setSubmissionAnimationOpen(true);
       fetchData();
     } catch (error: any) {
       toast.error("Erro ao enviar DFD: " + (error?.message || "erro desconhecido"));
@@ -623,6 +626,11 @@ export default function DfdDetailsPage() {
           </motion.section>
         </div>
       </div>
+      <DfdSubmissionAnimation
+        open={submissionAnimationOpen}
+        protocol={dfd.numero_protocolo || `DFD-${dfd.id.slice(0, 8).toUpperCase()}`}
+        onClose={() => setSubmissionAnimationOpen(false)}
+      />
     </div>
   );
 }

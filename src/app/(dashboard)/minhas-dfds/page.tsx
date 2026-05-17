@@ -29,6 +29,7 @@ import { useRouter } from "next/navigation";
 import { resolveCampusBranding } from "@/lib/campus-branding";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { DFD_PROCESS_STEPS, getDfdProcessStage } from "@/lib/dfd-process-guide";
+import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
 
 type DfdStatus =
   | "rascunho"
@@ -147,6 +148,7 @@ export default function MinhasDFDsPage() {
   const [unitNameMap, setUnitNameMap] = useState<Record<string, string>>({});
   const [currentRole, setCurrentRole] = useState<UserRole>("solicitante");
   const [sendingDfdId, setSendingDfdId] = useState<string | null>(null);
+  const [submittedDfd, setSubmittedDfd] = useState<{ id: string; protocol?: string | null } | null>(null);
   const [markingKitId, setMarkingKitId] = useState<string | null>(null);
   const [author, setAuthor] = useState<AuthorProfile>({
     fullName: "Solicitante",
@@ -286,6 +288,7 @@ export default function MinhasDFDsPage() {
   const handleSendToChefia = async (dfdId: string) => {
     setSendingDfdId(dfdId);
     try {
+      const targetDfd = dfds.find((dfd) => dfd.id === dfdId) || null;
       const response = await fetch("/api/dfd/send-to-triagem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -299,6 +302,10 @@ export default function MinhasDFDsPage() {
       setDfds((prev) =>
         prev.map((dfd) => (dfd.id === dfdId ? { ...dfd, status: "triagem" } : dfd)),
       );
+      setSubmittedDfd({
+        id: dfdId,
+        protocol: targetDfd?.numero_protocolo || `DFD-${dfdId.slice(0, 8).toUpperCase()}`,
+      });
       toast.success("DFD enviada para análise da chefia.");
     } catch (error: any) {
       toast.error("Erro ao enviar DFD: " + (error?.message || "erro desconhecido"));
@@ -776,6 +783,11 @@ export default function MinhasDFDsPage() {
           )}
         </section>
       )}
+      <DfdSubmissionAnimation
+        open={Boolean(submittedDfd)}
+        protocol={submittedDfd?.protocol}
+        onClose={() => setSubmittedDfd(null)}
+      />
     </div>
   );
 }
