@@ -221,6 +221,7 @@
   --motion-slow: 420ms;
   --motion-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-spring-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Shadcn Overrides */
   --background: var(--upe-neutral-cool-off-white);
@@ -241,6 +242,10 @@
   --radius: 1.5rem;
   --app-bar-height: 72px;
   --sidebar-width: 100px;
+}
+
+html:not([data-motion-ready="1"]) [data-animate-page] {
+  opacity: 0;
 }
 
 html[data-theme-mode="dark"] {
@@ -294,10 +299,10 @@ html[data-density-mode="compact"] {
   --app-bar-height: 64px;
   --sidebar-width: 88px;
 }
-
-html[data-reduced-motion="1"] *,
-html[data-reduced-motion="1"] *::before,
-html[data-reduced-motion="1"] *::after {
+html[data-reduced-motion="1"] *::after,
+html[data-show-animations="0"] *,
+html[data-show-animations="0"] *::before,
+html[data-show-animations="0"] *::after {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   scroll-behavior: auto !important;
@@ -565,6 +570,39 @@ html[data-route-pending="1"] {
     @apply border-[#C7D7EA] shadow-[0_18px_45px_-30px_rgba(17,24,39,0.38)];
     transform: translateY(-2px);
   }
+
+  [data-slot="card"],
+  .motion-surface,
+  .m3-form-card,
+  .feedback-surface,
+  .rounded-2xl.border,
+  .rounded-xl.border {
+    transition:
+      transform var(--motion-base) var(--motion-spring-soft),
+      box-shadow var(--motion-base) var(--motion-ease-standard),
+      border-color var(--motion-base) var(--motion-ease-standard),
+      background-color var(--motion-base) var(--motion-ease-standard);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    [data-slot="card"]:hover,
+    .motion-surface:hover,
+    .m3-form-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 45px -32px rgba(17, 24, 39, 0.42);
+      border-color: rgba(77, 121, 168, 0.38);
+    }
+
+    tbody tr {
+      transition:
+        background-color var(--motion-fast) var(--motion-ease-standard),
+        transform var(--motion-fast) var(--motion-ease-standard);
+    }
+
+    tbody tr:hover {
+      background-color: rgba(244, 247, 250, 0.78);
+    }
+  }
 }
 
 @layer utilities {
@@ -574,6 +612,14 @@ html[data-route-pending="1"] {
 
   .animate-soft-pop {
     animation: soft-pop 220ms var(--motion-ease-emphasized) both;
+  }
+
+  .animate-fade-in-scale {
+    animation: fade-in-scale 260ms var(--motion-ease-emphasized) both;
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 260ms var(--motion-ease-emphasized) both;
   }
 
   .skeleton-shimmer::after {
@@ -609,6 +655,30 @@ html[data-route-pending="1"] {
     to {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  @keyframes fade-in-scale {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
     }
   }
 

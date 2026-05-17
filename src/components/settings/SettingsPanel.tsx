@@ -223,7 +223,14 @@ export function SettingsPanel({ scope }: { scope: string }) {
     root.dataset.densityMode = settings.densityMode;
     root.dataset.accentColor = settings.accentColor;
     root.dataset.reducedMotion = settings.reducedMotion ? "1" : "0";
-  }, [settings.themeMode, settings.densityMode, settings.accentColor, settings.reducedMotion]);
+    root.dataset.showAnimations = settings.showAnimations ? "1" : "0";
+  }, [
+    settings.themeMode,
+    settings.densityMode,
+    settings.accentColor,
+    settings.reducedMotion,
+    settings.showAnimations,
+  ]);
 
   const syncLabel = useMemo(
     () =>

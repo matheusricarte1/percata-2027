@@ -309,6 +309,8 @@ export function AppShell({
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={pathname}
+                data-animate-page
+                data-animate-auto
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
                 animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}

@@ -3,6 +3,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NavigationFeedback } from "@/components/feedback/NavigationFeedback";
+import { AnimationRuntime } from "@/components/motion/AnimationRuntime";
 import CssBaseline from "@mui/material/CssBaseline";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import { ThemeProvider } from "@mui/material/styles";
@@ -30,6 +31,7 @@ function applyStoredSettings(settings: Partial<UserSettings> | null) {
   root.dataset.densityMode = normalized.densityMode;
   root.dataset.accentColor = normalized.accentColor;
   root.dataset.reducedMotion = normalized.reducedMotion ? "1" : "0";
+  root.dataset.showAnimations = normalized.showAnimations ? "1" : "0";
 }
 
 function loadStoredSettings(): Partial<UserSettings> | null {
@@ -100,6 +102,7 @@ export function AppProviders({ children }: AppProvidersProps) {
         <CssBaseline enableColorScheme />
         <TooltipProvider>
           {children}
+          <AnimationRuntime />
           <NavigationFeedback />
           <Toaster richColors position="top-right" closeButton />
         </TooltipProvider>
