@@ -219,6 +219,7 @@ export default function DfdColetivaDetailPage() {
   const [flyingCartItems, setFlyingCartItems] = useState<FlyingCartItem[]>([]);
   const [cartPulseKey, setCartPulseKey] = useState(0);
   const cartTargetRef = useRef<HTMLButtonElement | null>(null);
+  const roomStatus = detail?.room.status;
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -239,16 +240,16 @@ export default function DfdColetivaDetailPage() {
   }, [loadDetail, roomId]);
 
   useEffect(() => {
-    if (!detail) return;
-    if (detail.room.status === "convertida" || detail.room.status === "arquivada") {
+    if (!roomStatus) return;
+    if (roomStatus === "convertida" || roomStatus === "arquivada") {
       setActiveStage("finalizar");
       return;
     }
-    if (detail.room.status === "em_revisao") {
+    if (roomStatus === "em_revisao") {
       setActiveStage("revisao");
       return;
     }
-  }, [activeStage, detail]);
+  }, [roomStatus]);
 
   useEffect(() => {
     const searchTerm = sanitizeCollectiveCatalogSearch(catalogSearch);
