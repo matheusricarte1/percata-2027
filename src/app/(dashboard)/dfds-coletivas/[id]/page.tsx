@@ -49,6 +49,7 @@ import {
   buildCollectiveCatalogSearchArgs,
   sanitizeCollectiveCatalogSearch,
 } from "@/lib/collective-catalog-search";
+import { rerankCatalogSearchResults } from "@/lib/catalog-search-ranking";
 
 type RoomStatus = "aberta" | "em_revisao" | "convertida" | "arquivada";
 type FlowStage = "adicionar" | "consolidar" | "revisao" | "finalizar";
@@ -281,7 +282,7 @@ export default function DfdColetivaDetailPage() {
         if ((data || []).length > 0) {
           if (!active) return;
           const rows = (data || []) as CatalogItem[];
-          setCatalogItems(rows);
+          setCatalogItems(rerankCatalogSearchResults(searchTerm, rows));
           setCatalogHasMore(buildCollectiveCatalogPageState(catalogPage, rows.length).hasNext);
           return;
         }
@@ -301,7 +302,7 @@ export default function DfdColetivaDetailPage() {
         if (error) toast.error("Falha ao buscar no catálogo.");
         if (!active) return;
         const rows = (data || []) as CatalogItem[];
-        setCatalogItems(rows);
+        setCatalogItems(rerankCatalogSearchResults(searchTerm, rows));
         setCatalogHasMore(buildCollectiveCatalogPageState(catalogPage, rows.length).hasNext);
       } finally {
         if (active) setCatalogLoading(false);

@@ -85,10 +85,88 @@ describe("catalog-search-ranking", () => {
     assert.equal(first.id, 2);
   });
 
+  it("penalizes service results when a technical product query asks for equipment", () => {
+    const [first] = rerankCatalogSearchResults("ar condicionado split 12000 btus", [
+      {
+        id: 1,
+        rank: 160,
+        tipo_objeto: "SERVIÇO",
+        descricao:
+          "SERVICO DE MANUTENCAO PREVENTIVA E/OU CORRETIVA EM AR CONDICIONADO TIPO SPLIT 12000 BTU/H",
+      },
+      {
+        id: 2,
+        rank: 80,
+        tipo_objeto: "MATERIAL",
+        descricao: "CONDICIONADOR DE AR - SPLIT, 12000 BTUS, FRIO, CONTROLE REMOTO",
+      },
+    ]);
+
+    assert.equal(first.id, 2);
+  });
+
+  it("uses oficio plus material co-occurrence and blocks unrelated MDF contexts", () => {
+    const [first] = rerankCatalogSearchResults("marcenaria com material", [
+      {
+        id: 1,
+        rank: 150,
+        tipo_objeto: "MATERIAL",
+        descricao: "MATERIAL PEDAGOGICO EM MDF - JOGO DE MEMORIA INFANTIL",
+      },
+      {
+        id: 2,
+        rank: 75,
+        tipo_objeto: "SERVIÇO",
+        descricao:
+          "SERVICO DE MARCENARIA - INCLUSIVE FORNECIMENTO DE MATERIAL, MDF, FERRAGENS E ACABAMENTO",
+      },
+    ]);
+
+    assert.equal(first.id, 2);
+  });
+
+  it("diversifies repeated prefixes after the third result", () => {
+    const ranked = rerankCatalogSearchResults("lampada led 9w bivolt", [
+      { id: 1, rank: 100, descricao: "LAMPADA LED - 9W BIVOLT A60" },
+      { id: 2, rank: 99, descricao: "LAMPADA LED - 9W BIVOLT BULBO" },
+      { id: 3, rank: 98, descricao: "LAMPADA LED - 9W BIVOLT E27" },
+      { id: 4, rank: 97, descricao: "LAMPADA LED - 9W BIVOLT FRIA" },
+      { id: 5, rank: 60, descricao: "LUMINARIA LED - 9W BIVOLT DE SOBREPOR" },
+    ]);
+
+    assert.deepEqual(ranked.slice(0, 5).map((item) => item.id), [1, 2, 3, 5, 4]);
+  });
+
   it("exposes a compact visual interpretation of the user query", () => {
     const analysis = analyzeCatalogSearchQuery("TV televisor 85 polegadas smart");
 
     assert.deepEqual(analysis.primaryTerms, ["tv/televisor"]);
     assert.deepEqual(analysis.specificationTerms, ["85", "polegadas", "smart"]);
+  });
+
+  it("normalizes decimal technical specs as specification terms", () => {
+    const analysis = analyzeCatalogSearchQuery("cabo eletrico azul 2,5mm");
+
+    assert.deepEqual(analysis.primaryTerms, ["cabo", "eletrico", "azul"]);
+    assert.deepEqual(analysis.specificationTerms, ["2.5mm"]);
+  });
+
+  it("matches compact BTU notation against catalog descriptions with separated thousands", () => {
+    const [first] = rerankCatalogSearchResults("ar condicionado split 12000 btus", [
+      {
+        id: 1,
+        rank: 95,
+        tipo_objeto: "MATERIAL",
+        descricao: "CONDICIONADOR DE AR - TIPO SPLIT, CAPACIDADE DE 18 000 BTUS",
+      },
+      {
+        id: 2,
+        rank: 80,
+        tipo_objeto: "MATERIAL",
+        descricao: "CONDICIONADOR DE AR - TIPO SPLIT, CAPACIDADE DE 12 000 BTUS",
+      },
+    ]);
+
+    assert.equal(first.id, 2);
   });
 });
