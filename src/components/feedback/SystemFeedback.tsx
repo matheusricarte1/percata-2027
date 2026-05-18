@@ -63,6 +63,8 @@ export function EmptyState({
   description,
   tone = "neutral",
   icon = "empty",
+  imageSrc,
+  imageAlt,
   action,
   className,
 }: {
@@ -70,6 +72,8 @@ export function EmptyState({
   description?: string;
   tone?: FeedbackTone;
   icon?: "empty" | "success" | "warning" | "refresh";
+  imageSrc?: string;
+  imageAlt?: string;
   action?: ReactNode;
   className?: string;
 }) {
@@ -93,9 +97,17 @@ export function EmptyState({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/75 shadow-sm">
-        <Icon className="h-5 w-5" />
-      </div>
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={imageAlt || ""}
+          className="mx-auto mb-5 aspect-[16/9] w-full max-w-[280px] rounded-2xl object-contain"
+        />
+      ) : (
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/75 shadow-sm">
+          <Icon className="h-5 w-5" />
+        </div>
+      )}
       <p className="font-display text-lg font-semibold">{title}</p>
       {description ? <p className="mx-auto mt-2 max-w-xl text-sm leading-6 opacity-80">{description}</p> : null}
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}

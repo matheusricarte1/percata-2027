@@ -1603,8 +1603,12 @@ export default function TriagemPage() {
                 <Skeleton key={i} className="h-32 w-full rounded-[20px]" />
               ))
             ) : filteredDfds.length === 0 ? (
-              <div className="py-32 text-center space-y-6 opacity-20">
-                <CheckCircle size={80} weight="thin" className="mx-auto text-upe-blue-upe" />
+              <div className="space-y-6 py-24 text-center">
+                <img
+                  src="/guidance/triage-empty-queue.png"
+                  alt=""
+                  className="mx-auto aspect-[16/9] w-full max-w-[380px] object-contain"
+                />
                 <div className="space-y-1">
                   <h3 className="font-display font-semibold text-2xl text-upe-blue-upe uppercase tracking-tighter">
                     Limpo e Finalizado

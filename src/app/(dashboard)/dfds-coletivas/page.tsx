@@ -355,9 +355,11 @@ export default function DfdsColetivasPage() {
                 ))
               ) : rooms.length === 0 ? (
                 <div className="flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-10 text-center">
-                  <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-[#EAF2FF] text-[#0B4AA2]">
-                    <Package size={64} weight="duotone" />
-                  </div>
+                  <img
+                    src="/guidance/collective-empty-room.png"
+                    alt=""
+                    className="aspect-[16/9] w-full max-w-[360px] object-contain"
+                  />
                   <p className="mt-6 text-lg font-semibold text-[#0F1F3D]">
                     Nenhuma DFD coletiva encontrada
                   </p>

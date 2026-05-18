@@ -14,7 +14,6 @@ import {
   GraduationCap,
   Handshake,
   Info,
-  ShoppingCartSimple,
   SquaresFour,
   StackSimple,
   Target,
@@ -1105,9 +1104,11 @@ export default function NovaDFDPage() {
   if (items.length === 0) {
     return (
       <div className="flex min-h-[72vh] flex-col items-center justify-center gap-5 px-6">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-[#D9E0E8] bg-white text-[#164073]">
-          <ShoppingCartSimple size={36} />
-        </div>
+        <img
+          src="/guidance/empty-cart.png"
+          alt=""
+          className="aspect-[16/9] w-full max-w-[420px] object-contain"
+        />
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-[#164073]">Carrinho vazio</h2>
           <p className="text-sm text-[#5B6675]">

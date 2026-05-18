@@ -171,8 +171,14 @@ export function NotificationBell({
               {loading ? (
                 <div className="px-4 py-6 text-xs text-[#7D98B8]">Carregando notificações...</div>
               ) : notifications.length === 0 ? (
-                <div className="px-4 py-6 text-xs text-[#7D98B8]">
-                  Nenhuma notificação até o momento.
+                <div className="px-5 py-6 text-center text-xs text-[#7D98B8]">
+                  <img
+                    src="/guidance/notifications-empty.png"
+                    alt=""
+                    className="mx-auto mb-3 aspect-[16/9] w-full max-w-[220px] object-contain"
+                  />
+                  <p className="font-semibold text-[#164073]">Nenhuma notificação até o momento.</p>
+                  <p className="mt-1 leading-5">Quando houver movimentações nas suas DFDs, elas aparecerão aqui.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-[#E8EDF2]">

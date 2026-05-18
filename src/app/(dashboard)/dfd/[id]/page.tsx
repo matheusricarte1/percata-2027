@@ -14,7 +14,6 @@ import {
   Clock,
   Paperclip,
   Buildings,
-  WarningCircle,
   ShieldCheck,
   Hash,
   PaperPlaneTilt,
@@ -534,7 +533,11 @@ export default function DfdDetailsPage() {
 
             {items.length === 0 ? (
               <div className="px-4 py-10 text-center">
-                <WarningCircle size={36} className="mx-auto text-[#A7B1BD]" />
+                <img
+                  src="/guidance/empty-cart.png"
+                  alt=""
+                  className="mx-auto aspect-[16/9] w-full max-w-[300px] object-contain"
+                />
                 <p className="mt-2 text-sm font-medium text-[#5B6675]">Nenhum item vinculado.</p>
               </div>
             ) : (

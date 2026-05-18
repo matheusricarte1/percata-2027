@@ -1172,8 +1172,12 @@ export default function CatalogoPage() {
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-              <WarningCircle size={48} />
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <img
+                src="/guidance/catalog-no-results.png"
+                alt=""
+                className="mb-5 aspect-[16/9] w-full max-w-[360px] object-contain"
+              />
               <p className="font-display font-semibold text-xl mt-4">
                 {products.length > 0
                   ? "Nenhum resultado para os filtros ativos"
