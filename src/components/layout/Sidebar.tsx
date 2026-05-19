@@ -16,6 +16,7 @@ import {
   Wallet,
   ArrowRight,
   UsersThree,
+  MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { useCarrinhoStore } from "@/store/carrinho";
 
@@ -205,6 +206,11 @@ function buildSections(role: SidebarProps["role"], itemCount: number): NavSectio
         href: "/admin/consolidacao",
         icon: CheckCircle,
         label: "Consolidação de Pedidos",
+      },
+      {
+        href: "/admin/catalogo-busca",
+        icon: MagnifyingGlass,
+        label: "Busca do Catálogo",
       },
     ],
   };
