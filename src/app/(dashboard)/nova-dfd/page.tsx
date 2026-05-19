@@ -1131,14 +1131,14 @@ export default function NovaDFDPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.08em] text-[#164073]">
-              Fluxo de Solicitação PCA
+              Solicitação guiada
             </span>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[#0F2E57] md:text-5xl">
-              Configurar Demandas
+              Vamos organizar sua demanda
             </h1>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-[#3E4C5F]">
-              Escolha como o carrinho será organizado e complete os dados obrigatórios para gerar
-              rascunhos de DFD, com justificativas técnicas, previsão de recebimento e referência de preço.
+              O sistema separa o carrinho em etapas para que você consiga montar os rascunhos de DFD
+              com mais clareza, justificativas melhores e menos sensação de preenchimento solto.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -1163,12 +1163,11 @@ export default function NovaDFDPage() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-[#164073]">
-                Como esta DFD sai do carrinho e chega à chefia
+                Você não precisa lembrar tudo de uma vez
               </h2>
               <p className="mt-1 max-w-4xl text-sm leading-6 text-[#52627A]">
-                Você pode seguir sozinho: complete os dados obrigatórios, finalize os rascunhos e,
-                em Minhas DFDs, envie cada DFD para a chefia. O envio é sempre feito pela pessoa
-                que criou a DFD.
+                Complete os dados essenciais, finalize os rascunhos e, depois, envie cada DFD para a chefia
+                em Minhas DFDs. O sistema usa este fluxo para ajudar você a construir a solicitação com mais segurança.
               </p>
             </div>
           </div>
@@ -1297,16 +1296,16 @@ export default function NovaDFDPage() {
           </div>
         ) : null}
         {groupingMode === "coletiva" ? (
-          <div className="mt-4 rounded-2xl border border-[#D9E0E8] bg-[#F8FAFC] px-4 py-3 text-sm text-[#3E4C5F]">
-            <p className="font-semibold text-[#164073]">
-              Modo coletivo ativo
-            </p>
-            <p className="mt-1 text-xs leading-5">
-              Ao finalizar, seus itens entram no rascunho coletivo da unidade selecionada e
-              o sistema gera DFD(s) agregada(s) com a distribuição de quantidades por usuário.
-            </p>
-          </div>
-        ) : null}
+            <div className="mt-4 rounded-2xl border border-[#D9E0E8] bg-[#F8FAFC] px-4 py-3 text-sm text-[#3E4C5F]">
+              <p className="font-semibold text-[#164073]">
+                Modo coletivo ativo
+              </p>
+              <p className="mt-1 text-xs leading-5">
+                Ao finalizar, seus itens entram no rascunho coletivo da unidade selecionada e
+                o sistema preserva a distribuicao por usuario para que a colaboracao continue legivel.
+              </p>
+            </div>
+          ) : null}
       </section>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">

@@ -71,17 +71,20 @@ export function Sidebar({ role = "solicitante" }: SidebarProps) {
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           className="rounded-2xl border border-[#D2D0CE] bg-white px-2 py-3 shadow-sm"
         >
-          <div className="flex flex-col items-center gap-2">
-            <img
-              src="/brands/percata-logo.png"
-              alt="PERCATA"
-              className="h-auto w-full object-contain"
-            />
-            <p className="text-center text-[9px] font-semibold uppercase leading-3 text-[#605E5C]">
-              Ciclo {cycleYear}
-            </p>
-          </div>
-        </motion.div>
+            <div className="flex flex-col items-center gap-2">
+              <img
+                src="/brands/percata-logo.png"
+                alt="PERCATA"
+                className="h-auto w-full object-contain"
+              />
+              <p className="text-center text-[9px] font-semibold uppercase leading-3 text-[#605E5C]">
+                Ciclo {cycleYear}
+              </p>
+              <p className="text-center text-[10px] font-medium leading-4 text-[#667085]">
+                Planejamento com mais clareza
+              </p>
+            </div>
+          </motion.div>
 
         <div className="sidebar-scroll mt-4 flex-1 w-full flex flex-col gap-3 overflow-y-auto pr-1">
           {sections.map((section, index) => (

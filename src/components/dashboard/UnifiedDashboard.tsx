@@ -373,15 +373,15 @@ export default function UnifiedDashboard() {
       ? metrics.ownDrafts + metrics.ownReturned + metrics.ownTriagem
       : metrics.globalTriagem + metrics.globalReturned;
   const heroTitle = isExecutive
-    ? `Olá, ${firstName}. Visão executiva do ciclo`
+    ? `Olá, ${firstName}. Vamos cuidar do ciclo com mais clareza`
     : loading
       ? "Carregando..."
-      : `Olá, ${firstName} 👋`;
+      : `Olá, ${firstName}.`;
   const heroText = isExecutive
-    ? "Monitore saúde do portfólio, gargalos e alavancas de governança em uma visão preparada para decisão."
+    ? "Veja onde o ciclo precisa de apoio, onde a fila pressiona e onde a governança pode destravar o andamento."
     : isManager
-      ? "Acompanhe a fila, antecipe riscos e mantenha o fluxo institucional em movimento."
-      : "Acompanhe suas solicitações, crie novos pedidos e veja o que precisa da sua atenção.";
+      ? "Acompanhe a fila, reduza devoluções e mantenha o fluxo do setor legível para quem decide e para quem solicita."
+      : "Acompanhe suas solicitações, comece novos pedidos e siga cada etapa com mais tranquilidade.";
   const quickActions = isExecutive
     ? [
         { href: "/admin/consolidacao", label: "Consolidação", detail: "Portfólio e priorização", icon: ChartLineUp },
@@ -417,6 +417,77 @@ export default function UnifiedDashboard() {
         { label: "Devolvidas", value: metrics.ownReturned, tone: "red", icon: FunnelSimple },
         { label: "Anteriores", value: metrics.ownLegacyCount, tone: "amber", icon: CalendarBlank },
       ];
+  const guidanceMoments = isExecutive
+    ? [
+        {
+          title: "Comece pela fila",
+          description: "Observe triagens e devoluções antes de olhar o volume consolidado.",
+          href: "/triagem",
+          cta: "Abrir fila",
+          icon: Hourglass,
+        },
+        {
+          title: "Leia o ciclo com contexto",
+          description: "Conecte valor aprovado, pressão operacional e ritmo mensal antes de intervir.",
+          href: "/admin/consolidacao",
+          cta: "Ver consolidação",
+          icon: ChartLineUp,
+        },
+        {
+          title: "Apoie as unidades",
+          description: "Use usuários e campanhas para reduzir ruído e aumentar previsibilidade.",
+          href: "/admin/usuarios",
+          cta: "Ver usuários",
+          icon: UsersThree,
+        },
+      ]
+    : isManager
+      ? [
+          {
+            title: "O que precisa de decisão agora",
+            description: "A fila de triagem mostra o que está aguardando leitura e encaminhamento.",
+            href: "/triagem",
+            cta: "Abrir triagem",
+            icon: FunnelSimple,
+          },
+          {
+            title: "Onde a devolução está pesando",
+            description: "O resumo ajuda a ver gargalos, pressão e impacto do setor sem perder o contexto.",
+            href: "/chefia/orcamento",
+            cta: "Abrir resumo",
+            icon: ChartLineUp,
+          },
+          {
+            title: "Como colaborar melhor",
+            description: "As DFDs coletivas ajudam a reunir demandas antes da aprovação formal.",
+            href: "/dfds-coletivas",
+            cta: "Ver coletivas",
+            icon: UsersThree,
+          },
+        ]
+      : [
+          {
+            title: "Se você está começando",
+            description: "Abra o catálogo para escolher itens e entender melhor o que vai compor sua solicitação.",
+            href: "/catalogo",
+            cta: "Abrir catálogo",
+            icon: ListChecks,
+          },
+          {
+            title: "Se já tem uma demanda em mente",
+            description: "Crie uma nova DFD e preencha os dados em etapas, com apoio visual do sistema.",
+            href: "/nova-dfd",
+            cta: "Nova solicitação",
+            icon: ClipboardText,
+          },
+          {
+            title: "Se precisa acompanhar ou ajustar",
+            description: "Minhas solicitações mostra devoluções, análises em andamento e o que falta revisar.",
+            href: "/minhas-dfds",
+            cta: "Acompanhar",
+            icon: Files,
+          },
+        ];
 
   return (
     <div className="py-6 space-y-5">
@@ -471,6 +542,32 @@ export default function UnifiedDashboard() {
         {quickActions.map((action) => (
           <ActionTile key={action.href + action.label} {...action} />
         ))}
+      </section>
+
+      <section className="rounded-[24px] border border-[#D9E0E8] bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
+              Seu caminho no Percata
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[#164073]">
+              O que faz mais sentido agora
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#5B6675]">
+              Em vez de procurar tudo ao mesmo tempo, siga pelo ponto que melhor representa o seu momento.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#F4F7FA] px-3 py-1.5 text-xs font-semibold text-[#3E4C5F]">
+            <Lightning size={14} weight="fill" className="text-[#164073]" />
+            Fluxo guiado por perfil
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 xl:grid-cols-3">
+          {guidanceMoments.map((item) => (
+            <GuidanceTile key={item.href + item.title} {...item} />
+          ))}
+        </div>
       </section>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-5">
@@ -870,13 +967,13 @@ export default function UnifiedDashboard() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
-                  Tour Inicial
+                  Comece por aqui
                 </p>
                 <h3 className="mt-1 text-2xl font-semibold tracking-tight text-[#164073]">
-                  Como usar o PERCATA em 3 etapas
+                  Seu primeiro caminho no Percata
                 </h3>
                 <p className="mt-1 text-sm text-[#5B6675]">
-                  Caminho recomendado para criar, enviar e acompanhar suas solicitações.
+                  Um percurso simples para criar, enviar e acompanhar suas solicitações sem se perder nas etapas.
                 </p>
               </div>
               <button
@@ -929,7 +1026,7 @@ export default function UnifiedDashboard() {
 
               <div className="inline-flex items-center gap-2 text-xs font-semibold text-[#3E4C5F]">
                 <Lightning size={14} weight="fill" className="text-[#164073]" />
-                Você pode abrir este tour novamente pelo botão no topo.
+                Você pode abrir este guia novamente quando precisar.
               </div>
             </div>
           </div>
@@ -963,6 +1060,39 @@ function ActionTile({
       </div>
       <p className="mt-3 text-sm font-semibold text-[#164073]">{label}</p>
       <p className="mt-1 text-xs leading-4 text-[#5B6675]">{detail}</p>
+    </Link>
+  );
+}
+
+function GuidanceTile({
+  href,
+  title,
+  description,
+  cta,
+  icon: Icon,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  cta: string;
+  icon: any;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-[#E8EDF2] bg-[#FBFCFE] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#C7D7EA] hover:bg-white"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#164073] transition-colors group-hover:bg-[#164073] group-hover:text-white">
+          <Icon size={20} weight="duotone" />
+        </span>
+        <ArrowRight size={16} weight="bold" className="text-[#7D98B8]" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold tracking-tight text-[#164073]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[#5B6675]">{description}</p>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073]">
+        {cta}
+      </p>
     </Link>
   );
 }
