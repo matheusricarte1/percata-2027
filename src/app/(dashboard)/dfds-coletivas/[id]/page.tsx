@@ -195,6 +195,96 @@ const FLOW_STEPS: Array<{
   },
 ];
 
+const STAGE_GUIDANCE: Record<
+  FlowStage,
+  {
+    eyebrow: string;
+    title: string;
+    description: string;
+    highlights: string[];
+    railTitle: string;
+    railDescription: string;
+    railChecklist: string[];
+  }
+> = {
+  adicionar: {
+    eyebrow: "Etapa 1",
+    title: "Comece reunindo contribuições com contexto",
+    description:
+      "Aqui a sala ainda está aberta para o setor. A ideia é buscar itens, ajustar quantidades e registrar justificativas sem correr para a conversão cedo demais.",
+    highlights: [
+      "Monte o carrinho com calma antes de enviar os itens para a sala.",
+      "Cada item precisa de quantidade, valor unitário e justificativa.",
+      "Quando já houver base suficiente, avance para a consolidação.",
+    ],
+    railTitle: "O que ajuda nesta etapa",
+    railDescription:
+      "Quanto mais claro estiver o contexto do item agora, menos retrabalho aparece na revisão.",
+    railChecklist: [
+      "buscar termos mais amplos quando o catálogo vier vazio",
+      "conferir se o item faz sentido para o escopo da sala",
+      "registrar justificativa útil, não apenas repetir o nome do item",
+    ],
+  },
+  consolidar: {
+    eyebrow: "Etapa 2",
+    title: "Agora a sala precisa ganhar forma",
+    description:
+      "A consolidação serve para revisar o que entrou, remover excesso, ajustar inconsistências e garantir que a demanda represente bem o setor antes de seguir.",
+    highlights: [
+      "Confira duplicidades, quantidades e valores antes de avançar.",
+      "Use o resumo lateral para enxergar o peso corrente e capital.",
+      "Se algo ainda estiver cru, volte uma etapa sem perder o trabalho.",
+    ],
+    railTitle: "Antes de ir para revisão",
+    railDescription:
+      "Esta etapa costuma ser a última chance de limpar ruído antes da leitura mais formal.",
+    railChecklist: [
+      "itens consolidados sem conflito de quantidade",
+      "valores unitários plausíveis para todos os itens",
+      "participantes visíveis e distribuição coerente",
+    ],
+  },
+  revisao: {
+    eyebrow: "Etapa 3",
+    title: "Revise como quem vai explicar a demanda para outra pessoa",
+    description:
+      "Na revisão, a sala precisa ficar legível para quem não participou da montagem. O objetivo é deixar claras as informações da demanda e o racional da consolidação.",
+    highlights: [
+      "Leia a sala como se fosse a primeira vez.",
+      "Ajuste título, justificativa geral e escopo quando faltarem contexto.",
+      "Use o histórico e os itens consolidados para validar a narrativa da demanda.",
+    ],
+    railTitle: "O que revisar agora",
+    railDescription:
+      "A sala precisa contar uma história coerente: por que existe, o que reúne e como chegou a esse total.",
+    railChecklist: [
+      "justificativa geral compreensível por quem vai aprovar",
+      "escopo suficiente para separar o que entra e o que fica fora",
+      "itens consolidados consistentes com o objetivo da sala",
+    ],
+  },
+  finalizar: {
+    eyebrow: "Etapa 4",
+    title: "Sala encerrada, demanda pronta para acompanhamento",
+    description:
+      "Depois da conversão, o papel desta tela passa a ser acompanhamento: entender o que foi gerado e retomar os documentos oficiais quando necessário.",
+    highlights: [
+      "Abra as DFDs oficiais geradas pela conversão.",
+      "Use o histórico da sala como memória da construção coletiva.",
+      "Se a demanda mudar muito, o ideal é abrir uma nova sala.",
+    ],
+    railTitle: "Leitura desta etapa",
+    railDescription:
+      "A sala não é mais um rascunho ativo. Ela vira referência do que foi consolidado e convertido.",
+    railChecklist: [
+      "DFDs oficiais vinculadas e acessíveis",
+      "histórico preservado para consultas futuras",
+      "sala encerrada para evitar contribuições fora de contexto",
+    ],
+  },
+};
+
 export default function DfdColetivaDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -358,6 +448,7 @@ export default function DfdColetivaDetailPage() {
       metadata: Boolean(detail?.room.description || detail?.room.scope),
     };
   }, [detail]);
+  const stageGuide = STAGE_GUIDANCE[activeStage];
 
   const canEdit = Boolean(detail?.room.can_edit_metadata);
   const isOpen = detail?.room.status === "aberta";
@@ -764,7 +855,7 @@ export default function DfdColetivaDetailPage() {
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#063F8F] px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <LockSimple size={17} weight="bold" />
-                    {converting ? "Gerando..." : "Encerrar sala"}
+                    {converting ? "Gerando..." : "Gerar DFD oficial"}
                   </button>
                 )}
               </div>
@@ -779,9 +870,17 @@ export default function DfdColetivaDetailPage() {
           onStageChange={setActiveStage}
         />
 
+        <StageCompass
+          stage={activeStage}
+          guide={stageGuide}
+          itemCount={detail.items.length}
+          participantCount={detail.participants.length}
+          totalValue={totalValue}
+        />
+
         {activeStage === "adicionar" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <SideRail detail={detail} />
+          <section className="grid gap-4 2xl:grid-cols-[300px_minmax(0,1fr)]">
+            <SideRail detail={detail} activeStage={activeStage} />
             <CatalogPanel
               catalogSearch={catalogSearch}
               setCatalogSearch={setCatalogSearch}
@@ -804,8 +903,8 @@ export default function DfdColetivaDetailPage() {
         )}
 
         {activeStage === "consolidar" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_1fr_360px]">
-            <SideRail detail={detail} compactHelp />
+          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+            <SideRail detail={detail} compactHelp activeStage={activeStage} />
             <ConsolidationPanel
               detail={detail}
               totalValue={totalValue}
@@ -828,8 +927,8 @@ export default function DfdColetivaDetailPage() {
         )}
 
         {activeStage === "revisao" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_1fr_360px]">
-            <SideRail detail={detail} reviewMode />
+          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+            <SideRail detail={detail} reviewMode activeStage={activeStage} />
             <ReviewPanel
               detail={detail}
               reviewTab={reviewTab}
@@ -853,8 +952,8 @@ export default function DfdColetivaDetailPage() {
         )}
 
         {activeStage === "finalizar" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_1fr]">
-            <SideRail detail={detail} reviewMode />
+          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <SideRail detail={detail} reviewMode activeStage={activeStage} />
             <section className="rounded-lg border border-[#DDE5EF] bg-white p-8 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
               <div className="flex max-w-3xl flex-col items-start gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E8F5E9] text-[#188B56]">
@@ -862,8 +961,8 @@ export default function DfdColetivaDetailPage() {
                 </div>
                 <h2 className="text-xl font-semibold text-[#0B3473]">DFD coletiva finalizada</h2>
                 <p className="text-sm leading-6 text-[#526070]">
-                  A sala foi encerrada ou enviada para a próxima etapa. Quando a conversão gerar DFDs oficiais,
-                  os documentos aparecem abaixo para acompanhamento.
+                  Esta sala já cumpriu o papel de reunir e consolidar a demanda. Use os links abaixo para acompanhar
+                  as DFDs oficiais geradas a partir desta construção coletiva.
                 </p>
                 {detail.linkedDfds.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -983,17 +1082,83 @@ function FlowStepper({
   );
 }
 
+function StageCompass({
+  stage,
+  guide,
+  itemCount,
+  participantCount,
+  totalValue,
+}: {
+  stage: FlowStage;
+  guide: (typeof STAGE_GUIDANCE)[FlowStage];
+  itemCount: number;
+  participantCount: number;
+  totalValue: number;
+}) {
+  return (
+    <section className="rounded-lg border border-[#DDE5EF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-6 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0B4AA2]">{guide.eyebrow}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-[#0F1F3D]">{guide.title}</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-[#526070]">{guide.description}</p>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {guide.highlights.map((highlight) => (
+              <div
+                key={highlight}
+                className="rounded-lg border border-[#DDE5EF] bg-white/90 p-4 text-sm leading-6 text-[#445164]"
+              >
+                <div className="mb-3 h-2 w-10 rounded-full bg-[#CFE2FF]" />
+                {highlight}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-[#DDE5EF] bg-white p-5">
+          <p className="text-sm font-semibold text-[#0B3473]">Pulso da sala nesta etapa</p>
+          <div className="mt-4 grid gap-3">
+            <StageMetric label="Participantes visíveis" value={participantCount} />
+            <StageMetric label="Itens consolidados" value={itemCount} />
+            <StageMetric
+              label={stage === "adicionar" ? "Valor já consolidado" : "Valor estimado"}
+              value={formatCurrency(totalValue)}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SideRail({
   detail,
+  activeStage,
   compactHelp,
   reviewMode,
 }: {
   detail: RoomDetail;
+  activeStage: FlowStage;
   compactHelp?: boolean;
   reviewMode?: boolean;
 }) {
+  const guide = STAGE_GUIDANCE[activeStage];
   return (
     <aside className="flex flex-col gap-3">
+      <Panel>
+        <SectionTitle icon={<CheckCircle size={18} weight="fill" />} title={guide.railTitle} />
+        <p className="mt-3 text-sm leading-6 text-[#526070]">{guide.railDescription}</p>
+        <div className="mt-4 grid gap-2">
+          {guide.railChecklist.map((item) => (
+            <div
+              key={item}
+              className="rounded-md border border-[#E2E8F0] bg-[#FBFCFF] px-3 py-2 text-xs leading-5 text-[#445164]"
+            >
+              • {item}
+            </div>
+          ))}
+        </div>
+      </Panel>
+
       <Panel>
         <SectionTitle icon={<UsersThree size={18} weight="bold" />} title={`Participantes (${detail.participants.length})`} />
         <div className="mt-4 flex flex-col gap-3">
@@ -1051,17 +1216,21 @@ function SideRail({
         </Panel>
       ) : (
         <Panel>
-          <SectionTitle icon={<FunnelSimple size={18} weight="bold" />} title={compactHelp ? "Precisa de ajuda?" : "Filtros rápidos"} />
+          <SectionTitle
+            icon={<FunnelSimple size={18} weight="bold" />}
+            title={compactHelp ? "Como saber se a sala amadureceu" : "Como orientar boas contribuições"}
+          />
           {compactHelp ? (
-            <p className="mt-3 text-xs leading-5 text-[#667085]">
-              Confira quantidades, valores, justificativas e participantes antes de avançar para revisão.
-            </p>
+            <div className="mt-3 grid gap-2 text-xs leading-5 text-[#667085]">
+              <p>Confira quantidades, valores, justificativas e participantes antes de avançar para revisão.</p>
+              <p>Se ainda houver incerteza relevante, vale voltar uma etapa e refinar a base da sala.</p>
+            </div>
           ) : (
             <div className="mt-4 grid gap-3 text-sm text-[#344054]">
-              <FilterCheck label="Apenas corrente" checked />
-              <FilterCheck label="Apenas capital" />
-              <FilterCheck label="Material de consumo" checked />
-              <FilterCheck label="Equipamento permanente" />
+              <FilterCheck label="Itens com justificativa específica" checked />
+              <FilterCheck label="Referências minimamente verificáveis" checked />
+              <FilterCheck label="Contribuições aderentes ao escopo" checked />
+              <FilterCheck label="Descrição clara do que não deve entrar" checked={false} />
             </div>
           )}
         </Panel>
@@ -1253,6 +1422,15 @@ function CatalogPanel(props: {
   );
 }
 
+function StageMetric({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border border-[#E2E8F0] bg-[#FBFCFF] p-3">
+      <p className="text-xs text-[#667085]">{label}</p>
+      <p className="mt-1 text-base font-semibold text-[#0F172A]">{value}</p>
+    </div>
+  );
+}
+
 function SelectionFloatingBar({
   activeCartItem,
   pendingCount,
@@ -1280,8 +1458,8 @@ function SelectionFloatingBar({
     ? `${pendingCount} item(ns) no carrinho`
     : `${consolidatedCount} item(ns) na DFD coletiva`;
   const description = hasPendingItems
-    ? `Pendente: ${formatCurrency(pendingCartValue)}`
-    : `Total consolidado: ${formatCurrency(totalValue)}`;
+    ? `Pronto para revisar e enviar: ${formatCurrency(pendingCartValue)}`
+    : `Total consolidado ate aqui: ${formatCurrency(totalValue)}`;
 
   return (
     <AnimatePresence>
@@ -1445,10 +1623,10 @@ function SelectedItemDrawer({
             <div className="flex h-[82px] items-center justify-between border-b border-[#DDE5EF] bg-white px-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085]">
-                  Resumo da seleção
+                  Apoio de preenchimento
                 </p>
                 <h2 className="mt-1 text-xl font-semibold text-[#0B3473]">
-                  Carrinho da DFD coletiva
+                  Sua seleção nesta sala
                 </h2>
               </div>
               <button
@@ -1575,7 +1753,7 @@ function SelectedItemDrawer({
                     disabled={disabled || cartItems.length === 0}
                     className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {savingCart ? "Enviando..." : "Adicionar carrinho"} <Plus size={17} weight="bold" />
+                    {savingCart ? "Enviando..." : "Enviar itens para a sala"} <Plus size={17} weight="bold" />
                   </button>
                 </form>
                 <button
@@ -1588,7 +1766,7 @@ function SelectedItemDrawer({
                 </button>
               </div>
               <p className="mt-3 text-center text-xs text-[#667085]">
-                Itens do carrinho só entram na DFD coletiva após clicar em Adicionar carrinho.
+                Os itens do carrinho so entram na DFD coletiva quando voce confirma o envio para a sala.
               </p>
             </div>
           </motion.aside>
@@ -1777,10 +1955,10 @@ function SelectedItemPanel({
           disabled={disabled || cartCount === 0}
           className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Plus size={17} weight="bold" /> {savingCart ? "Enviando..." : "Adicionar carrinho à sala"}
+          <Plus size={17} weight="bold" /> {savingCart ? "Enviando..." : "Enviar carrinho para a sala"}
         </button>
         <p className="mt-3 text-center text-xs text-[#667085]">
-          Todos os itens preenchidos do carrinho serão incluídos em Itens consolidados.
+          Todos os itens preenchidos do carrinho serao incluidos em Itens consolidados.
         </p>
       </form>
     </Panel>
@@ -2020,8 +2198,9 @@ function ReviewPanel({
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <SectionTitle icon={<UsersThree size={18} weight="bold" />} title="Revisão da DFD coletiva" />
-          <p className="mt-2 text-xs text-[#667085]">
-            Confira todos os itens consolidados, justificativas e informações antes de finalizar e enviar para aprovação.
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#667085]">
+            Leia esta sala como se outra pessoa fosse aprovar sem ter acompanhado a montagem. Itens, justificativas e
+            contexto geral precisam fazer sentido juntos.
           </p>
         </div>
         <button
@@ -2131,7 +2310,7 @@ function ApprovalSummary({
       <h2 className="text-base font-semibold text-[#0B3473]">Resumo para aprovação</h2>
       <SummaryRows detail={detail} breakdown={breakdown} totalValue={totalValue} />
       <div className="mt-5 rounded-md border border-[#BBD6FF] bg-[#F7FBFF] p-4 text-xs leading-5 text-[#0B4AA2]">
-        Após finalizar, os responsáveis receberão a DFD oficial gerada a partir da consolidação desta sala.
+        Ao finalizar, esta sala deixa de ser rascunho e gera as DFDs oficiais resultantes da consolidação coletiva.
       </div>
       <Checklist title="Checklist de revisão" checklist={checklist} />
       <div className="mt-5 border-t border-[#E2E8F0] pt-5">
@@ -2148,7 +2327,7 @@ function ApprovalSummary({
         disabled={!canConvert || converting || detail.items.length === 0}
         className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {converting ? "Enviando..." : "Enviar para aprovação"} <PaperPlaneTilt size={17} weight="bold" />
+        {converting ? "Gerando..." : "Encerrar sala e gerar DFD oficial"} <PaperPlaneTilt size={17} weight="bold" />
       </button>
       <button
         type="button"

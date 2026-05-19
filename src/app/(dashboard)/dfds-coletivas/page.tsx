@@ -49,6 +49,24 @@ const STATUS_LABELS: Record<RoomListItem["status"], string> = {
   arquivada: "Arquivada",
 };
 
+const COLLECTIVE_GUIDE = [
+  {
+    icon: <Plus size={18} weight="bold" />,
+    title: "Abra com contexto",
+    description: "Defina o tema, o recorte e o que faz sentido entrar nesta DFD coletiva.",
+  },
+  {
+    icon: <UsersThree size={18} weight="bold" />,
+    title: "Receba contribuições",
+    description: "Cada participante adiciona itens com justificativa, quantidade e referência.",
+  },
+  {
+    icon: <ArrowRight size={18} weight="bold" />,
+    title: "Revise antes de converter",
+    description: "A sala consolida a demanda do setor antes de virar DFD oficial.",
+  },
+] as const;
+
 export default function DfdsColetivasPage() {
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
@@ -211,11 +229,16 @@ export default function DfdsColetivasPage() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-3xl font-semibold text-[#0F1F3D]">
-                DFDs coletivas do setor
+                DFDs coletivas para construir demandas em conjunto
               </h1>
               <p className="mt-3 max-w-2xl text-base leading-7 text-[#526070]">
-                DFDs coletivas abertas para que membros do mesmo setor adicionem itens e a chefia converta em DFD oficial.
+                Reuna contribuições do setor num fluxo mais claro: a equipe adiciona itens, a sala consolida a demanda
+                e a chefia transforma tudo em DFD oficial com menos ruído no caminho.
               </p>
+              <div className="mt-5 inline-flex w-fit items-center gap-2 rounded-full border border-[#D8E0EA] bg-[#FBFCFF] px-4 py-2 text-sm text-[#526070]">
+                <UsersThree size={16} className="text-[#0B4AA2]" weight="duotone" />
+                Uma sala coletiva organiza a conversa antes da formalização.
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Metric icon={<Buildings size={30} weight="duotone" />} label="DFDs" value={totals.rooms} />
@@ -225,7 +248,22 @@ export default function DfdsColetivasPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[390px_1fr]">
+        <section className="grid gap-4 lg:grid-cols-3">
+          {COLLECTIVE_GUIDE.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF4FF] text-[#0B4AA2]">
+                {item.icon}
+              </div>
+              <h2 className="mt-4 text-base font-semibold text-[#0F1F3D]">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#526070]">{item.description}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
           <form
             onSubmit={createRoom}
             className="rounded-lg border border-[#E2E8F0] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]"
@@ -235,9 +273,20 @@ export default function DfdsColetivasPage() {
                 <Plus size={22} weight="bold" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-[#0F1F3D]">Nova DFD coletiva</h2>
-                <p className="text-sm text-[#667085]">Crie uma demanda temática</p>
+                <h2 className="text-lg font-semibold text-[#0F1F3D]">Abra uma DFD coletiva com contexto</h2>
+                <p className="text-sm text-[#667085]">
+                  Defina o tema, o setor e o recorte da sala antes de convidar contribuições.
+                </p>
               </div>
+            </div>
+
+            <div className="mt-5 rounded-lg border border-[#DDE5EF] bg-[#FBFCFF] p-4">
+              <p className="text-sm font-semibold text-[#0B3473]">O que precisa ficar claro desde o início</p>
+              <ul className="mt-3 grid gap-2 text-sm leading-6 text-[#526070]">
+                <li>• qual problema ou necessidade a sala pretende reunir;</li>
+                <li>• qual unidade responde pela consolidação;</li>
+                <li>• que tipo de item deve ou não deve entrar.</li>
+              </ul>
             </div>
 
             <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-[#4B5563]">
@@ -283,7 +332,7 @@ export default function DfdsColetivasPage() {
                 rows={4}
                 maxLength={500}
                 className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
-                placeholder="Contexto da demanda coletiva."
+                placeholder="Explique por que esta DFD coletiva foi aberta e qual contexto ela atende."
               />
             </label>
 
@@ -297,7 +346,7 @@ export default function DfdsColetivasPage() {
                 rows={4}
                 maxLength={500}
                 className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
-                placeholder="Critérios do que deve entrar nesta DFD coletiva."
+                placeholder="Descreva o que entra, o que fica fora e o critério usado para as contribuições."
               />
             </label>
 
@@ -313,17 +362,23 @@ export default function DfdsColetivasPage() {
 
           <section className="rounded-lg border border-[#E2E8F0] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="relative flex-1">
-                <MagnifyingGlass
-                  size={20}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#667085]"
-                />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  className="w-full rounded-md border border-[#CBD5E1] py-3 pl-12 pr-4 text-sm outline-none focus:border-[#0B4AA2]"
-                  placeholder="Buscar por tema, descrição ou escopo"
-                />
+              <div className="min-w-0 flex-1">
+                <p className="text-lg font-semibold text-[#0F1F3D]">Salas abertas e histórico recente</p>
+                <p className="mt-1 text-sm text-[#667085]">
+                  Acompanhe o que já está em andamento, retome revisões e veja onde sua equipe já contribuiu.
+                </p>
+                <div className="relative mt-4">
+                  <MagnifyingGlass
+                    size={20}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-[#667085]"
+                  />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    className="w-full rounded-md border border-[#CBD5E1] py-3 pl-12 pr-4 text-sm outline-none focus:border-[#0B4AA2]"
+                    placeholder="Buscar por tema, descrição ou escopo"
+                  />
+                </div>
               </div>
               <div className="relative">
                 <FunnelSimple
@@ -364,7 +419,7 @@ export default function DfdsColetivasPage() {
                     Nenhuma DFD coletiva encontrada
                   </p>
                   <p className="mt-2 max-w-md text-sm text-[#667085]">
-                    Crie uma nova DFD coletiva ou ajuste seus filtros para ver as demandas existentes.
+                    Crie uma nova DFD coletiva ou ajuste a busca para reencontrar uma sala já iniciada pelo setor.
                   </p>
                   <button
                     type="button"
@@ -372,7 +427,7 @@ export default function DfdsColetivasPage() {
                     className="mt-5 inline-flex items-center justify-center gap-2 rounded-md border border-[#0B4AA2] px-5 py-3 text-sm font-semibold text-[#0B4AA2]"
                   >
                     <Plus size={16} weight="bold" />
-                    Criar nova DFD coletiva
+                    Abrir nova DFD coletiva
                   </button>
                 </div>
               ) : (
@@ -413,6 +468,14 @@ function Metric({
 
 function RoomCard({ room }: { room: RoomListItem }) {
   const summary = room.summary;
+  const stageHint =
+    room.status === "aberta"
+      ? "Recebendo contribuições do setor."
+      : room.status === "em_revisao"
+        ? "Em conferência antes da conversão."
+        : room.status === "convertida"
+          ? "Já gerou DFD oficial."
+          : "Sala encerrada para novas contribuições.";
   return (
     <Link
       href={`/dfds-coletivas/${room.id}`}
@@ -444,6 +507,7 @@ function RoomCard({ room }: { room: RoomListItem }) {
           <p className="mt-1 line-clamp-2 text-sm text-[#5B6472]">
             {room.description || room.scope || "DFD coletiva sem descrição."}
           </p>
+          <p className="mt-2 text-xs font-semibold text-[#0B4AA2]">{stageHint}</p>
           <p className="mt-2 text-xs font-medium text-[#6B7280]">
             {room.unit_name} · Atualizada em{" "}
             {new Date(room.updated_at).toLocaleDateString("pt-BR")}
@@ -464,7 +528,7 @@ function RoomCard({ room }: { room: RoomListItem }) {
         </div>
       </div>
       <div className="mt-3 flex items-center justify-end text-xs font-semibold uppercase tracking-wider text-[#0B4AA2]">
-        Abrir DFD coletiva <ArrowRight size={14} className="ml-1" weight="bold" />
+        Entrar na sala <ArrowRight size={14} className="ml-1" weight="bold" />
       </div>
     </Link>
   );
