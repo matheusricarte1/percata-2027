@@ -1441,10 +1441,10 @@ export default function TriagemPage() {
             </div>
             <div className="space-y-1">
               <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-[#17233C]">
-                Curadoria
+                Triagem com contexto
               </h1>
               <p className="ml-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#47739F]">
-                Análise Estratégica Chefia
+                Chefia e análise institucional
               </p>
             </div>
           </div>
@@ -1454,9 +1454,12 @@ export default function TriagemPage() {
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 animate-pulse rounded-full bg-[#164073]" />
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-[#47739F]">
-                  Demandas em Fila
+                  Trabalho do dia
                 </span>
               </div>
+              <p className="max-w-xl text-sm leading-6 text-[#52627A]">
+                Abra uma DFD, confira coerência da demanda, leia as justificativas e só então devolva ou homologue.
+              </p>
               <div className="flex gap-2">
                 <Button
                   onClick={fetchDfds}
@@ -1484,11 +1487,11 @@ export default function TriagemPage() {
 
             <div className="rounded-2xl border border-[#D9E0E8] bg-white px-8 py-4 text-right shadow-sm">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-[#47739F]">
-                Aguardando Triagem
+                Aguardando decisão
               </span>
               <span className="text-3xl font-semibold tracking-tight text-[#164073]">
                 {dfds.length}{" "}
-                <span className="text-sm text-[#7D98B8]">Pendentes</span>
+                <span className="text-sm text-[#7D98B8]">na fila</span>
               </span>
             </div>
           </div>
@@ -1546,10 +1549,10 @@ export default function TriagemPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
-              Como analisar sem se perder
+              Como decidir sem se perder
             </p>
             <h2 className="mt-1 text-lg font-semibold text-[#164073]">
-              A chefia decide com base em vínculo, justificativa e prioridade
+              A fila fica melhor quando a chefia enxerga contexto, coerência e prioridade
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-[#52627A]">
               Abra uma DFD para ver o resumo consolidado do setor. Em DFDs coletivas,
@@ -1579,9 +1582,14 @@ export default function TriagemPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-8">
           <div className="flex items-center justify-between px-4">
-            <h2 className="font-display font-semibold text-2xl text-upe-blue-upe uppercase tracking-tight ">
-              Fila de Recebimento
-            </h2>
+            <div>
+              <h2 className="font-display font-semibold text-2xl text-upe-blue-upe uppercase tracking-tight ">
+                Fila de triagem
+              </h2>
+              <p className="mt-1 text-sm text-[#52627A]">
+                Priorize demandas com leitura clara e sinais suficientes para decisão.
+              </p>
+            </div>
             <div className="relative group">
               <MagnifyingGlass
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-upe-blue-upe/30 group-focus-within:text-upe-blue-upe transition-colors"
@@ -1712,6 +1720,11 @@ export default function TriagemPage() {
                                     ? `${dfd.item_count} itens`
                                     : "Sem itens"}
                                 </span>
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-[#47739F]">
+                                  {Number(dfd.valor_total_estimado || 0) > 0
+                                    ? "Pronta para leitura"
+                                    : "Exige conferência"}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -1743,12 +1756,12 @@ export default function TriagemPage() {
         </div>
 
         {/* Sidebar de orientação */}
-        <div className="space-y-8">
+      <div className="space-y-8">
           <div className="space-y-6 rounded-[20px] border border-[#D9E0E8] bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <Stack size={24} weight="fill" className="text-[#164073]" />
               <h3 className="font-display font-semibold text-xl text-upe-blue-upe uppercase tracking-tight ">
-                Apoio à Decisão
+                Leitura da fila
               </h3>
             </div>
             <div className="space-y-5">
@@ -1764,8 +1777,7 @@ export default function TriagemPage() {
                   </p>
                 </div>
                 <p className="text-[11px] text-emerald-800/60 font-medium leading-relaxed">
-                  Priorize DFDs com objeto claro, local de uso definido e itens com
-                  justificativa técnica e base de quantidade.
+                  Comece por DFDs que já explicam bem o objeto, mostram local de uso e trazem item com justificativa técnica.
                 </p>
               </div>
               <div className="cursor-default space-y-2 rounded-2xl border border-amber-100 bg-amber-50 p-5 transition-all hover:bg-amber-100/40">
@@ -1780,8 +1792,18 @@ export default function TriagemPage() {
                   </p>
                 </div>
                 <p className="text-[11px] text-emerald-800/60 font-medium leading-relaxed">
-                  Quando houver distribuição por usuário, confira se todos pertencem
-                  ao mesmo setor ou laboratório antes de homologar.
+                  Quando houver distribuição por usuário, confirme se a demanda é realmente comum ao mesmo setor ou laboratório.
+                </p>
+              </div>
+              <div className="cursor-default space-y-2 rounded-2xl border border-[#D9E0E8] bg-white p-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <Lightning size={20} weight="fill" className="text-[#164073]" />
+                  <p className="text-xs font-semibold text-[#164073] uppercase">
+                    Regra prática
+                  </p>
+                </div>
+                <p className="text-[11px] text-[#52627A] font-medium leading-relaxed">
+                  Se a chefia ainda precisa adivinhar por que o item existe, a melhor decisão costuma ser devolver com orientação objetiva.
                 </p>
               </div>
             </div>
@@ -2370,7 +2392,7 @@ export default function TriagemPage() {
               <div className="space-y-7">
                 <div className="flex items-center justify-between">
                   <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest border border-white/10">
-                    DFD Completa
+                    Leitura da DFD
                   </span>
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-upe-support-blue-bluish-mist">
                     Triagem
@@ -2494,13 +2516,13 @@ export default function TriagemPage() {
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-upe-support-blue-bluish-mist">
-                        Análise da Chefia
-                      </p>
-                      <p className="mt-1 text-xs text-white/65">
-                        Vínculo, orçamento, locais e pendências da DFD.
-                      </p>
-                    </div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-upe-support-blue-bluish-mist">
+                      Painel de decisão
+                    </p>
+                    <p className="mt-1 text-xs text-white/65">
+                        Vínculo, coerência da demanda, sinais de prontidão e pontos de atenção.
+                    </p>
+                  </div>
                     <span className="rounded-full border border-white/10 bg-white/10 px-2 py-1 text-xs font-semibold">
                       {decisionGaps.readiness}%
                     </span>
@@ -2847,9 +2869,14 @@ export default function TriagemPage() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-2xl font-semibold text-upe-blue-upe uppercase tracking-tight">
-                    Curadoria de Itens ({items.length})
-                  </h3>
+                  <div>
+                    <h3 className="text-2xl font-semibold text-upe-blue-upe uppercase tracking-tight">
+                      Itens para decisão ({items.length})
+                    </h3>
+                    <p className="mt-1 text-sm text-[#52627A]">
+                      Ajuste quantidades, classifique prioridade e marque apenas os destaques realmente estratégicos.
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={resetDialogState}

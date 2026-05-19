@@ -91,6 +91,76 @@ const STATUS_META: Record<DfdStatus, { label: string; className: string }> = {
   concluida: { label: "Concluída", className: "bg-[#E7F0EA] text-[#5F735C]" },
 };
 
+const STATUS_GUIDANCE: Record<
+  DfdStatus,
+  {
+    title: string;
+    description: string;
+    highlights: string[];
+  }
+> = {
+  rascunho: {
+    title: "Esta DFD ainda está em construção",
+    description:
+      "O objetivo agora é garantir que a demanda esteja compreensível para quem vai analisar depois.",
+    highlights: [
+      "Conferir se o objeto está claro",
+      "Validar se cada item tem justificativa e referência",
+      "Enviar apenas quando a leitura estiver madura",
+    ],
+  },
+  devolvida: {
+    title: "Esta DFD voltou para ajuste",
+    description:
+      "Use o histórico e os itens para entender o que precisa ser corrigido antes do reenvio.",
+    highlights: [
+      "Ler o parecer da devolução",
+      "Revisar itens, quantidades e justificativas",
+      "Reenviar só depois de eliminar as pendências",
+    ],
+  },
+  triagem: {
+    title: "A demanda está em análise pela chefia",
+    description:
+      "Agora a função desta tela é acompanhar o processo e manter rastreabilidade do que foi enviado.",
+    highlights: [
+      "Acompanhar o histórico de tramitação",
+      "Usar a impressão e o CSV quando precisar compartilhar",
+      "Observar se houver devolução para correção",
+    ],
+  },
+  aprovada: {
+    title: "A DFD foi homologada",
+    description:
+      "A demanda já passou pela triagem e segue como referência oficial para as próximas etapas.",
+    highlights: [
+      "Usar esta tela como memória da decisão",
+      "Conferir itens homologados e valores",
+      "Acompanhar movimentações posteriores no histórico",
+    ],
+  },
+  pactuando: {
+    title: "A demanda está em pactuação",
+    description:
+      "Esta etapa exige leitura cuidadosa do que foi homologado e do que ainda pode sofrer ajuste institucional.",
+    highlights: [
+      "Conferir alinhamento entre valor e prioridade",
+      "Usar o histórico para sustentar decisões",
+      "Preservar o contexto original da demanda",
+    ],
+  },
+  concluida: {
+    title: "A DFD está concluída",
+    description:
+      "A demanda já percorreu o fluxo principal. Esta tela passa a servir como registro e consulta.",
+    highlights: [
+      "Retomar o histórico quando necessário",
+      "Usar a exportação para consultas futuras",
+      "Tomar esta DFD como referência final do processo",
+    ],
+  },
+};
+
 export default function DfdDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -361,6 +431,14 @@ export default function DfdDetailsPage() {
       currentUserId,
       solicitanteId: dfd.solicitante_id,
     });
+  const statusGuide = STATUS_GUIDANCE[dfd.status] || STATUS_GUIDANCE.rascunho;
+  const infoReadiness = [
+    Boolean(String(dfd.objeto_contratacao || "").trim()),
+    Boolean(String(dfd.justificativa_contratacao || "").trim()),
+    items.length > 0,
+    items.every((item) => Boolean(String(item.justificativa_item || "").trim())),
+  ].filter(Boolean).length;
+  const readinessPercent = Math.round((infoReadiness / 4) * 100);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-5 pb-28 md:px-6">
@@ -388,7 +466,7 @@ export default function DfdDetailsPage() {
               {dfd.objeto_contratacao || "Demanda sem objeto informado"}
             </h1>
             <p className="mt-1 text-sm text-[#5B6675]">
-              Protocolo de solicitação com rastreabilidade completa de itens e decisões.
+              Uma leitura clara da demanda, dos itens e das decisões já registradas.
             </p>
           </div>
 
@@ -459,6 +537,34 @@ export default function DfdDetailsPage() {
         </div>
       </header>
 
+      <section className="rounded-2xl border border-[#D9E0E8] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FBFF_100%)] p-5 shadow-sm">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+              Leitura da etapa atual
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-[#164073]">{statusGuide.title}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-[#52627A]">{statusGuide.description}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {statusGuide.highlights.map((item) => (
+                <div key={item} className="rounded-xl border border-[#D9E0E8] bg-white p-4 text-sm leading-6 text-[#445164]">
+                  <div className="mb-3 h-2 w-10 rounded-full bg-[#DCEAF0]" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4">
+            <p className="text-sm font-semibold text-[#164073]">Pulso desta DFD</p>
+            <div className="mt-4 grid gap-3">
+              <ReadinessMetric label="Itens vinculados" value={items.length} />
+              <ReadinessMetric label="Valor estimado" value={formatCurrency(totalGeral)} />
+              <ReadinessMetric label="Prontidão da leitura" value={`${readinessPercent}%`} />
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <section className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
@@ -519,6 +625,17 @@ export default function DfdDetailsPage() {
                   Roteamento da chefia: {dfd.analysis_routing_reason}
                 </p>
               ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <GuidanceCard
+                title="O que esta tela responde"
+                body="Quem pediu, o que foi solicitado, quanto isso representa e quais itens sustentam a demanda."
+              />
+              <GuidanceCard
+                title="Quando ainda vale revisar"
+                body="Principalmente em rascunho ou devolução: objeto, justificativa, itens e referências precisam conversar entre si."
+              />
             </div>
           </section>
 
@@ -621,7 +738,7 @@ export default function DfdDetailsPage() {
               Histórico de tramitação
             </h2>
             <p className="mt-1 text-xs leading-5 text-[#5B6675]">
-              Acompanhe a sequência oficial de movimentações desta DFD.
+              Use este histórico para entender o que aconteceu e o que pode acontecer em seguida.
             </p>
             <div className="mt-3">
               <DfdTimeline logs={logs} />
@@ -699,5 +816,23 @@ function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | 
       className="h-8 w-8 rounded-full border border-[#D9E0E8] object-cover"
       onError={() => setBroken(true)}
     />
+  );
+}
+
+function ReadinessMetric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-[#E8EDF2] bg-[#FAFBFC] p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">{label}</p>
+      <p className="mt-1 text-base font-semibold text-[#164073]">{value}</p>
+    </div>
+  );
+}
+
+function GuidanceCard({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-[#D9E0E8] bg-white p-4">
+      <p className="text-sm font-semibold text-[#164073]">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-[#52627A]">{body}</p>
+    </div>
   );
 }
