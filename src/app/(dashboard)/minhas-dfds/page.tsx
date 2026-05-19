@@ -398,6 +398,20 @@ export default function MinhasDFDsPage() {
     };
   }, [dfds, legacyRecords.length]);
   const canCreateKits = currentRole === "admin" || currentRole === "superadmin";
+  const requesterGuides = [
+    {
+      title: "Rascunho ainda é espaço de ajuste",
+      description: "Use esta fase para conferir objeto, itens, justificativas e referências antes do envio.",
+    },
+    {
+      title: "Envie só quando a leitura estiver madura",
+      description: "Depois do envio, a chefia analisa a coerência da demanda e pode devolver com orientação.",
+    },
+    {
+      title: "Acompanhe o status sem perder o fio",
+      description: "Cada DFD mostra em que etapa está e o que tende a acontecer a seguir.",
+    },
+  ] as const;
 
   return (
     <div className="space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
@@ -405,13 +419,13 @@ export default function MinhasDFDsPage() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#47739F]">
-              Fluxo do Solicitante
+              Acompanhamento do solicitante
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#17233C]">
-              Meus Pedidos (DFD)
+              Suas DFDs em um fluxo mais claro
             </h1>
             <p className="mt-1 text-sm text-[#52627A]">
-              Controle completo das suas demandas ativas e do histórico legado.
+              Veja o que ainda está sob sua responsabilidade, o que já seguiu para análise e o que voltou para ajuste.
             </p>
           </div>
 
@@ -434,6 +448,16 @@ export default function MinhasDFDsPage() {
         </div>
       </section>
 
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {requesterGuides.map((item) => (
+          <div key={item.title} className="rounded-[20px] border border-[#D9E0E8] bg-white p-5 shadow-sm">
+            <div className="mb-3 h-2 w-10 rounded-full bg-[#DCEAF0]" />
+            <h2 className="text-base font-semibold text-[#164073]">{item.title}</h2>
+            <p className="mt-2 text-sm leading-6 text-[#52627A]">{item.description}</p>
+          </div>
+        ))}
+      </section>
+
       <section className="rounded-[20px] border border-[#D9E0E8] bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -444,8 +468,7 @@ export default function MinhasDFDsPage() {
               O que fazer com cada DFD
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-[#52627A]">
-              Rascunhos ficam sob seu controle. Quando estiverem conferidos, envie à chefia.
-              Depois disso, a chefia homologa ou devolve com orientação de ajuste.
+              Rascunhos ficam com você. Quando a leitura estiver pronta, envie à chefia. Depois disso, acompanhe se a demanda foi homologada ou devolvida com orientação.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[560px]">
@@ -594,6 +617,11 @@ export default function MinhasDFDsPage() {
                             Etapa {stage.stepIndex}/4 · {stage.label}
                           </span>
                           <span className="text-xs text-[#66758A]">{stage.description}</span>
+                          {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#47739F]">
+                              Requer sua ação
+                            </span>
+                          )}
                         </div>
                       </div>
 

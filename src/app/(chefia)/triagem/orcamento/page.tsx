@@ -993,7 +993,7 @@ function HeaderPanel({
             </div>
             <div>
               <h1 className="font-display text-3xl font-semibold tracking-tight text-[#17233C] md:text-4xl">
-                Resumo do Setor
+                Panorama do setor para decidir melhor
               </h1>
               <p className="mt-1 text-sm font-medium text-[#5B6675]">
                 {scopeLabel} | Exercício 2026
@@ -1029,6 +1029,20 @@ function HeaderPanel({
               {scopeOptions.find((option) => option.key === selectedScopeKey)?.detail ||
                 "O painel usa apenas as DFDs vinculadas a este recorte."}
             </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <QuickGuideCard
+              title="Leia antes de comparar"
+              description="Este painel existe para mostrar pressão orçamentária, gargalos e sobreposição antes da decisão."
+            />
+            <QuickGuideCard
+              title="Veja o que trava o setor"
+              description="DFDs em análise, devolvidas e possíveis duplicidades costumam ser o primeiro foco de chefia."
+            />
+            <QuickGuideCard
+              title="Priorize com contraste"
+              description="A visão geral ajuda a separar impacto financeiro, urgência e oportunidade de consolidação."
+            />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1137,6 +1151,9 @@ function HealthStrip({ analytics }: { analytics: ReturnType<typeof buildAnalytic
               className="h-full rounded-full bg-gradient-to-r from-[#EC2029] via-[#C9A646] to-[#2A7C8C]"
             />
           </div>
+          <p className="mt-3 text-sm leading-6 text-[#52627A]">
+            Esta leitura resume o quanto o setor está pronto para decidir sem acumular ruído de fila, devolução e duplicidade.
+          </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {reasons.map((reason) => (
@@ -1605,6 +1622,22 @@ function Panel({
       </div>
       {children}
     </section>
+  );
+}
+
+function QuickGuideCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4">
+      <div className="mb-3 h-2 w-10 rounded-full bg-[#DCEAF0]" />
+      <p className="text-sm font-semibold text-[#164073]">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-[#52627A]">{description}</p>
+    </div>
   );
 }
 
