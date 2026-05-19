@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  applyCatalogSearchOverrides,
+  normalizeCatalogSearchQuery,
+} from "@/lib/catalog-search-learning";
 import { rerankCatalogSearchResults } from "@/lib/catalog-search-ranking";
 import { searchCatalogWithTypesense } from "@/lib/catalog-typesense";
+import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
 import { createClient } from "@/utils/supabase/server";
 
 const DEFAULT_LIMIT = 30;
@@ -27,17 +32,13 @@ function parseBoundedInt(value: string | null, fallback: number, min: number, ma
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 }
 
-async function searchCatalogWithSupabase(query: string, category: string, limit: number, offset: number) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return { response: NextResponse.json({ error: "Usuario nao autenticado." }, { status: 401 }) };
-  }
-
+async function searchCatalogWithSupabase(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  query: string,
+  category: string,
+  limit: number,
+  offset: number,
+) {
   const { data, error } = await supabase.rpc("buscar_catalogo_inteligente", {
     query_text: query,
     categoria_filtro: category,
@@ -60,15 +61,30 @@ async function searchCatalogWithSupabase(query: string, category: string, limit:
 }
 
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: "Usuario nao autenticado." }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const query = sanitizeSearchInput(searchParams.get("q"));
   const category = normalizeCategory(searchParams.get("category"));
+  const context = sanitizeSearchInput(searchParams.get("context")) || "catalogo";
   const limit = parseBoundedInt(searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = parseBoundedInt(searchParams.get("offset"), 0, 0, 200_000);
+  const queryNorm = normalizeCatalogSearchQuery(query);
+  const admin = hasSupabaseAdminCredentials() ? createSupabaseAdminClient() : null;
 
   if (!query) {
     return NextResponse.json({ items: [], source: "empty", hasMore: false });
   }
+
+  let rows: any[] = [];
+  let source = "supabase";
 
   try {
     const typesenseRows = await searchCatalogWithTypesense({
@@ -79,22 +95,54 @@ export async function GET(request: NextRequest) {
     });
 
     if (typesenseRows) {
-      return NextResponse.json({
-        items: typesenseRows,
-        source: "typesense",
-        hasMore: typesenseRows.length === limit,
-      });
+      rows = typesenseRows;
+      source = "typesense";
     }
   } catch (error) {
     console.error("Typesense catalog search failed; falling back to Supabase.", error);
   }
 
-  const fallback = await searchCatalogWithSupabase(query, category, limit, offset);
-  if (fallback.response) return fallback.response;
+  if (rows.length === 0) {
+    const fallback = await searchCatalogWithSupabase(supabase, query, category, limit, offset);
+    if (fallback.response) return fallback.response;
+    rows = fallback.rows || [];
+  }
+
+  if (admin) {
+    try {
+      const { data: overrides } = await admin
+        .from("catalog_search_overrides")
+        .select("query_norm,match_mode,override_type,catalog_id,codigo_efisco,weight")
+        .eq("is_active", true)
+        .limit(200);
+
+      rows = applyCatalogSearchOverrides(query, rows, (overrides || []) as any[]);
+    } catch (error) {
+      console.error("Catalog search overrides failed.", error);
+    }
+
+    try {
+      await admin.from("catalog_search_logs").insert({
+        user_id: user.id,
+        query_text: query,
+        query_norm: queryNorm,
+        category,
+        context,
+        source,
+        offset_val: offset,
+        limit_val: limit,
+        result_count: rows.length,
+        top_catalog_id: Number(rows[0]?.id || 0) || null,
+        top_codigo_efisco: rows[0]?.codigo_efisco || null,
+      });
+    } catch (error) {
+      console.error("Catalog search logging failed.", error);
+    }
+  }
 
   return NextResponse.json({
-    items: fallback.rows || [],
-    source: "supabase",
-    hasMore: (fallback.rows || []).length === limit,
+    items: rows,
+    source,
+    hasMore: rows.length === limit,
   });
 }

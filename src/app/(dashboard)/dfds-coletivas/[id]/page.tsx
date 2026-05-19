@@ -17,6 +17,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
+import { recordCatalogSearchClick } from "@/lib/catalog-search-events";
 import {
   ArrowLeft,
   ArrowRight,
@@ -274,7 +275,7 @@ export default function DfdColetivaDetailPage() {
       const offset = catalogPage * COLLECTIVE_CATALOG_SEARCH_LIMIT;
       try {
         const response = await fetch(
-          `/api/catalog-search?q=${encodeURIComponent(searchTerm)}&category=all&limit=${COLLECTIVE_CATALOG_SEARCH_LIMIT}&offset=${offset}`,
+          `/api/catalog-search?q=${encodeURIComponent(searchTerm)}&category=all&context=dfd_coletiva&limit=${COLLECTIVE_CATALOG_SEARCH_LIMIT}&offset=${offset}`,
         );
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload?.error || "Falha na busca.");
@@ -427,7 +428,7 @@ export default function DfdColetivaDetailPage() {
     }
   }
 
-  function addItemToCart(item: CatalogItem, event?: MouseEvent<HTMLButtonElement>) {
+  function addItemToCart(item: CatalogItem & { searchPosition?: number }, event?: MouseEvent<HTMLButtonElement>) {
     const key = getCatalogItemKey(item);
     const existing = cartItems.find((cartItem) => getCatalogItemKey(cartItem.item) === key);
 
@@ -448,6 +449,21 @@ export default function DfdColetivaDetailPage() {
     setActiveCartId(nextItem.cartId);
     setSelectionDrawerOpen(true);
     setCartPulseKey((current) => current + 1);
+
+    void recordCatalogSearchClick({
+      actionType: "add_to_collective_cart",
+      queryText: catalogQuery,
+      category: "all",
+      context: "dfd_coletiva",
+      source: "catalog_search",
+      resultPosition:
+        Number.isFinite(Number(item.searchPosition)) && Number(item.searchPosition) >= 0
+          ? Number(item.searchPosition)
+          : null,
+      catalogId: item.id,
+      codigoEfisco: item.codigo_efisco || item.codigo_tce,
+      itemDescricao: item.descricao,
+    });
   }
 
   function launchCartAnimation(event: MouseEvent<HTMLButtonElement>, label: string) {
@@ -532,6 +548,17 @@ export default function DfdColetivaDetailPage() {
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error || "Erro ao adicionar item.");
+
+        void recordCatalogSearchClick({
+          actionType: "add_to_collective_room",
+          queryText: catalogQuery,
+          category: "all",
+          context: "dfd_coletiva",
+          source: "collective_room",
+          catalogId: selectedItem.id,
+          codigoEfisco: selectedItem.codigo_efisco || selectedItem.codigo_tce,
+          itemDescricao: selectedItem.descricao,
+        });
       }
       toast.success(`${cartItems.length} item(ns) adicionados à DFD coletiva.`);
       setCartItems([]);
@@ -1054,7 +1081,10 @@ function CatalogPanel(props: {
   catalogQuery: string;
   cartItemKeys: Set<string>;
   activeCatalogItemKey: string | null;
-  addItemToCart: (item: CatalogItem, event: MouseEvent<HTMLButtonElement>) => void;
+  addItemToCart: (
+    item: CatalogItem & { searchPosition?: number },
+    event: MouseEvent<HTMLButtonElement>,
+  ) => void;
   catalogPageState: ReturnType<typeof buildCollectiveCatalogPageState>;
   catalogHasMore: boolean;
   setCatalogPage: (updater: (current: number) => number) => void;
@@ -1140,7 +1170,7 @@ function CatalogPanel(props: {
 
       <div className="mt-4 grid gap-3">
         {props.catalogLoading && <p className="text-sm text-[#667085]">Buscando catálogo...</p>}
-        {props.catalogItems.map((item) => {
+        {props.catalogItems.map((item, index) => {
           const expenseBadge = getCatalogExpenseBadge(
             item.gnd_preferencial ||
               deriveGndFromNatureza(item.codigo_natureza_preferencial),
@@ -1152,7 +1182,7 @@ function CatalogPanel(props: {
             <button
               key={`${item.id}-${item.codigo_efisco || item.codigo_tce}`}
               type="button"
-              onClick={(event) => props.addItemToCart(item, event)}
+              onClick={(event) => props.addItemToCart({ ...item, searchPosition: index }, event)}
               className={cn(
                 "group relative grid gap-2 overflow-hidden rounded-md border p-4 text-left transition",
                 active

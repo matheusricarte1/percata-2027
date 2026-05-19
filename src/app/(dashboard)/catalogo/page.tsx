@@ -27,6 +27,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useCarrinhoStore } from "@/store/carrinho";
+import { recordCatalogSearchClick } from "@/lib/catalog-search-events";
 import { supabase } from "@/lib/supabase";
 import { ProductSkeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -701,7 +702,7 @@ export default function CatalogoPage() {
         : await fetch(
             `/api/catalog-search?q=${encodeURIComponent(
               sanitizeSearchInput(debouncedSearch),
-            )}&category=${encodeURIComponent(selectedCat)}&limit=${pageSize}&offset=${
+            )}&category=${encodeURIComponent(selectedCat)}&context=catalogo&limit=${pageSize}&offset=${
               targetPage * pageSize
             }`,
           ).then(async (response) => {
@@ -838,6 +839,21 @@ export default function CatalogoPage() {
         "Não definido",
       );
 
+      void recordCatalogSearchClick({
+        actionType: "add_to_cart",
+        queryText: debouncedSearch,
+        category: selectedCat,
+        context: "catalogo",
+        source: "catalog_search",
+        resultPosition:
+          Number.isFinite(Number(product.searchPosition)) && Number(product.searchPosition) >= 0
+            ? Number(product.searchPosition)
+            : null,
+        catalogId: product.id,
+        codigoEfisco: product.efiscoCode || product.siad,
+        itemDescricao: product.name,
+      });
+
       if (sourceEl) {
         const source = sourceEl.getBoundingClientRect();
         const target = cartIconRef.current?.getBoundingClientRect();
@@ -869,7 +885,7 @@ export default function CatalogoPage() {
       triggerCartShake();
       toast.success("Item adicionado ao carrinho.");
     },
-    [addItem, cartCodeSet, triggerCartShake],
+    [addItem, cartCodeSet, debouncedSearch, selectedCat, triggerCartShake],
   );
 
   const displayCount = selectedCat === "kits" ? kits.length : visibleProducts.length;
@@ -1161,7 +1177,7 @@ export default function CatalogoPage() {
                 {visibleProducts.map((product, idx) => (
                   <ProductCard
                     key={`${product.id}-${product.siad}`}
-                    product={product}
+                    product={{ ...product, searchPosition: idx }}
                     index={idx % 30}
                     inCart={cartCodeSet.has(String(product.siad || "").trim())}
                     isFavorite={favoriteIds.has(Number(product.id))}
