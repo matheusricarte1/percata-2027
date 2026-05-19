@@ -32,31 +32,61 @@ const FLOW_STEPS = [
     title: "Planeje",
     description: "Defina a necessidade e organize o que precisa entrar no ciclo.",
     icon: ClipboardText,
+    tone: {
+      card: "border-[#D7E2EE] bg-[#F7FAFE]",
+      icon: "bg-[#EAF2FF] text-[#173B69]",
+      number: "text-[#6F89AA]",
+    },
   },
   {
     title: "Busque itens",
     description: "Encontre referências no catálogo com mais clareza e menos tentativa e erro.",
     icon: ListChecks,
+    tone: {
+      card: "border-[#CFE4E6] bg-[#F4FBFB]",
+      icon: "bg-[#E0F3F4] text-[#1D5A63]",
+      number: "text-[#6E97A0]",
+    },
   },
   {
     title: "Colabore",
     description: "Construa salas coletivas para demandas compartilhadas do setor.",
     icon: UsersThree,
+    tone: {
+      card: "border-[#F0DCC9] bg-[#FFF8F2]",
+      icon: "bg-[#FBEADF] text-[#8B5A2B]",
+      number: "text-[#B08456]",
+    },
   },
   {
     title: "Revise",
     description: "Conferências, justificativas e sinais visuais ajudam antes do envio.",
     icon: CheckCircle,
+    tone: {
+      card: "border-[#D6E4D9] bg-[#F6FBF7]",
+      icon: "bg-[#E6F3E8] text-[#2C6A45]",
+      number: "text-[#6D957B]",
+    },
   },
   {
     title: "Envie",
     description: "A DFD segue para análise com contexto mais organizado.",
     icon: FunnelSimple,
+    tone: {
+      card: "border-[#D7E2EE] bg-[#F4F8FD]",
+      icon: "bg-[#DEEAF9] text-[#173B69]",
+      number: "text-[#6D88AB]",
+    },
   },
   {
     title: "Acompanhe",
     description: "Veja devoluções, aprovações e próximos passos sem perder o fio.",
     icon: CalendarBlank,
+    tone: {
+      card: "border-[#D9E1EA] bg-[#F8FAFC]",
+      icon: "bg-[#E9EEF4] text-[#50637C]",
+      number: "text-[#7E91A8]",
+    },
   },
 ];
 
@@ -204,6 +234,7 @@ export function HumanLandingPage({
                 title={step.title}
                 description={step.description}
                 icon={<step.icon size={18} weight="bold" />}
+                tone={step.tone}
               />
             ))}
           </div>
@@ -356,19 +387,25 @@ function FlowStep({
   title,
   description,
   icon,
+  tone,
 }: {
   index: number;
   title: string;
   description: string;
   icon: ReactNode;
+  tone: {
+    card: string;
+    icon: string;
+    number: string;
+  };
 }) {
   return (
-    <div className="rounded-[22px] border border-[#D7E2EE] bg-white p-5 shadow-sm">
+    <div className={`rounded-[22px] border p-5 shadow-sm transition-colors ${tone.card}`}>
       <div className="flex items-center justify-between">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#173B69]">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.icon}`}>
           {icon}
         </span>
-        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7D98B8]">
+        <span className={`text-xs font-semibold uppercase tracking-[0.18em] ${tone.number}`}>
           {String(index).padStart(2, "0")}
         </span>
       </div>
