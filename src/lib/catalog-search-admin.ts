@@ -47,6 +47,10 @@ export type CatalogSearchQueryInsight = {
   query_label: string;
   searches: number;
   clicks: number;
+  zero_result_searches: number;
+  total_result_count: number;
+  avg_result_count: number;
+  latest_result_count: number;
   categories: string[];
   contexts: string[];
   last_searched_at: string;
@@ -60,6 +64,12 @@ export type CatalogSearchMetrics = {
   clicks_7d: number;
   unique_queries_7d: number;
   click_through_rate: number;
+};
+
+export type CatalogSearchActionQueues = {
+  no_click_queries: CatalogSearchQueryInsight[];
+  zero_result_queries: CatalogSearchQueryInsight[];
+  low_ctr_queries: CatalogSearchQueryInsight[];
 };
 
 function parseDate(value: string) {
@@ -98,6 +108,10 @@ export function buildCatalogSearchInsights(
       query_label: row.query_text || key,
       searches: 0,
       clicks: 0,
+      zero_result_searches: 0,
+      total_result_count: 0,
+      avg_result_count: 0,
+      latest_result_count: row.result_count || 0,
       categories: [],
       contexts: [],
       last_searched_at: row.created_at,
@@ -107,12 +121,16 @@ export function buildCatalogSearchInsights(
     };
 
     current.searches += 1;
+    current.total_result_count += Math.max(0, row.result_count || 0);
+    if ((row.result_count || 0) === 0) current.zero_result_searches += 1;
     if (!current.categories.includes(row.category)) current.categories.push(row.category);
     if (!current.contexts.includes(row.context)) current.contexts.push(row.context);
     if (parseDate(row.created_at) > parseDate(current.last_searched_at)) {
       current.last_searched_at = row.created_at;
       current.query_label = row.query_text || current.query_label;
+      current.latest_result_count = row.result_count || 0;
     }
+    current.avg_result_count = current.searches > 0 ? current.total_result_count / current.searches : 0;
     map.set(key, current);
   }
 
@@ -144,6 +162,10 @@ export function buildCatalogSearchInsights(
       query_label: row.query_text || key,
       searches: 0,
       clicks: 0,
+      zero_result_searches: 0,
+      total_result_count: 0,
+      avg_result_count: 0,
+      latest_result_count: 0,
       categories: [],
       contexts: [],
       last_searched_at: row.created_at,
@@ -176,4 +198,38 @@ export function buildCatalogSearchInsights(
       parseDate(b.last_searched_at) - parseDate(a.last_searched_at) ||
       b.searches - a.searches,
   );
+}
+
+export function buildCatalogSearchActionQueues(
+  logs: CatalogSearchLogRow[],
+  clicks: CatalogSearchClickRow[],
+): CatalogSearchActionQueues {
+  const insights = buildCatalogSearchInsights(logs, clicks);
+
+  return {
+    no_click_queries: insights
+      .filter((query) => query.searches >= 2 && query.clicks === 0)
+      .sort(
+        (a, b) =>
+          b.searches - a.searches ||
+          parseDate(b.last_searched_at) - parseDate(a.last_searched_at),
+      )
+      .slice(0, 12),
+    zero_result_queries: insights
+      .filter((query) => query.zero_result_searches > 0)
+      .sort(
+        (a, b) =>
+          b.zero_result_searches - a.zero_result_searches ||
+          parseDate(b.last_searched_at) - parseDate(a.last_searched_at),
+      )
+      .slice(0, 12),
+    low_ctr_queries: insights
+      .filter((query) => query.searches >= 3 && query.clicks / Math.max(query.searches, 1) < 0.2)
+      .sort(
+        (a, b) =>
+          a.clicks / Math.max(a.searches, 1) - b.clicks / Math.max(b.searches, 1) ||
+          b.searches - a.searches,
+      )
+      .slice(0, 12),
+  };
 }

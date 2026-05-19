@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildCatalogSearchActionQueues,
   buildCatalogSearchInsights,
   buildCatalogSearchMetrics,
   type CatalogSearchClickRow,
@@ -76,7 +77,7 @@ describe("catalog-search-admin", () => {
           category: "all",
           context: "dfd_coletiva",
           source: "supabase",
-          result_count: 4,
+          result_count: 0,
           created_at: "2026-05-18T11:00:00.000Z",
         },
       ],
@@ -114,5 +115,69 @@ describe("catalog-search-admin", () => {
     assert.deepEqual(insights[0]?.contexts.sort(), ["catalogo", "dfd_coletiva"]);
     assert.equal(insights[0]?.top_clicked_code, "200-2");
     assert.equal(insights[0]?.top_clicked_label, "SERVICO DE MARCENARIA");
+    assert.equal(insights[0]?.zero_result_searches, 1);
+    assert.equal(insights[0]?.latest_result_count, 0);
+    assert.equal(insights[0]?.avg_result_count, 2);
+  });
+
+  it("surfaces operational queues for zero-result and no-click queries", () => {
+    const logs: CatalogSearchLogRow[] = [
+      {
+        id: 1,
+        query_text: "vidracaria",
+        query_norm: "vidracaria",
+        category: "all",
+        context: "catalogo",
+        source: "supabase",
+        result_count: 0,
+        created_at: "2026-05-18T10:00:00.000Z",
+      },
+      {
+        id: 2,
+        query_text: "vidracaria",
+        query_norm: "vidracaria",
+        category: "all",
+        context: "catalogo",
+        source: "supabase",
+        result_count: 0,
+        created_at: "2026-05-18T11:00:00.000Z",
+      },
+      {
+        id: 3,
+        query_text: "cadeira diretor",
+        query_norm: "cadeira diretor",
+        category: "all",
+        context: "catalogo",
+        source: "supabase",
+        result_count: 8,
+        created_at: "2026-05-18T12:00:00.000Z",
+      },
+      {
+        id: 4,
+        query_text: "cadeira diretor",
+        query_norm: "cadeira diretor",
+        category: "all",
+        context: "catalogo",
+        source: "supabase",
+        result_count: 7,
+        created_at: "2026-05-18T13:00:00.000Z",
+      },
+      {
+        id: 5,
+        query_text: "cadeira diretor",
+        query_norm: "cadeira diretor",
+        category: "all",
+        context: "catalogo",
+        source: "supabase",
+        result_count: 6,
+        created_at: "2026-05-18T14:00:00.000Z",
+      },
+    ];
+
+    const queues = buildCatalogSearchActionQueues(logs, []);
+
+    assert.equal(queues.zero_result_queries[0]?.query_norm, "vidracaria");
+    assert.equal(queues.no_click_queries[0]?.query_norm, "cadeira diretor");
+    assert.equal(queues.low_ctr_queries[0]?.query_norm, "cadeira diretor");
   });
 });

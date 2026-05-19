@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MagnifyingGlass, TrendUp, CursorClick, Sparkle } from "@phosphor-icons/react";
+import { MagnifyingGlass, TrendUp, CursorClick, Sparkle, WarningCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,29 @@ type QueryInsight = {
   query_label: string;
   searches: number;
   clicks: number;
+  zero_result_searches: number;
+  total_result_count: number;
+  avg_result_count: number;
+  latest_result_count: number;
   categories: string[];
   contexts: string[];
   last_searched_at: string;
   last_clicked_at: string | null;
   top_clicked_code: string | null;
   top_clicked_label: string | null;
+};
+
+type LogRow = {
+  id: number;
+  query_text: string;
+  query_norm: string;
+  category: string;
+  context: string;
+  source: string;
+  result_count: number;
+  top_catalog_id?: number | null;
+  top_codigo_efisco?: string | null;
+  created_at: string;
 };
 
 type ClickRow = {
@@ -54,9 +71,17 @@ type OverrideRow = {
   updated_at: string;
 };
 
+type ActionQueues = {
+  no_click_queries: QueryInsight[];
+  zero_result_queries: QueryInsight[];
+  low_ctr_queries: QueryInsight[];
+};
+
 type InsightsPayload = {
   metrics: Metrics;
   queries: QueryInsight[];
+  actionQueues: ActionQueues;
+  recentLogs: LogRow[];
   recentClicks: ClickRow[];
   overrides: OverrideRow[];
 };
@@ -198,9 +223,13 @@ export default function AdminCatalogoBuscaPage() {
     return queries.filter((query) =>
       `${query.query_label} ${query.top_clicked_label || ""} ${query.top_clicked_code || ""}`
         .toLowerCase()
-        .includes(term),
+      .includes(term),
     );
   }, [filter, payload?.queries]);
+
+  const noClickQueries = payload?.actionQueues.no_click_queries || [];
+  const zeroResultQueries = payload?.actionQueues.zero_result_queries || [];
+  const lowCtrQueries = payload?.actionQueues.low_ctr_queries || [];
 
   return (
     <main className="space-y-6">
@@ -247,6 +276,36 @@ export default function AdminCatalogoBuscaPage() {
           label="CTR"
           value={formatPercent(payload?.metrics.click_through_rate || 0)}
           icon={<TrendUp size={18} weight="bold" />}
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <QueueCard
+          title="Sem clique"
+          description="Consultas recorrentes que retornam itens, mas ninguém escolhe nada."
+          icon={<CursorClick size={18} weight="bold" />}
+          accent="amber"
+          count={noClickQueries.length}
+          items={noClickQueries}
+          onBoost={(query) => prefillOverride(query.query_norm, query, "boost")}
+        />
+        <QueueCard
+          title="Sem resultado"
+          description="Consultas que precisam de sinônimo, expansão ou tratamento de gap."
+          icon={<WarningCircle size={18} weight="bold" />}
+          accent="rose"
+          count={zeroResultQueries.length}
+          items={zeroResultQueries}
+          onBoost={(query) => prefillOverride(query.query_norm, query, "boost")}
+        />
+        <QueueCard
+          title="CTR baixo"
+          description="Consultas com volume real e pouca confirmação por clique."
+          icon={<TrendUp size={18} weight="bold" />}
+          accent="blue"
+          count={lowCtrQueries.length}
+          items={lowCtrQueries}
+          onBoost={(query) => prefillOverride(query.query_norm, query, "boost")}
         />
       </section>
 
@@ -307,14 +366,18 @@ export default function AdminCatalogoBuscaPage() {
                       <td className="px-4 py-4 text-[#344054]">
                         <div>{query.searches} busca(s)</div>
                         <div>{query.clicks} clique(s)</div>
+                        <div>{query.zero_result_searches} sem resultado</div>
                         <div className="mt-1 text-xs text-[#667085]">
-                          Última: {formatDateTime(query.last_searched_at)}
+                          Última: {formatDateTime(query.last_searched_at)} · {query.latest_result_count} resultado(s)
                         </div>
                       </td>
                       <td className="px-4 py-4 text-[#344054]">
                         <div className="font-medium">{query.top_clicked_label || "Sem clique ainda"}</div>
                         <div className="mt-1 text-xs text-[#667085]">
                           {query.top_clicked_code || "Sem código"}
+                        </div>
+                        <div className="mt-1 text-xs text-[#667085]">
+                          Média de resultados: {Math.round(query.avg_result_count)}
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -481,6 +544,54 @@ export default function AdminCatalogoBuscaPage() {
           </section>
 
           <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[#164073]">Buscas recentes</h2>
+            <div className="mt-4 space-y-3">
+              {(payload?.recentLogs || []).slice(0, 10).map((log) => (
+                <div key={log.id} className="rounded-2xl border border-[#E5EDF5] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-[#0F172A]">
+                        {log.query_text || log.query_norm}
+                      </div>
+                      <div className="mt-1 text-xs text-[#667085]">
+                        {log.context} · {log.source} · {formatDateTime(log.created_at)}
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-xs font-semibold",
+                        log.result_count === 0
+                          ? "bg-[#FEF3F2] text-[#B42318]"
+                          : "bg-[#ECFDF3] text-[#027A48]",
+                      )}
+                    >
+                      {log.result_count} resultado(s)
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => prefillOverride(log.query_norm || log.query_text, undefined, "boost")}
+                      className="rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      Preparar boost
+                    </button>
+                    {log.result_count === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => prefillOverride(log.query_norm || log.query_text, undefined, "boost")}
+                        className="rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#164073]"
+                      >
+                        Tratar gap
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-[#164073]">Cliques recentes</h2>
             <div className="mt-4 space-y-3">
               {(payload?.recentClicks || []).slice(0, 12).map((click) => (
@@ -539,6 +650,71 @@ function MetricCard({
         </span>
       </div>
       <div className="mt-4 text-3xl font-semibold tracking-tight text-[#164073]">{value}</div>
+    </section>
+  );
+}
+
+function QueueCard({
+  title,
+  description,
+  count,
+  icon,
+  items,
+  accent,
+  onBoost,
+}: {
+  title: string;
+  description: string;
+  count: number;
+  icon: React.ReactNode;
+  items: QueryInsight[];
+  accent: "amber" | "rose" | "blue";
+  onBoost: (query: QueryInsight) => void;
+}) {
+  const accentClass =
+    accent === "rose"
+      ? "bg-[#FEF3F2] text-[#B42318]"
+      : accent === "amber"
+        ? "bg-[#FFFAEB] text-[#B54708]"
+        : "bg-[#EFF6FF] text-[#1D4ED8]";
+
+  return (
+    <section className="rounded-[24px] border border-[#DDE5EF] bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-[#164073]">{title}</div>
+          <p className="mt-1 text-sm text-[#526070]">{description}</p>
+        </div>
+        <span className={cn("inline-flex h-10 min-w-10 items-center justify-center rounded-2xl px-3 text-sm font-semibold", accentClass)}>
+          {icon}
+        </span>
+      </div>
+      <div className="mt-4 text-3xl font-semibold tracking-tight text-[#164073]">{count}</div>
+      <div className="mt-4 space-y-3">
+        {items.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#D7E2EE] px-4 py-4 text-sm text-[#667085]">
+            Nada crítico nesta fila agora.
+          </div>
+        ) : (
+          items.slice(0, 3).map((query) => (
+            <div key={query.query_norm} className="rounded-2xl border border-[#E5EDF5] px-4 py-3">
+              <div className="font-semibold text-[#0F172A]">{query.query_label}</div>
+              <div className="mt-1 text-xs text-[#667085]">
+                {query.searches} busca(s) · {query.clicks} clique(s) · última em {formatDateTime(query.last_searched_at)}
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => onBoost(query)}
+                  className="rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white"
+                >
+                  Abrir no override
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { normalizeRole } from "@/lib/access";
 import {
+  buildCatalogSearchActionQueues,
   buildCatalogSearchInsights,
   buildCatalogSearchMetrics,
   type CatalogSearchClickRow,
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       metrics: buildCatalogSearchMetrics(typedLogs, typedClicks),
       queries: buildCatalogSearchInsights(typedLogs, typedClicks).slice(0, 60),
+      actionQueues: buildCatalogSearchActionQueues(typedLogs, typedClicks),
       recentLogs: typedLogs.slice(0, 80),
       recentClicks: typedClicks.slice(0, 80),
       overrides: typedOverrides,
