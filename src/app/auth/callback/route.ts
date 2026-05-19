@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getPublicSiteOrigin, toPublicSiteUrl } from "@/lib/site-url";
 import { createClient } from "@/utils/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
@@ -173,13 +172,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const { searchParams, origin } = requestUrl;
   const code = searchParams.get("code");
-  const publicOrigin = getPublicSiteOrigin(origin);
-
-  if (code && origin !== publicOrigin) {
-    return NextResponse.redirect(
-      toPublicSiteUrl(`${requestUrl.pathname}${requestUrl.search}`, origin),
-    );
-  }
+  const callbackOrigin = origin;
 
   // if "next" is in param, use it as the redirect URL
   const rawNext = searchParams.get("next") ?? "/dashboard";
@@ -205,7 +198,7 @@ export async function GET(request: Request) {
         if (!authUser || !email) {
           await supabase.auth.signOut();
           return NextResponse.redirect(
-            `${publicOrigin}/auth/auth-code-error?error=Conta%20Google%20sem%20e-mail%20válido.`,
+            `${callbackOrigin}/auth/auth-code-error?error=Conta%20Google%20sem%20e-mail%20válido.`,
           );
         }
 
@@ -214,7 +207,7 @@ export async function GET(request: Request) {
         if (!isAllowed) {
           await supabase.auth.signOut();
           return NextResponse.redirect(
-            `${publicOrigin}/auth/auth-code-error?error=Acesso%20restrito.%20Solicite%20ativação%20prévia%20do%20seu%20usuário%20pela%20administração.`,
+            `${callbackOrigin}/auth/auth-code-error?error=Acesso%20restrito.%20Solicite%20ativação%20prévia%20do%20seu%20usuário%20pela%20administração.`,
           );
         }
 
@@ -225,15 +218,15 @@ export async function GET(request: Request) {
       } catch (syncError) {
         console.error("Falha ao sincronizar identidade do usuário:", syncError);
       }
-      return NextResponse.redirect(`${publicOrigin}${next}`);
+      return NextResponse.redirect(`${callbackOrigin}${next}`);
     }
     // Se houve erro na troca do código, aí sim mostramos o erro
     return NextResponse.redirect(
-      `${publicOrigin}/auth/auth-code-error?error=${error.message}`,
+      `${callbackOrigin}/auth/auth-code-error?error=${error.message}`,
     );
   }
 
   // Se não veio código, mas você tem o #access_token (visível ao navegador),
   // o dashboard vai conseguir te logar. Vamos tentar!
-  return NextResponse.redirect(`${publicOrigin}${next}`);
+  return NextResponse.redirect(`${callbackOrigin}${next}`);
 }
