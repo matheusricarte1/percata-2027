@@ -384,23 +384,23 @@ export default function UnifiedDashboard() {
       : "Acompanhe suas solicitações, comece novos pedidos e siga cada etapa com mais tranquilidade.";
   const quickActions = isExecutive
     ? [
-        { href: "/admin/consolidacao", label: "Consolidação", detail: "Portfólio e priorização", icon: ChartLineUp },
-        { href: "/triagem", label: "Fila estratégica", detail: "Análises pendentes", icon: FunnelSimple },
-        { href: "/admin/usuarios", label: "Usuários", detail: "Perfis e acessos", icon: UsersThree },
-        { href: "/admin/campanhas", label: "Ciclo", detail: "Campanhas e governança", icon: CalendarBlank },
+        { href: "/admin/consolidacao", label: "Consolidação", detail: "Portfólio e priorização", icon: ChartLineUp, tone: "blue" as const },
+        { href: "/triagem", label: "Fila estratégica", detail: "Análises pendentes", icon: FunnelSimple, tone: "teal" as const },
+        { href: "/admin/usuarios", label: "Usuários", detail: "Perfis e acessos", icon: UsersThree, tone: "warm" as const },
+        { href: "/admin/campanhas", label: "Ciclo", detail: "Campanhas e governança", icon: CalendarBlank, tone: "slate" as const },
       ]
     : isManager
       ? [
-          { href: "/triagem", label: "Triagem", detail: "Avaliar solicitações", icon: FunnelSimple },
-          { href: "/chefia/orcamento", label: "Orçamento", detail: "Consultar impacto", icon: ChartLineUp },
-          { href: "/minhas-dfds", label: "Minhas solicitações", detail: "Acompanhar pedidos", icon: Files },
-          { href: "/catalogo", label: "Catálogo", detail: "Itens e serviços", icon: ListChecks },
+          { href: "/triagem", label: "Triagem", detail: "Avaliar solicitações", icon: FunnelSimple, tone: "teal" as const },
+          { href: "/chefia/orcamento", label: "Orçamento", detail: "Consultar impacto", icon: ChartLineUp, tone: "blue" as const },
+          { href: "/minhas-dfds", label: "Minhas solicitações", detail: "Acompanhar pedidos", icon: Files, tone: "slate" as const },
+          { href: "/catalogo", label: "Catálogo", detail: "Itens e serviços", icon: ListChecks, tone: "warm" as const },
         ]
       : [
-          { href: "/nova-dfd", label: "Nova Solicitação", detail: "Criar um novo pedido", icon: ClipboardText },
-          { href: "/minhas-dfds", label: "Minhas Solicitações", detail: "Ver e gerenciar pedidos", icon: Files },
-          { href: "/catalogo", label: "Catálogo", detail: "Ver itens disponíveis", icon: ListChecks },
-          { href: "/historico", label: "Histórico", detail: "Consultar anos anteriores", icon: CalendarBlank },
+          { href: "/nova-dfd", label: "Nova Solicitação", detail: "Criar um novo pedido", icon: ClipboardText, tone: "blue" as const },
+          { href: "/minhas-dfds", label: "Minhas Solicitações", detail: "Ver e gerenciar pedidos", icon: Files, tone: "slate" as const },
+          { href: "/catalogo", label: "Catálogo", detail: "Ver itens disponíveis", icon: ListChecks, tone: "warm" as const },
+          { href: "/historico", label: "Histórico", detail: "Consultar anos anteriores", icon: CalendarBlank, tone: "teal" as const },
         ];
   const summaryMetrics = isManager
     ? [
@@ -1041,22 +1041,49 @@ function ActionTile({
   label,
   detail,
   icon: Icon,
+  tone,
 }: {
   href: string;
   label: string;
   detail: string;
   icon: any;
+  tone?: "blue" | "teal" | "warm" | "slate";
 }) {
+  const palette =
+    tone === "teal"
+      ? {
+          card: "border-[#D4E6E8] bg-[#F4FBFB] hover:border-[#B8D6D9]",
+          icon: "bg-[#E0F3F4] text-[#1D5A63] group-hover:bg-[#D0ECEE]",
+          arrow: "text-[#6E97A0]",
+        }
+      : tone === "warm"
+        ? {
+            card: "border-[#F0DCC9] bg-[#FFF8F2] hover:border-[#E6C9AE]",
+            icon: "bg-[#FBEADF] text-[#8B5A2B] group-hover:bg-[#F7E2D3]",
+            arrow: "text-[#B08456]",
+          }
+        : tone === "slate"
+          ? {
+              card: "border-[#D9E1EA] bg-[#F8FAFC] hover:border-[#C7D3E0]",
+              icon: "bg-[#E9EEF4] text-[#50637C] group-hover:bg-[#DDE6EF]",
+              arrow: "text-[#7E91A8]",
+            }
+          : {
+              card: "border-[#D7E2EE] bg-[#F7FAFE] hover:border-[#C7D7EA]",
+              icon: "bg-[#EAF2FF] text-[#164073] group-hover:bg-[#DCEAFB]",
+              arrow: "text-[#6F89AA]",
+            };
+
   return (
     <Link
       href={href}
-      className="group min-h-[92px] rounded-2xl border border-black/5 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#C7D7EA] hover:shadow-md"
+      className={`group min-h-[92px] rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${palette.card}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#164073] transition-colors group-hover:bg-[#164073] group-hover:text-white">
+        <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${palette.icon}`}>
           <Icon size={22} weight="duotone" />
         </span>
-        <ArrowRight size={16} weight="bold" className="text-[#7D98B8]" />
+        <ArrowRight size={16} weight="bold" className={palette.arrow} />
       </div>
       <p className="mt-3 text-sm font-semibold text-[#164073]">{label}</p>
       <p className="mt-1 text-xs leading-4 text-[#5B6675]">{detail}</p>
