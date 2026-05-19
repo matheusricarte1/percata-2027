@@ -698,14 +698,27 @@ export default function CatalogoPage() {
 
             return query;
           })()
-        : await supabase.rpc("buscar_catalogo_inteligente", {
-            query_text: sanitizeSearchInput(debouncedSearch),
-            categoria_filtro: selectedCat,
-            limit_val: pageSize,
-            offset_val: targetPage * pageSize,
+        : await fetch(
+            `/api/catalog-search?q=${encodeURIComponent(
+              sanitizeSearchInput(debouncedSearch),
+            )}&category=${encodeURIComponent(selectedCat)}&limit=${pageSize}&offset=${
+              targetPage * pageSize
+            }`,
+          ).then(async (response) => {
+            const payload = await response.json().catch(() => ({}));
+            return {
+              data: payload.items || [],
+              error: response.ok ? null : payload,
+              hasMore: Boolean(payload.hasMore),
+            };
           });
 
-      const { data, error } = result;
+      const { data, error } = result as {
+        data: any[] | null;
+        error: any;
+        hasMore?: boolean;
+      };
+      const apiHasMore = "hasMore" in result ? Boolean(result.hasMore) : false;
 
       if (error) {
         toast.error("Falha ao consultar catálogo inteligente.");
@@ -764,7 +777,7 @@ export default function CatalogoPage() {
         setProducts((prev) =>
           isNewSearch ? rankedProducts : [...prev, ...rankedProducts],
         );
-        setHasMore(data.length === pageSize);
+        setHasMore(isEmptySearch ? data.length === pageSize : apiHasMore);
       }
       setLoading(false);
     },

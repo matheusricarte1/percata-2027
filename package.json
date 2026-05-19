@@ -8,6 +8,7 @@
     "start": "next start",
     "test": "tsx --test src/lib/*.test.ts",
     "lint": "eslint",
+    "catalog:index-typesense": "node scripts/index-typesense-catalog.mjs",
     "db:check-grants": "node scripts/check-supabase-grants.mjs",
     "deploy:check": "npm run db:check-grants && npm run lint && npm test && npm run build"
   },
@@ -49,6 +50,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tw-animate-css": "^1.4.0",
+    "typesense": "^3.0.6",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

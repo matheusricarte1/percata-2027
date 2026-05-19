@@ -46,7 +46,6 @@ import {
   COLLECTIVE_CATALOG_SEARCH_LIMIT,
   buildCollectiveCatalogFallbackFilter,
   buildCollectiveCatalogPageState,
-  buildCollectiveCatalogSearchArgs,
   sanitizeCollectiveCatalogSearch,
 } from "@/lib/collective-catalog-search";
 import { rerankCatalogSearchResults } from "@/lib/catalog-search-ranking";
@@ -274,16 +273,16 @@ export default function DfdColetivaDetailPage() {
       setCatalogLoading(true);
       const offset = catalogPage * COLLECTIVE_CATALOG_SEARCH_LIMIT;
       try {
-        const { data, error } = await supabase.rpc(
-          "buscar_catalogo_inteligente",
-          buildCollectiveCatalogSearchArgs(searchTerm, offset),
+        const response = await fetch(
+          `/api/catalog-search?q=${encodeURIComponent(searchTerm)}&category=all&limit=${COLLECTIVE_CATALOG_SEARCH_LIMIT}&offset=${offset}`,
         );
-        if (error) throw error;
-        if ((data || []).length > 0) {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || "Falha na busca.");
+        if ((payload.items || []).length > 0) {
           if (!active) return;
-          const rows = (data || []) as CatalogItem[];
+          const rows = (payload.items || []) as CatalogItem[];
           setCatalogItems(rerankCatalogSearchResults(searchTerm, rows));
-          setCatalogHasMore(buildCollectiveCatalogPageState(catalogPage, rows.length).hasNext);
+          setCatalogHasMore(Boolean(payload.hasMore));
           return;
         }
       } catch {
