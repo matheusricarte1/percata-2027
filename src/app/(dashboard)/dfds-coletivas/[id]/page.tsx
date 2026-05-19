@@ -1039,6 +1039,13 @@ function FlowStepper({
   onStageChange: (stage: FlowStage) => void;
 }) {
   const activeIndex = FLOW_STEPS.findIndex((step) => step.id === activeStage);
+  const allowedStagesByStatus: Record<RoomStatus, FlowStage[]> = {
+    aberta: ["adicionar", "consolidar"],
+    em_revisao: ["consolidar", "revisao"],
+    convertida: ["finalizar"],
+    arquivada: ["finalizar"],
+  };
+  const allowedStages = allowedStagesByStatus[status] || [activeStage];
   return (
     <section className="rounded-lg border border-[#DDE5EF] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
       <div className="grid gap-4 md:grid-cols-4">
@@ -1049,34 +1056,66 @@ function FlowStepper({
             (step.id === "consolidar" && status === "em_revisao") ||
             (step.id === "finalizar" && status === "convertida");
           const active = step.id === activeStage;
+          const allowed = allowedStages.includes(step.id);
+          const clickable = allowed && !active;
           return (
             <button
               key={step.id}
               type="button"
-              onClick={() => onStageChange(step.id)}
-              className="group grid grid-cols-[36px_1fr] gap-3 text-left"
+              onClick={() => {
+                if (!clickable) return;
+                onStageChange(step.id);
+              }}
+              disabled={!clickable}
+              aria-current={active ? "step" : undefined}
+              className={cn(
+                "group grid grid-cols-[36px_1fr] gap-3 rounded-xl px-2 py-2 text-left transition",
+                clickable && "cursor-pointer hover:bg-[#F7FBFF]",
+                !clickable && !active && "cursor-not-allowed opacity-72",
+              )}
             >
               <span
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
+                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition",
                   active && "bg-[#0B63CE] text-white shadow-sm",
                   completed && !active && "bg-[#D9F8E7] text-[#168A5A]",
                   !active && !completed && "bg-[#EEF2F7] text-[#526070]",
+                  clickable && "ring-1 ring-transparent group-hover:ring-[#BBD6FF]",
                 )}
               >
                 {completed && !active ? <CheckCircle size={17} weight="fill" /> : index + 1}
               </span>
               <span>
-                <span className={cn("block text-sm font-semibold", active ? "text-[#0B3473]" : "text-[#0F172A]")}>
+                <span
+                  className={cn(
+                    "block text-sm font-semibold",
+                    active ? "text-[#0B3473]" : "text-[#0F172A]",
+                    clickable && "group-hover:text-[#0B4AA2]",
+                  )}
+                >
                   {step.title}
                 </span>
                 <span className={cn("mt-1 block text-xs", active ? "text-[#0B4AA2]" : "text-[#667085]")}>
                   {step.description}
                 </span>
+                <span className="mt-1 block text-[11px] font-semibold text-[#7D98B8]">
+                  {active
+                    ? "Etapa atual"
+                    : clickable
+                      ? "Clique para revisar"
+                      : allowed
+                        ? "Disponível nesta fase"
+                        : "Bloqueada nesta fase"}
+                </span>
               </span>
             </button>
           );
         })}
+      </div>
+      <div className="mt-4 rounded-md border border-[#E2E8F0] bg-[#FBFCFF] px-4 py-3 text-xs leading-5 text-[#526070]">
+        Você só pode voltar para etapas que ainda façam sentido no status atual da sala. Depois que a sala sai de
+        <strong className="mx-1 text-[#0B3473]">aberta</strong>, ela não volta para receber novas contribuições pela barra.
+        Depois da geração da DFD oficial, o fluxo fica apenas para acompanhamento.
       </div>
     </section>
   );
