@@ -829,7 +829,7 @@ export default function DfdColetivaDetailPage() {
                 <span>Criada em {formatDateTime(detail.room.created_at)}</span>
               </div>
             </div>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-end">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <HeaderMetric icon={<UsersThree size={26} weight="duotone" />} label="Pessoas" value={detail.participants.length} />
                 <HeaderMetric icon={<Package size={26} weight="duotone" />} label="Itens consolidados" value={detail.items.length} />
@@ -839,11 +839,11 @@ export default function DfdColetivaDetailPage() {
                   value={formatCurrency(totalValue)}
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3 lg:justify-end">
                 <button
                   type="button"
                   onClick={exportCollectiveCsv}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#CBD5E1] bg-white px-5 text-sm font-semibold text-[#0B4AA2]"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#CBD5E1] bg-white px-5 text-sm font-semibold text-[#0B4AA2]"
                 >
                   <DownloadSimple size={17} weight="bold" /> Exportar
                 </button>
@@ -852,7 +852,7 @@ export default function DfdColetivaDetailPage() {
                     type="button"
                     onClick={convertRoom}
                     disabled={converting || detail.items.length === 0}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#063F8F] px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-11 min-w-[168px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-[#063F8F] px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <LockSimple size={17} weight="bold" />
                     {converting ? "Gerando..." : "Gerar DFD oficial"}
