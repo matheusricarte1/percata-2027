@@ -1748,16 +1748,14 @@ export default function ConsolidationPage() {
 
           <div
             className={cn(
-              "hidden border-b border-black/5 px-5 py-2 text-[10px] font-semibold uppercase tracking-widest 2xl:grid 2xl:grid-cols-[minmax(460px,1fr)_120px_160px_130px_92px] 2xl:gap-4",
+              "hidden border-b border-black/5 px-5 py-2 text-[10px] font-semibold uppercase tracking-widest 2xl:grid 2xl:grid-cols-[minmax(560px,1fr)_250px_92px] 2xl:gap-4",
               contrastMode === "high"
                 ? "bg-upe-blue-upe text-white/85"
                 : "bg-upe-neutral-cool-ice text-black/45",
             )}
           >
             <span>Item</span>
-            <span className="text-right">Qtd.</span>
-            <span className="text-right">Valor</span>
-            <span className="text-right">Score</span>
+            <span className="text-right">Decisão</span>
             <span className="text-right">Pareto</span>
           </div>
 
@@ -1801,7 +1799,7 @@ export default function ConsolidationPage() {
                   return (
                     <div
                       className={cn(
-                        "mx-3 my-1.5 rounded-xl border border-black/5 p-3 shadow-sm transition-colors md:mx-4 md:p-4 2xl:mx-0 2xl:my-0 2xl:rounded-none 2xl:border-x-0 2xl:border-t-0 2xl:px-4 2xl:shadow-none 2xl:grid 2xl:grid-cols-[minmax(520px,1fr)_88px_142px_112px_76px] 2xl:gap-3 2xl:items-center",
+                        "mx-3 my-1.5 rounded-xl border border-black/5 p-3 shadow-sm transition-colors md:mx-4 md:p-4 2xl:mx-0 2xl:my-0 2xl:rounded-none 2xl:border-x-0 2xl:border-t-0 2xl:px-4 2xl:shadow-none 2xl:grid 2xl:grid-cols-[minmax(560px,1fr)_250px_76px] 2xl:gap-4 2xl:items-start",
                         stripedBg,
                         rowDensity,
                         item.is_highlight && "ring-1 ring-inset ring-upe-accent-matte-gold/25",
@@ -1833,26 +1831,11 @@ export default function ConsolidationPage() {
                           <span className="truncate">
                             Local: {compactList(item.locais_uso, 2)}
                           </span>
+                          <span className="text-black/35">•</span>
+                          <span>{item.source_item_count} origem{item.source_item_count === 1 ? "" : "ens"}</span>
                         </div>
 
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {primaryDfd ? (
-                            <a
-                              href={`/dfd/${primaryDfd.id}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-[#C7D7EA] bg-white px-2.5 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe transition-colors hover:border-upe-blue-upe hover:bg-[#EAF2FF]"
-                              title={
-                                item.dfd_sources.length > 1
-                                  ? `Abrir ${primaryDfd.numero_protocolo}. Este item aparece em ${item.dfd_sources.length} DFDs.`
-                                  : `Abrir ${primaryDfd.numero_protocolo}`
-                              }
-                            >
-                              <ArrowSquareOut size={13} weight="bold" />
-                              Abrir DFD
-                            </a>
-                          ) : null}
                           <span
                             className={cn(
                               "px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-widest font-semibold",
@@ -1881,43 +1864,40 @@ export default function ConsolidationPage() {
                           )}
                         </div>
 
-                        {item.dfd_sources.length > 1 ? (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                            <span className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
-                              Origens:
-                            </span>
-                            {item.dfd_sources.slice(0, 3).map((source) => (
-                              <a
-                                key={source.id}
-                                href={`/dfd/${source.id}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(event) => event.stopPropagation()}
-                                className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[10px] font-semibold text-black/55 hover:border-upe-blue-upe hover:text-upe-blue-upe"
-                                title={`Abrir ${source.numero_protocolo} · ${source.solicitante_nome}`}
-                              >
-                                {source.numero_protocolo}
-                              </a>
-                            ))}
-                            {item.dfd_sources.length > 3 ? (
-                              <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-semibold text-black/45">
-                                +{item.dfd_sources.length - 3}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          <InlineStat label="Origens" value={String(item.source_item_count)} />
-                          <InlineStat label="Variações" value={String(item.description_variants)} />
-                          <InlineStat
-                            label="Faixa"
-                            value={formatCompactCurrencyRange(item.min_unit_value, item.max_unit_value)}
-                          />
-                          <InlineStat label="Pendências" value={`${item.missing_quality_count}%`} />
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium text-black/45">
+                          <span>Variações {item.description_variants}</span>
+                          <span className="text-black/25">•</span>
+                          <span>Faixa {formatCompactCurrencyRange(item.min_unit_value, item.max_unit_value)}</span>
+                          <span className="text-black/25">•</span>
+                          <span>Pendências {item.missing_quality_count}%</span>
                         </div>
 
-                        <div className="mt-1.5 grid grid-cols-2 gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {primaryDfd ? (
+                            <a
+                              href={`/dfd/${primaryDfd.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-[#C7D7EA] bg-white px-2.5 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe transition-colors hover:border-upe-blue-upe hover:bg-[#EAF2FF]"
+                              title={
+                                item.dfd_sources.length > 1
+                                  ? `Abrir ${primaryDfd.numero_protocolo}. Este item aparece em ${item.dfd_sources.length} DFDs.`
+                                  : `Abrir ${primaryDfd.numero_protocolo}`
+                              }
+                            >
+                              <ArrowSquareOut size={13} weight="bold" />
+                              Abrir DFD
+                            </a>
+                          ) : null}
+                          {item.dfd_sources.length > 1 ? (
+                            <span className="text-[10px] font-medium text-black/45">
+                              +{item.dfd_sources.length - 1} protocolo{item.dfd_sources.length - 1 === 1 ? "" : "s"}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                           <div>
                             <div className="mb-1 flex items-center justify-between">
                               <p className="text-[9px] uppercase tracking-widest text-[#9A5B44] font-semibold">
@@ -1971,35 +1951,35 @@ export default function ConsolidationPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 2xl:mt-0 2xl:contents">
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
-                            Quantidade
+                      <div className="mt-3 grid grid-cols-3 gap-2 2xl:mt-0 2xl:grid-cols-1">
+                        <div className="rounded-xl border border-[#D9E0E8] bg-white/90 p-3 text-left shadow-sm 2xl:text-right">
+                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
+                            Valor total
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-upe-blue-upe 2xl:mt-0">
-                            {item.quantidade_total}
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
-                            Valor
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-upe-blue-upe 2xl:mt-0">
+                          <p className="mt-1 text-lg font-semibold tracking-tight text-upe-blue-upe">
                             {item.valor_total.toLocaleString("pt-BR", {
                               style: "currency",
                               currency: "BRL",
                             })}
                           </p>
                         </div>
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:text-right">
+                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
+                            Quantidade
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-upe-neutral-dark-soft-black">
+                            {item.quantidade_total}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:text-right">
+                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
                             Score
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-upe-neutral-dark-soft-black 2xl:mt-0">
+                          <p className="mt-1 text-sm font-semibold text-upe-neutral-dark-soft-black">
                             {Math.round(item.rank_score)}
                           </p>
                           {showScoreBars && (
-                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 2xl:ml-auto 2xl:w-[88px]">
+                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 2xl:ml-auto 2xl:w-[104px]">
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-blue-medium to-upe-blue-upe"
                                 style={{ width: `${scoreWidth}%` }}
@@ -2007,11 +1987,17 @@ export default function ConsolidationPage() {
                             </div>
                           )}
                         </div>
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
-                            Pareto
-                          </p>
-                          <div className="mt-1 flex justify-start 2xl:mt-0 2xl:justify-end">
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-black/5 bg-white/70 p-2.5 2xl:mt-0 2xl:border-0 2xl:bg-transparent 2xl:p-0">
+                        <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 text-left 2xl:text-right">
+                          Pareto
+                        </p>
+                        <div className="mt-1 flex items-center justify-between gap-2 2xl:flex-col 2xl:items-end">
+                          <span className="text-[10px] font-semibold uppercase tracking-widest text-black/45">
+                            {item.is_highlight ? "Top 20%" : "Acompanhar"}
+                          </span>
+                          <div className="flex justify-start 2xl:justify-end">
                         <span
                           className={cn(
                             "inline-flex items-center justify-center w-8 h-8 rounded-lg",
@@ -2329,15 +2315,6 @@ function AvatarGroup({
         </span>
       ) : null}
     </div>
-  );
-}
-
-function InlineStat({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#D9E0E8] bg-white/80 px-2 py-1 text-[10px] font-semibold text-[#526070]">
-      <span className="uppercase tracking-[0.12em] text-[#8A97A8]">{label}</span>
-      <span className="text-[#164073]">{value}</span>
-    </span>
   );
 }
 
