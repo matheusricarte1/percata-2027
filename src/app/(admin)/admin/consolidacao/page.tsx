@@ -430,6 +430,7 @@ export default function ConsolidationPage() {
   const [dfdMenuOpen, setDfdMenuOpen] = useState(false);
   const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
   const [previewDfdId, setPreviewDfdId] = useState<string | null>(null);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [sortBy, setSortBy] = useState<"score_desc" | "value_desc" | "quantity_desc">("score_desc");
   const [quickFocus, setQuickFocus] = useState<QuickFocus>("none");
@@ -1693,6 +1694,7 @@ export default function ConsolidationPage() {
                     6,
                     Math.min(100, Math.round((item.rank_score / maxVisibleScore) * 100)),
                   );
+                  const isExpanded = expandedItemId === item.siad;
                   const hasQualityGap =
                     item.criticidade_level === 0 ||
                     item.priorizacao_level === 0 ||
@@ -1711,80 +1713,126 @@ export default function ConsolidationPage() {
                   return (
                     <div
                       className={cn(
-                        "mx-3 my-1.5 rounded-xl border border-black/5 p-3 shadow-sm transition-colors md:mx-4 md:p-4 2xl:mx-0 2xl:my-0 2xl:rounded-none 2xl:border-x-0 2xl:border-t-0 2xl:px-4 2xl:shadow-none 2xl:grid 2xl:grid-cols-[minmax(560px,1fr)_250px_76px] 2xl:gap-4 2xl:items-start",
+                        "mx-3 my-1.5 rounded-[22px] border border-[#E5EDF7] bg-white p-4 shadow-[0_10px_24px_rgba(22,64,115,0.06)] transition-colors md:mx-4",
                         stripedBg,
                         rowDensity,
                         item.is_highlight && "ring-1 ring-inset ring-upe-accent-matte-gold/25",
                       )}
                     >
-                      <div className="min-w-0">
-                        <p className="text-[9px] uppercase tracking-[0.14em] font-semibold text-black/35">
-                          #{item.siad} · {item.dfd_count} DFDs · {item.pedidos.join(", ")}
-                        </p>
-                        <p
-                          className={cn(
-                            "mt-1 font-semibold text-upe-neutral-dark-soft-black line-clamp-2 leading-snug",
-                            densityMode === "compact" ? "text-[13px]" : "text-[15px]",
-                          )}
-                        >
-                          {item.descricao}
-                        </p>
-                        <p className="mt-1 text-[11px] text-black/55">
-                          {item.grupo_nome} · {item.classe_nome} · {item.tipo_nome} ·{" "}
-                          {item.gnd_dominante}
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-black/50">
-                          <div className="inline-flex items-center gap-2">
-                            <AvatarGroup people={item.solicitante_people} />
-                            <span className="font-medium text-black/60">
-                              {item.solicitante_people.length} servidor{item.solicitante_people.length === 1 ? "" : "es"}
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_220px_170px]">
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-[0.14em] font-semibold text-black/35">
+                            #{item.siad} · {item.dfd_count} DFD{item.dfd_count === 1 ? "" : "s"} · {item.pedidos.join(", ")}
+                          </p>
+                          <p
+                            className={cn(
+                              "mt-1 font-semibold text-upe-neutral-dark-soft-black line-clamp-2 leading-snug",
+                              densityMode === "compact" ? "text-[15px]" : "text-[16px]",
+                            )}
+                          >
+                            {item.descricao}
+                          </p>
+                          <p className="mt-2 text-[12px] text-black/50">
+                            {item.grupo_nome} · {item.classe_nome} · {item.tipo_nome} · {item.gnd_dominante}
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                "px-2.5 py-1 rounded-full border text-[11px] font-semibold",
+                                criticidadeBadgeClass(item.criticidade_level),
+                              )}
+                            >
+                              {CRITICIDADE_LABELS[item.criticidade_level]}
                             </span>
+                            <span
+                              className={cn(
+                                "px-2.5 py-1 rounded-full border text-[11px] font-semibold",
+                                priorizacaoBadgeClass(item.priorizacao_level),
+                              )}
+                            >
+                              {PRIORIZACAO_LABELS[item.priorizacao_level]}
+                            </span>
+                            {hasOutlier ? (
+                              <span className="px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-upe-warm-light-peach text-upe-warm-light-terracotta border-upe-warm-light-terracotta/30">
+                                Outlier
+                              </span>
+                            ) : null}
+                            {hasQualityGap ? (
+                              <span className="px-2.5 py-1 rounded-full border text-[11px] font-semibold bg-amber-100 text-amber-700 border-amber-200">
+                                Revisar
+                              </span>
+                            ) : null}
                           </div>
-                          <span className="truncate">
-                            Local: {compactList(item.locais_uso, 2)}
-                          </span>
-                          <span className="text-black/35">•</span>
-                          <span>{item.source_item_count} origem{item.source_item_count === 1 ? "" : "ens"}</span>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-black/55">
+                            <div className="inline-flex items-center gap-2">
+                              <AvatarGroup people={item.solicitante_people} />
+                              <span className="font-medium text-black/65">
+                                {item.solicitante_people.length} servidor{item.solicitante_people.length === 1 ? "" : "es"}
+                              </span>
+                            </div>
+                            <span>Local: {compactList(item.locais_uso, 1)}</span>
+                            <span>{item.source_item_count} origem{item.source_item_count === 1 ? "" : "ens"}</span>
+                          </div>
                         </div>
 
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-widest font-semibold",
-                              criticidadeBadgeClass(item.criticidade_level),
-                            )}
+                        <div className="grid gap-2 self-start rounded-[18px] border border-[#E6EDF7] bg-[#FBFDFF] p-3">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7A8CA7]">
+                              Valor estimado
+                            </p>
+                            <p className="mt-1 text-[15px] font-semibold text-[#164073]">
+                              {item.valor_total.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7A8CA7]">
+                              Origem
+                            </p>
+                            <p className="mt-1 text-[13px] font-medium text-black/70">
+                              {item.solicitante_people.length} servidor
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7A8CA7]">
+                              Local
+                            </p>
+                            <p className="mt-1 text-[13px] font-medium text-black/70 line-clamp-2">
+                              {compactList(item.locais_uso, 1)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 self-start">
+                          <div className="rounded-[18px] border border-[#D8EFE0] bg-[#F4FCF7] p-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#4F8D64]">
+                              Score
+                            </p>
+                            <p className="mt-1 text-[28px] font-semibold leading-none tracking-tight text-[#164073]">
+                              {Math.round(item.rank_score)}
+                            </p>
+                            {showScoreBars ? (
+                              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#DCE8F7]">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-blue-medium to-upe-blue-upe"
+                                  style={{ width: `${scoreWidth}%` }}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedItemId((prev) => (prev === item.siad ? null : item.siad))
+                            }
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D9E6F3] bg-white px-4 text-sm font-semibold text-[#164073] hover:bg-[#F5F9FF]"
                           >
-                            {CRITICIDADE_LABELS[item.criticidade_level]}
-                          </span>
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-widest font-semibold",
-                              priorizacaoBadgeClass(item.priorizacao_level),
-                            )}
-                          >
-                            {PRIORIZACAO_LABELS[item.priorizacao_level]}
-                          </span>
-                          {hasOutlier && (
-                            <span className="px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-widest font-semibold bg-upe-warm-light-peach text-upe-warm-light-terracotta border-upe-warm-light-terracotta/30">
-                              Outlier preço
-                            </span>
-                          )}
-                          {hasQualityGap && (
-                            <span className="px-2 py-0.5 rounded-md border text-[10px] uppercase tracking-widest font-semibold bg-amber-100 text-amber-700 border-amber-200">
-                              Revisar dados
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium text-black/45">
-                          <span>Variações {item.description_variants}</span>
-                          <span className="text-black/25">•</span>
-                          <span>Faixa {formatCompactCurrencyRange(item.min_unit_value, item.max_unit_value)}</span>
-                          <span className="text-black/25">•</span>
-                          <span>Pendências {item.missing_quality_count}%</span>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            Ver detalhes
+                          </button>
                           {primaryDfd ? (
                             <button
                               type="button"
@@ -1792,139 +1840,107 @@ export default function ConsolidationPage() {
                                 event.stopPropagation();
                                 setPreviewDfdId(primaryDfd.id);
                               }}
-                              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-[#C7D7EA] bg-white px-2.5 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe transition-colors hover:border-upe-blue-upe hover:bg-[#EAF2FF]"
-                              title={
-                                item.dfd_sources.length > 1
-                                  ? `Ver ${primaryDfd.numero_protocolo}. Este item aparece em ${item.dfd_sources.length} DFDs.`
-                                  : `Ver ${primaryDfd.numero_protocolo}`
-                              }
+                              className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D9E6F3] bg-white px-4 text-sm font-semibold text-[#164073] hover:bg-[#F5F9FF]"
                             >
-                              <ArrowSquareOut size={13} weight="bold" />
-                              Ver DFD
+                              Ver origem
                             </button>
                           ) : null}
-                          {item.dfd_sources.length > 1 ? (
-                            <span className="text-[10px] font-medium text-black/45">
-                              +{item.dfd_sources.length - 1} protocolo{item.dfd_sources.length - 1 === 1 ? "" : "s"}
+                          <div className="flex justify-end">
+                            <span
+                              className={cn(
+                                "inline-flex items-center justify-center w-9 h-9 rounded-xl",
+                                item.is_highlight
+                                  ? "bg-upe-accent-matte-gold text-white"
+                                  : "bg-upe-neutral-cool-ice text-upe-neutral-cool-steel-gray",
+                              )}
+                              title={item.is_highlight ? "Dentro do Pareto (20%)" : "Fora do Pareto"}
+                            >
+                              <Star size={14} weight={item.is_highlight ? "fill" : "bold"} />
                             </span>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <div>
-                            <div className="mb-1 flex items-center justify-between">
-                              <p className="text-[9px] uppercase tracking-widest text-[#9A5B44] font-semibold">
-                                Criticidade
-                              </p>
-                              <span className="text-[10px] font-semibold text-[#C14953]">
-                                {CRITICIDADE_LABELS[item.criticidade_level]}
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min={0}
-                              max={4}
-                              step={1}
-                              value={item.criticidade_level}
-                              onChange={(event) =>
-                                updateItemLevel(
-                                  item.siad,
-                                  "criticidade_level",
-                                  Number(event.target.value),
-                                )
-                              }
-                              className="w-full h-1.5 rounded-lg slider-crit accent-[#C14953]"
-                            />
-                          </div>
-                          <div>
-                            <div className="mb-1 flex items-center justify-between">
-                              <p className="text-[9px] uppercase tracking-widest text-[#46698F] font-semibold">
-                                Priorização
-                              </p>
-                              <span className="text-[10px] font-semibold text-[#164073]">
-                                {PRIORIZACAO_LABELS[item.priorizacao_level]}
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min={0}
-                              max={4}
-                              step={1}
-                              value={item.priorizacao_level}
-                              onChange={(event) =>
-                                updateItemLevel(
-                                  item.siad,
-                                  "priorizacao_level",
-                                  Number(event.target.value),
-                                )
-                              }
-                              className="w-full h-1.5 rounded-lg slider-prio accent-[#164073]"
-                            />
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-3 gap-2 2xl:mt-0 2xl:grid-cols-1">
-                        <div className="rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] p-3 text-left shadow-sm 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-[#47739F]">
-                            Score
-                          </p>
-                          <p className="mt-1 text-xl font-semibold tracking-tight text-[#164073]">
-                            {Math.round(item.rank_score)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-medium text-[#47739F]">
-                            define a ordem da lista
-                          </p>
-                          {showScoreBars && (
-                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/10 2xl:ml-auto 2xl:w-[120px]">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-blue-medium to-upe-blue-upe"
-                                style={{ width: `${scoreWidth}%` }}
+                      {isExpanded ? (
+                        <div className="mt-4 grid gap-4 border-t border-[#E6EDF7] pt-4 lg:grid-cols-[1fr_1fr]">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-medium text-black/50">
+                              <span>Variações {item.description_variants}</span>
+                              <span className="text-black/25">•</span>
+                              <span>Faixa {formatCompactCurrencyRange(item.min_unit_value, item.max_unit_value)}</span>
+                              <span className="text-black/25">•</span>
+                              <span>Pendências {item.missing_quality_count}%</span>
+                            </div>
+                            <div>
+                              <div className="mb-1 flex items-center justify-between">
+                                <p className="text-[10px] uppercase tracking-widest text-[#9A5B44] font-semibold">
+                                  Criticidade
+                                </p>
+                                <span className="text-[11px] font-semibold text-[#C14953]">
+                                  {CRITICIDADE_LABELS[item.criticidade_level]}
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0}
+                                max={4}
+                                step={1}
+                                value={item.criticidade_level}
+                                onChange={(event) =>
+                                  updateItemLevel(
+                                    item.siad,
+                                    "criticidade_level",
+                                    Number(event.target.value),
+                                  )
+                                }
+                                className="w-full h-1.5 rounded-lg slider-crit accent-[#C14953]"
                               />
                             </div>
-                          )}
-                        </div>
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
-                            Valor total
-                          </p>
-                          <p className="mt-1 text-base font-semibold tracking-tight text-upe-blue-upe">
-                            {item.valor_total.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </p>
-                        </div>
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
-                            Quantidade
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-upe-neutral-dark-soft-black">
-                            {item.quantidade_total}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 rounded-lg border border-black/5 bg-white/70 p-2.5 2xl:mt-0 2xl:border-0 2xl:bg-transparent 2xl:p-0">
-                        <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 text-left 2xl:text-right">
-                          Pareto
-                        </p>
-                        <div className="mt-1 flex items-center justify-between gap-2 2xl:flex-col 2xl:items-end">
-                          <div className="flex justify-start 2xl:justify-end">
-                        <span
-                          className={cn(
-                            "inline-flex items-center justify-center w-8 h-8 rounded-lg",
-                            item.is_highlight
-                              ? "bg-upe-accent-matte-gold text-white"
-                              : "bg-upe-neutral-cool-ice text-upe-neutral-cool-steel-gray",
-                          )}
-                          title={item.is_highlight ? "Dentro do Pareto (20%)" : "Fora do Pareto"}
-                        >
-                          <Star size={14} weight={item.is_highlight ? "fill" : "bold"} />
-                        </span>
+                            <div>
+                              <div className="mb-1 flex items-center justify-between">
+                                <p className="text-[10px] uppercase tracking-widest text-[#46698F] font-semibold">
+                                  Priorização
+                                </p>
+                                <span className="text-[11px] font-semibold text-[#164073]">
+                                  {PRIORIZACAO_LABELS[item.priorizacao_level]}
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0}
+                                max={4}
+                                step={1}
+                                value={item.priorizacao_level}
+                                onChange={(event) =>
+                                  updateItemLevel(
+                                    item.siad,
+                                    "priorizacao_level",
+                                    Number(event.target.value),
+                                  )
+                                }
+                                className="w-full h-1.5 rounded-lg slider-prio accent-[#164073]"
+                              />
+                            </div>
+                          </div>
+                          <div className="rounded-[18px] border border-[#E6EDF7] bg-[#FBFDFF] p-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7A8CA7]">
+                              Contexto do item
+                            </p>
+                            <div className="mt-3 space-y-2">
+                              <MetricLine label="Quantidade" value={String(item.quantidade_total)} />
+                              <MetricLine
+                                label="Protocolos"
+                                value={
+                                  item.dfd_sources.length > 1
+                                    ? `${primaryDfd?.numero_protocolo || "N/D"} +${item.dfd_sources.length - 1}`
+                                    : primaryDfd?.numero_protocolo || "N/D"
+                                }
+                              />
+                              <MetricLine label="Campus" value={compactList(item.pedidos, 2)} />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : null}
                     </div>
                   );
                 }}
