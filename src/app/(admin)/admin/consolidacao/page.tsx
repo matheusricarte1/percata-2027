@@ -37,6 +37,7 @@ type ApprovedDfd = {
   solicitante_id: string | null;
   solicitante_nome: string;
   solicitante_email: string | null;
+  solicitante_avatar_url: string | null;
   unidade_id: string | null;
   tipo_unidade: "departamento" | "laboratorio" | null;
   unidade_nome: string;
@@ -75,6 +76,7 @@ type ConsolidatedItem = {
   valor_total: number;
   pedidos: string[];
   solicitantes: string[];
+  solicitante_people: Array<{ name: string; avatarUrl: string | null }>;
   locais_uso: string[];
   dfd_count: number;
   source_item_count: number;
@@ -167,6 +169,36 @@ function compactList(values: string[], max = 2): string {
   if (clean.length === 0) return "N/D";
   if (clean.length <= max) return clean.join(", ");
   return `${clean.slice(0, max).join(", ")} +${clean.length - max}`;
+}
+
+function formatCompactCurrencyRange(min: number, max: number): string {
+  const safeMin = Number.isFinite(min) ? min : 0;
+  const safeMax = Number.isFinite(max) ? max : 0;
+  if (safeMin <= 0 && safeMax <= 0) return "N/D";
+  if (Math.abs(safeMax - safeMin) < 0.01) {
+    return safeMax.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  return `${safeMin.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  })} - ${safeMax.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function getInitials(fullName: string) {
+  return (
+    fullName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "U"
+  );
 }
 
 function deriveGroupFromGnd(gnd: string): string {
@@ -535,7 +567,7 @@ export default function ConsolidationPage() {
         solicitanteIds.length > 0
           ? supabase
               .from("profiles")
-              .select("id, full_name, email")
+              .select("id, full_name, email, avatar_url")
               .in("id", solicitanteIds)
           : Promise.resolve({ data: [], error: null } as any),
         departamentoIds.length > 0
@@ -603,6 +635,7 @@ export default function ConsolidationPage() {
         {
           nome: string;
           email: string | null;
+          avatarUrl: string | null;
         }
       >(
         ((profilesRes.data || []) as any[]).map((profile) => [
@@ -610,6 +643,7 @@ export default function ConsolidationPage() {
           {
             nome: String(profile.full_name || profile.email || "Usuário"),
             email: profile.email ? String(profile.email).toLowerCase() : null,
+            avatarUrl: profile.avatar_url ? String(profile.avatar_url) : null,
           },
         ]),
       );
@@ -660,6 +694,7 @@ export default function ConsolidationPage() {
           valor_total: number;
           pedidos: Set<string>;
           solicitantes: Set<string>;
+          solicitantePeople: Map<string, { name: string; avatarUrl: string | null }>;
           locais_uso: Set<string>;
           dfdSet: Set<string>;
           source_item_count: number;
@@ -704,6 +739,7 @@ export default function ConsolidationPage() {
             valor_total: 0,
             pedidos: new Set<string>(),
             solicitantes: new Set<string>(),
+            solicitantePeople: new Map<string, { name: string; avatarUrl: string | null }>(),
             locais_uso: new Set<string>(),
             dfdSet: new Set<string>(),
             source_item_count: 0,
@@ -747,7 +783,12 @@ export default function ConsolidationPage() {
         const profileInfo = dfd?.solicitante_id
           ? profileMap.get(String(dfd.solicitante_id))
           : null;
-        entry.solicitantes.add(profileInfo?.nome || "Usuário");
+        const requesterName = profileInfo?.nome || "Usuário";
+        entry.solicitantes.add(requesterName);
+        entry.solicitantePeople.set(String(dfd?.solicitante_id || requesterName), {
+          name: requesterName,
+          avatarUrl: profileInfo?.avatarUrl || null,
+        });
         const localUso = resolveUnitName(dfd) || String(row.local_uso || "").trim();
         if (localUso) entry.locais_uso.add(localUso);
       }
@@ -772,6 +813,7 @@ export default function ConsolidationPage() {
           solicitante_id: dfd.solicitante_id || null,
           solicitante_nome: profileInfo?.nome || "Usuário",
           solicitante_email: profileInfo?.email || null,
+          solicitante_avatar_url: profileInfo?.avatarUrl || null,
           unidade_id: dfd.unidade_id || null,
           tipo_unidade: (dfd.tipo_unidade as "departamento" | "laboratorio" | null) || null,
           unidade_nome: unitName,
@@ -846,6 +888,9 @@ export default function ConsolidationPage() {
           pedidos: Array.from(entry.pedidos),
           solicitantes: Array.from(entry.solicitantes).sort((a, b) =>
             String(a).localeCompare(String(b), "pt-BR"),
+          ),
+          solicitante_people: Array.from(entry.solicitantePeople.values()).sort((a, b) =>
+            String(a.name).localeCompare(String(b.name), "pt-BR"),
           ),
           locais_uso: Array.from(entry.locais_uso).sort((a, b) =>
             String(a).localeCompare(String(b), "pt-BR"),
@@ -1401,9 +1446,15 @@ export default function ConsolidationPage() {
                       <span>{dfd.campus_nome}</span>
                       <span>{dfd.item_count} itens</span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-black/60">
-                      <span className="truncate max-w-[58%]">{dfd.solicitante_nome}</span>
-                      <span>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-black/60">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <CompactAvatar
+                          name={dfd.solicitante_nome}
+                          avatarUrl={dfd.solicitante_avatar_url}
+                        />
+                        <span className="truncate max-w-[130px]">{dfd.unidade_nome || "local não definido"}</span>
+                      </div>
+                      <span className="shrink-0">
                         {dfd.valor_total.toLocaleString("pt-BR", {
                           style: "currency",
                           currency: "BRL",
@@ -1411,8 +1462,7 @@ export default function ConsolidationPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] text-black/45 truncate">
-                      {dfd.solicitante_email || "email não informado"} ·{" "}
-                      {dfd.unidade_nome || "local não definido"}
+                      {dfd.solicitante_email || "email não informado"}
                     </p>
                     <p className="mt-1 text-[11px] text-black/45">
                       {dfd.created_at
@@ -1728,7 +1778,7 @@ export default function ConsolidationPage() {
                 data={displayItems}
                 overscan={320}
                 itemContent={(index, item) => {
-                  const rowDensity = densityMode === "compact" ? "py-2.5" : "py-3.5";
+                  const rowDensity = densityMode === "compact" ? "py-2" : "py-3";
                   const scoreWidth = Math.max(
                     6,
                     Math.min(100, Math.round((item.rank_score / maxVisibleScore) * 100)),
@@ -1751,14 +1801,14 @@ export default function ConsolidationPage() {
                   return (
                     <div
                       className={cn(
-                        "mx-3 my-2 rounded-2xl border border-black/5 p-4 shadow-sm transition-colors md:mx-4 md:p-5 2xl:mx-0 2xl:my-0 2xl:rounded-none 2xl:border-x-0 2xl:border-t-0 2xl:px-5 2xl:shadow-none 2xl:grid 2xl:grid-cols-[minmax(460px,1fr)_120px_160px_130px_92px] 2xl:gap-4 2xl:items-center",
+                        "mx-3 my-1.5 rounded-xl border border-black/5 p-3 shadow-sm transition-colors md:mx-4 md:p-4 2xl:mx-0 2xl:my-0 2xl:rounded-none 2xl:border-x-0 2xl:border-t-0 2xl:px-4 2xl:shadow-none 2xl:grid 2xl:grid-cols-[minmax(520px,1fr)_88px_142px_112px_76px] 2xl:gap-3 2xl:items-center",
                         stripedBg,
                         rowDensity,
                         item.is_highlight && "ring-1 ring-inset ring-upe-accent-matte-gold/25",
                       )}
                     >
                       <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-black/35">
+                        <p className="text-[9px] uppercase tracking-[0.14em] font-semibold text-black/35">
                           #{item.siad} · {item.dfd_count} DFDs · {item.pedidos.join(", ")}
                         </p>
                         <p
@@ -1773,12 +1823,19 @@ export default function ConsolidationPage() {
                           {item.grupo_nome} · {item.classe_nome} · {item.tipo_nome} ·{" "}
                           {item.gnd_dominante}
                         </p>
-                        <p className="mt-1 text-[11px] text-black/45">
-                          Servidor(es): {compactList(item.solicitantes, 2)} · Local de uso:{" "}
-                          {compactList(item.locais_uso, 2)}
-                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-black/50">
+                          <div className="inline-flex items-center gap-2">
+                            <AvatarGroup people={item.solicitante_people} />
+                            <span className="font-medium text-black/60">
+                              {item.solicitante_people.length} servidor{item.solicitante_people.length === 1 ? "" : "es"}
+                            </span>
+                          </div>
+                          <span className="truncate">
+                            Local: {compactList(item.locais_uso, 2)}
+                          </span>
+                        </div>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           {primaryDfd ? (
                             <a
                               href={`/dfd/${primaryDfd.id}`}
@@ -1825,7 +1882,7 @@ export default function ConsolidationPage() {
                         </div>
 
                         {item.dfd_sources.length > 1 ? (
-                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                             <span className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
                               Origens:
                             </span>
@@ -1850,11 +1907,26 @@ export default function ConsolidationPage() {
                           </div>
                         ) : null}
 
-                        <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <InlineStat label="Origens" value={String(item.source_item_count)} />
+                          <InlineStat label="Variações" value={String(item.description_variants)} />
+                          <InlineStat
+                            label="Faixa"
+                            value={formatCompactCurrencyRange(item.min_unit_value, item.max_unit_value)}
+                          />
+                          <InlineStat label="Pendências" value={`${item.missing_quality_count}%`} />
+                        </div>
+
+                        <div className="mt-1.5 grid grid-cols-2 gap-2">
                           <div>
-                            <p className="text-[9px] uppercase tracking-widest text-black/35 font-semibold">
-                              Criticidade
-                            </p>
+                            <div className="mb-1 flex items-center justify-between">
+                              <p className="text-[9px] uppercase tracking-widest text-[#9A5B44] font-semibold">
+                                Criticidade
+                              </p>
+                              <span className="text-[10px] font-semibold text-[#C14953]">
+                                {CRITICIDADE_LABELS[item.criticidade_level]}
+                              </span>
+                            </div>
                             <input
                               type="range"
                               min={0}
@@ -1868,13 +1940,18 @@ export default function ConsolidationPage() {
                                   Number(event.target.value),
                                 )
                               }
-                              className="w-full h-1.5 rounded-lg slider-crit"
+                              className="w-full h-1.5 rounded-lg slider-crit accent-[#C14953]"
                             />
                           </div>
                           <div>
-                            <p className="text-[9px] uppercase tracking-widest text-black/35 font-semibold">
-                              Priorização
-                            </p>
+                            <div className="mb-1 flex items-center justify-between">
+                              <p className="text-[9px] uppercase tracking-widest text-[#46698F] font-semibold">
+                                Priorização
+                              </p>
+                              <span className="text-[10px] font-semibold text-[#164073]">
+                                {PRIORIZACAO_LABELS[item.priorizacao_level]}
+                              </span>
+                            </div>
                             <input
                               type="range"
                               min={0}
@@ -1888,14 +1965,14 @@ export default function ConsolidationPage() {
                                   Number(event.target.value),
                                 )
                               }
-                              className="w-full h-1.5 rounded-lg slider-prio"
+                              className="w-full h-1.5 rounded-lg slider-prio accent-[#164073]"
                             />
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4 2xl:mt-0 2xl:contents">
-                        <div className="rounded-xl border border-black/5 bg-white/70 p-3 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
+                      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 2xl:mt-0 2xl:contents">
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
                           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
                             Quantidade
                           </p>
@@ -1903,7 +1980,7 @@ export default function ConsolidationPage() {
                             {item.quantidade_total}
                           </p>
                         </div>
-                        <div className="rounded-xl border border-black/5 bg-white/70 p-3 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
                           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
                             Valor
                           </p>
@@ -1914,7 +1991,7 @@ export default function ConsolidationPage() {
                             })}
                           </p>
                         </div>
-                        <div className="rounded-xl border border-black/5 bg-white/70 p-3 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0 2xl:text-right">
                           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
                             Score
                           </p>
@@ -1930,7 +2007,7 @@ export default function ConsolidationPage() {
                             </div>
                           )}
                         </div>
-                        <div className="rounded-xl border border-black/5 bg-white/70 p-3 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0">
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:border-0 2xl:bg-transparent 2xl:p-0">
                           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35 2xl:hidden">
                             Pareto
                           </p>
@@ -2197,12 +2274,70 @@ export default function ConsolidationPage() {
 
 function KpiCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7D98B8]">
+    <div className="rounded-xl border border-[#D9E0E8] bg-white px-4 py-3 shadow-sm">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
         {label}
       </p>
-      <p className="mt-2 text-xl font-semibold tracking-tight text-[#164073]">{value}</p>
+      <p className="mt-1.5 text-lg font-semibold tracking-tight text-[#164073]">{value}</p>
     </div>
+  );
+}
+
+function CompactAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
+  const [broken, setBroken] = useState(false);
+
+  if (!avatarUrl || broken) {
+    return (
+      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#D9E0E8] bg-[#E8EDF2] text-[10px] font-semibold uppercase text-[#164073]">
+        {getInitials(name)}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={avatarUrl}
+      alt={name}
+      className="h-7 w-7 shrink-0 rounded-full border border-[#D9E0E8] object-cover"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+function AvatarGroup({
+  people,
+}: {
+  people: Array<{ name: string; avatarUrl: string | null }>;
+}) {
+  const visible = people.slice(0, 3);
+  const overflow = Math.max(0, people.length - visible.length);
+
+  return (
+    <div className="flex items-center">
+      {visible.map((person, index) => (
+        <div
+          key={`${person.name}-${index}`}
+          className={cn("relative", index > 0 && "-ml-2")}
+          title={person.name}
+        >
+          <CompactAvatar name={person.name} avatarUrl={person.avatarUrl} />
+        </div>
+      ))}
+      {overflow > 0 ? (
+        <span className="-ml-2 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-white bg-[#D9E0E8] px-1.5 text-[10px] font-semibold text-[#526070]">
+          +{overflow}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function InlineStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#D9E0E8] bg-white/80 px-2 py-1 text-[10px] font-semibold text-[#526070]">
+      <span className="uppercase tracking-[0.12em] text-[#8A97A8]">{label}</span>
+      <span className="text-[#164073]">{value}</span>
+    </span>
   );
 }
 

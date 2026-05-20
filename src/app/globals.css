@@ -468,11 +468,11 @@ html[data-route-pending="1"] {
   }
 
   .slider-crit {
-    @apply bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-accent-soft-mustard to-upe-red-upe;
+    @apply bg-gradient-to-r from-[#F6E0C7] via-[#E4A055] to-[#C14953];
   }
 
   .slider-prio {
-    @apply bg-gradient-to-r from-upe-neutral-cool-steel-gray via-upe-blue-closed-sky to-upe-blue-upe;
+    @apply bg-gradient-to-r from-[#D8E5F4] via-[#77A1D3] to-[#164073];
   }
 
   /* --- M3 Forms --- */
