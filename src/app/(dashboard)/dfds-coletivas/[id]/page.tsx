@@ -28,7 +28,6 @@ import {
   DownloadSimple,
   DotsThreeVertical,
   FloppyDisk,
-  FunnelSimple,
   LinkSimple,
   LockSimple,
   MagnifyingGlass,
@@ -194,96 +193,6 @@ const FLOW_STEPS: Array<{
     description: "Finalize e envie para aprovação",
   },
 ];
-
-const STAGE_GUIDANCE: Record<
-  FlowStage,
-  {
-    eyebrow: string;
-    title: string;
-    description: string;
-    highlights: string[];
-    railTitle: string;
-    railDescription: string;
-    railChecklist: string[];
-  }
-> = {
-  adicionar: {
-    eyebrow: "Etapa 1",
-    title: "Comece reunindo contribuições com contexto",
-    description:
-      "Aqui a sala ainda está aberta para o setor. A ideia é buscar itens, ajustar quantidades e registrar justificativas sem correr para a conversão cedo demais.",
-    highlights: [
-      "Monte o carrinho com calma antes de enviar os itens para a sala.",
-      "Cada item precisa de quantidade, valor unitário e justificativa.",
-      "Quando já houver base suficiente, avance para a consolidação.",
-    ],
-    railTitle: "O que ajuda nesta etapa",
-    railDescription:
-      "Quanto mais claro estiver o contexto do item agora, menos retrabalho aparece na revisão.",
-    railChecklist: [
-      "buscar termos mais amplos quando o catálogo vier vazio",
-      "conferir se o item faz sentido para o escopo da sala",
-      "registrar justificativa útil, não apenas repetir o nome do item",
-    ],
-  },
-  consolidar: {
-    eyebrow: "Etapa 2",
-    title: "Agora a sala precisa ganhar forma",
-    description:
-      "A consolidação serve para revisar o que entrou, remover excesso, ajustar inconsistências e garantir que a demanda represente bem o setor antes de seguir.",
-    highlights: [
-      "Confira duplicidades, quantidades e valores antes de avançar.",
-      "Use o resumo lateral para enxergar o peso corrente e capital.",
-      "Se algo ainda estiver cru, volte uma etapa sem perder o trabalho.",
-    ],
-    railTitle: "Antes de ir para revisão",
-    railDescription:
-      "Esta etapa costuma ser a última chance de limpar ruído antes da leitura mais formal.",
-    railChecklist: [
-      "itens consolidados sem conflito de quantidade",
-      "valores unitários plausíveis para todos os itens",
-      "participantes visíveis e distribuição coerente",
-    ],
-  },
-  revisao: {
-    eyebrow: "Etapa 3",
-    title: "Revise como quem vai explicar a demanda para outra pessoa",
-    description:
-      "Na revisão, a sala precisa ficar legível para quem não participou da montagem. O objetivo é deixar claras as informações da demanda e o racional da consolidação.",
-    highlights: [
-      "Leia a sala como se fosse a primeira vez.",
-      "Ajuste título, justificativa geral e escopo quando faltarem contexto.",
-      "Use o histórico e os itens consolidados para validar a narrativa da demanda.",
-    ],
-    railTitle: "O que revisar agora",
-    railDescription:
-      "A sala precisa contar uma história coerente: por que existe, o que reúne e como chegou a esse total.",
-    railChecklist: [
-      "justificativa geral compreensível por quem vai aprovar",
-      "escopo suficiente para separar o que entra e o que fica fora",
-      "itens consolidados consistentes com o objetivo da sala",
-    ],
-  },
-  finalizar: {
-    eyebrow: "Etapa 4",
-    title: "Sala encerrada, demanda pronta para acompanhamento",
-    description:
-      "Depois da conversão, o papel desta tela passa a ser acompanhamento: entender o que foi gerado e retomar os documentos oficiais quando necessário.",
-    highlights: [
-      "Abra as DFDs oficiais geradas pela conversão.",
-      "Use o histórico da sala como memória da construção coletiva.",
-      "Se a demanda mudar muito, o ideal é abrir uma nova sala.",
-    ],
-    railTitle: "Leitura desta etapa",
-    railDescription:
-      "A sala não é mais um rascunho ativo. Ela vira referência do que foi consolidado e convertido.",
-    railChecklist: [
-      "DFDs oficiais vinculadas e acessíveis",
-      "histórico preservado para consultas futuras",
-      "sala encerrada para evitar contribuições fora de contexto",
-    ],
-  },
-};
 
 export default function DfdColetivaDetailPage() {
   const params = useParams<{ id: string }>();
@@ -664,58 +573,6 @@ export default function DfdColetivaDetailPage() {
     }
   }
 
-  async function removeContribution(contribution: Contribution) {
-    if (!window.confirm("Remover esta contribuição da DFD coletiva?")) return;
-    try {
-      const response = await fetch(
-        `/api/collective-rooms/${roomId}/contributions/${contribution.id}`,
-        { method: "DELETE" },
-      );
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Erro ao remover.");
-      toast.success("Contribuição removida.");
-      await loadDetail();
-    } catch (error: any) {
-      toast.error(error?.message || "Erro ao remover contribuição.");
-    }
-  }
-
-  async function editContribution(contribution: Contribution) {
-    const quantidade = window.prompt("Quantidade", String(contribution.quantidade || 1));
-    if (quantidade === null) return;
-    const valor = window.prompt(
-      "Valor unitário estimado",
-      String(contribution.valor_unitario_estimado || 0),
-    );
-    if (valor === null) return;
-    const justificativa = window.prompt(
-      "Justificativa técnica",
-      String(contribution.justificativa_item || ""),
-    );
-    if (justificativa === null) return;
-
-    try {
-      const response = await fetch(
-        `/api/collective-rooms/${roomId}/contributions/${contribution.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            quantidade: Number(quantidade),
-            valor_unitario_estimado: Number(valor),
-            justificativa_item: justificativa,
-          }),
-        },
-      );
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Erro ao editar.");
-      toast.success("Contribuição atualizada.");
-      await loadDetail();
-    } catch (error: any) {
-      toast.error(error?.message || "Erro ao editar contribuição.");
-    }
-  }
-
   async function convertRoom() {
     if (!window.confirm("Gerar DFD oficial a partir desta DFD coletiva?")) return;
     setConverting(true);
@@ -869,39 +726,31 @@ export default function DfdColetivaDetailPage() {
         />
 
         {activeStage === "adicionar" && (
-          <section className="grid gap-4 2xl:grid-cols-[300px_minmax(0,1fr)]">
-            <SideRail detail={detail} activeStage={activeStage} />
-            <CatalogPanel
-              catalogSearch={catalogSearch}
-              setCatalogSearch={setCatalogSearch}
-              submitCatalogSearch={submitCatalogSearch}
-              clearCatalogSearch={clearCatalogSearch}
-              catalogItems={filteredCatalogItems}
-              rawCatalogItems={catalogItems}
-              catalogLoading={catalogLoading}
-              catalogQuery={catalogQuery}
-              cartItemKeys={cartItemKeys}
-              activeCatalogItemKey={activeCatalogItemKey}
-              addItemToCart={addItemToCart}
-              catalogPageState={catalogPageState}
-              catalogHasMore={catalogHasMore}
-              setCatalogPage={setCatalogPage}
-              catalogFilter={catalogFilter}
-              setCatalogFilter={setCatalogFilter}
-            />
-          </section>
+          <CatalogPanel
+            catalogSearch={catalogSearch}
+            setCatalogSearch={setCatalogSearch}
+            submitCatalogSearch={submitCatalogSearch}
+            clearCatalogSearch={clearCatalogSearch}
+            catalogItems={filteredCatalogItems}
+            rawCatalogItems={catalogItems}
+            catalogLoading={catalogLoading}
+            catalogQuery={catalogQuery}
+            cartItemKeys={cartItemKeys}
+            activeCatalogItemKey={activeCatalogItemKey}
+            addItemToCart={addItemToCart}
+            catalogPageState={catalogPageState}
+            catalogHasMore={catalogHasMore}
+            setCatalogPage={setCatalogPage}
+            catalogFilter={catalogFilter}
+            setCatalogFilter={setCatalogFilter}
+          />
         )}
 
         {activeStage === "consolidar" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_360px]">
-            <SideRail detail={detail} compactHelp activeStage={activeStage} />
+          <section className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
             <ConsolidationPanel
               detail={detail}
-              totalValue={totalValue}
               setActiveStage={setActiveStage}
-              editContribution={editContribution}
-              removeContribution={removeContribution}
-              isOpen={isOpen}
             />
             <ConsolidationSummary
               detail={detail}
@@ -917,13 +766,11 @@ export default function DfdColetivaDetailPage() {
         )}
 
         {activeStage === "revisao" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_360px]">
-            <SideRail detail={detail} reviewMode activeStage={activeStage} />
+          <section className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
             <ReviewPanel
               detail={detail}
               reviewTab={reviewTab}
               setReviewTab={setReviewTab}
-              totalValue={totalValue}
               saveMetadata={saveMetadata}
               savingMeta={savingMeta}
               setActiveStage={setActiveStage}
@@ -942,8 +789,7 @@ export default function DfdColetivaDetailPage() {
         )}
 
         {activeStage === "finalizar" && (
-          <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <SideRail detail={detail} reviewMode activeStage={activeStage} />
+          <section>
             <section className="rounded-lg border border-[#DDE5EF] bg-white p-8 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
               <div className="flex max-w-3xl flex-col items-start gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E8F5E9] text-[#188B56]">
@@ -1036,7 +882,6 @@ function FlowStepper({
     arquivada: ["finalizar"],
   };
   const allowedStages = allowedStagesByStatus[status] || [activeStage];
-  const stageGuide = STAGE_GUIDANCE[activeStage];
   const nextStage =
     FLOW_STEPS.find((step, index) => index > activeIndex && allowedStages.includes(step.id)) || null;
   const statusTone =
@@ -1153,17 +998,11 @@ function FlowStepper({
                       : allowed
                         ? "Disponível"
                         : step.id === "revisao"
-                          ? "Aguardando consolidação"
+                        ? "Aguardando consolidação"
                           : "Bloqueada"}
                 </span>
                 <span className="mt-3 max-w-[220px] text-[13px] leading-6 text-[#667085]">
-                  {step.id === "adicionar"
-                    ? "Coletar e ajustar contribuições"
-                    : step.id === "consolidar"
-                      ? "Revisar escopo e consolidar"
-                      : step.id === "revisao"
-                        ? "Validar a DFD coletiva"
-                        : "Liberada após a revisão"}
+                  {step.description}
                 </span>
               </div>
             </button>
@@ -1171,166 +1010,25 @@ function FlowStepper({
         })}
       </div>
 
-      <div className="mt-8 rounded-[22px] border border-[#E2E8F0] bg-[#FBFCFF] px-5 py-5">
-        <div className="grid gap-5 lg:grid-cols-3">
-          <div className="flex gap-4 lg:border-r lg:border-[#E2E8F0] lg:pr-5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#0B63CE]">
-              <CheckCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-[#0B63CE]">Agora</p>
-              <p className="mt-2 text-[14px] font-medium leading-7 text-[#344054]">{stageGuide.title}</p>
-              <p className="mt-1 text-[13px] leading-6 text-[#667085]">{stageGuide.highlights[0]}</p>
-            </div>
-          </div>
-
-          <div className="flex gap-4 lg:border-r lg:border-[#E2E8F0] lg:px-5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#0B63CE]">
-              <ArrowRight size={24} weight="bold" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-[#0B63CE]">Próxima ação</p>
-              {nextStage ? (
-                <button
-                  type="button"
-                  onClick={() => onStageChange(nextStage.id)}
-                  className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#0B63CE] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[#0954AF]"
-                >
-                  {nextStage.title}
-                  <ArrowRight size={16} weight="bold" />
-                </button>
-              ) : (
-                <p className="mt-2 text-[13px] leading-6 text-[#667085]">
-                  O próximo avanço depende do status atual da sala.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-4 lg:pl-5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#0B63CE]">
-              <LockSimple size={24} weight="bold" />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-[#0B63CE]">Regra do fluxo</p>
-              <p className="mt-2 text-[13px] leading-6 text-[#344054]">
-                Após sair do estado <strong className="text-[#0B3473]">aberta</strong>, a sala não volta a receber novas contribuições por esta barra. Depois da DFD oficial, o fluxo fica apenas para acompanhamento.
-              </p>
-            </div>
-          </div>
+        <div className="mt-6 flex flex-col gap-3 border-t border-[#E6EDF7] pt-5 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-[#667085]">
+            {nextStage
+              ? `Próxima ação sugerida: ${nextStage.title}.`
+              : "A próxima mudança depende do status atual da sala."}
+          </p>
+          {nextStage ? (
+            <button
+              type="button"
+              onClick={() => onStageChange(nextStage.id)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0B63CE] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#0954AF]"
+            >
+              {nextStage.title}
+              <ArrowRight size={16} weight="bold" />
+            </button>
+          ) : null}
         </div>
-      </div>
       </div>
     </section>
-  );
-}
-
-function SideRail({
-  detail,
-  activeStage,
-  compactHelp,
-  reviewMode,
-}: {
-  detail: RoomDetail;
-  activeStage: FlowStage;
-  compactHelp?: boolean;
-  reviewMode?: boolean;
-}) {
-  const guide = STAGE_GUIDANCE[activeStage];
-  return (
-    <aside className="flex flex-col gap-3">
-      <Panel>
-        <SectionTitle icon={<CheckCircle size={18} weight="fill" />} title={guide.railTitle} />
-        <p className="mt-3 text-sm leading-6 text-[#526070]">{guide.railDescription}</p>
-        <div className="mt-4 grid gap-2">
-          {guide.railChecklist.map((item) => (
-            <div
-              key={item}
-              className="rounded-md border border-[#E2E8F0] bg-[#FBFCFF] px-3 py-2 text-xs leading-5 text-[#445164]"
-            >
-              • {item}
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel>
-        <SectionTitle icon={<UsersThree size={18} weight="bold" />} title={`Participantes (${detail.participants.length})`} />
-        <div className="mt-4 flex flex-col gap-3">
-          {detail.participants.length === 0 ? (
-            <div className="rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-6 text-center">
-              <UsersThree size={28} className="mx-auto text-[#B8C1CC]" />
-              <p className="mt-3 text-sm font-medium text-[#526070]">
-                Nenhuma contribuição registrada.
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[#667085]">
-                As contribuições aparecerão aqui conforme forem adicionadas.
-              </p>
-            </div>
-          ) : (
-            detail.participants.slice(0, 4).map((participant, index) => (
-              <div key={participant.user_id} className="flex items-center gap-3">
-                <Avatar
-                  name={participant.user_name || participant.user_email || "Usuário"}
-                  src={participant.user_avatar_url}
-                  size="sm"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-[#0F172A]">
-                      {participant.user_name || participant.user_email || "Usuário"}
-                    </p>
-                    <span className="rounded-full bg-[#EAF2FF] px-2 py-0.5 text-[10px] font-semibold text-[#0B4AA2]">
-                      {index === 0 ? "Responsável" : "Contribuidor"}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs text-[#667085]">
-                    {participant.quantidade} item(ns) · {formatCurrency(participant.total)}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Panel>
-
-      <Panel>
-        <SectionTitle icon={<ClipboardText size={18} weight="bold" />} title="Resumo da DFD coletiva" />
-        <InfoRow label="Status" value={<StatusBadge status={detail.room.status} compact />} />
-        <InfoRow label="Setor" value={detail.room.unit_name} />
-        <InfoRow label="Criada em" value={formatDateTime(detail.room.created_at)} />
-        <InfoRow label="Atualizada em" value={formatDateTime(detail.room.updated_at)} />
-      </Panel>
-
-      {reviewMode ? (
-        <Panel>
-          <SectionTitle icon={<MagnifyingGlass size={18} weight="bold" />} title="Navegação rápida" />
-          <QuickNav label="Itens consolidados" count={detail.items.length} />
-          <QuickNav label="Contribuições" count={detail.contributions.length} />
-          <QuickNav label="Histórico" count={detail.events.length} />
-        </Panel>
-      ) : (
-        <Panel>
-          <SectionTitle
-            icon={<FunnelSimple size={18} weight="bold" />}
-            title={compactHelp ? "Como saber se a sala amadureceu" : "Como orientar boas contribuições"}
-          />
-          {compactHelp ? (
-            <div className="mt-3 grid gap-2 text-xs leading-5 text-[#667085]">
-              <p>Confira quantidades, valores, justificativas e participantes antes de avançar para revisão.</p>
-              <p>Se ainda houver incerteza relevante, vale voltar uma etapa e refinar a base da sala.</p>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3 text-sm text-[#344054]">
-              <FilterCheck label="Itens com justificativa específica" checked />
-              <FilterCheck label="Referências minimamente verificáveis" checked />
-              <FilterCheck label="Contribuições aderentes ao escopo" checked />
-              <FilterCheck label="Descrição clara do que não deve entrar" checked={false} />
-            </div>
-          )}
-        </Panel>
-      )}
-    </aside>
   );
 }
 
@@ -2053,18 +1751,10 @@ function SelectedItemPanel({
 
 function ConsolidationPanel({
   detail,
-  totalValue,
   setActiveStage,
-  editContribution,
-  removeContribution,
-  isOpen,
 }: {
   detail: RoomDetail;
-  totalValue: number;
   setActiveStage: (stage: FlowStage) => void;
-  editContribution: (contribution: Contribution) => void;
-  removeContribution: (contribution: Contribution) => void;
-  isOpen: boolean;
 }) {
   return (
     <Panel>
@@ -2084,18 +1774,6 @@ function ConsolidationPanel({
         </button>
       </div>
       <ConsolidatedItemsTable items={detail.items} />
-      <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-4 text-sm">
-        <span className="text-[#526070]">{detail.items.length} itens</span>
-        <span className="font-semibold text-[#0B3473]">
-          Total estimado <strong className="ml-4 text-lg text-[#0B4AA2]">{formatCurrency(totalValue)}</strong>
-        </span>
-      </div>
-      <ContributionsTable
-        contributions={detail.contributions}
-        editContribution={editContribution}
-        removeContribution={removeContribution}
-        isOpen={isOpen}
-      />
     </Panel>
   );
 }
@@ -2160,56 +1838,6 @@ function ConsolidatedItemsTable({ items }: { items: AggregatedItem[] }) {
   );
 }
 
-function ContributionsTable({
-  contributions,
-  editContribution,
-  removeContribution,
-  isOpen,
-}: {
-  contributions: Contribution[];
-  editContribution: (contribution: Contribution) => void;
-  removeContribution: (contribution: Contribution) => void;
-  isOpen: boolean;
-}) {
-  return (
-    <section className="mt-6 rounded-lg border border-[#E2E8F0] bg-white">
-      <div className="flex items-center justify-between border-b border-[#E2E8F0] px-4 py-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[#0B3473]">Contribuições recentes</h3>
-          <p className="text-xs text-[#667085]">Acompanhe as últimas ações realizadas pelos participantes.</p>
-        </div>
-      </div>
-      {contributions.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-[#667085]">Ainda não há contribuições nesta sala.</p>
-      ) : (
-        <div className="divide-y divide-[#E2E8F0]">
-          {contributions.slice(0, 5).map((contribution) => (
-            <div key={contribution.id} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[180px_1fr_auto] md:items-center">
-              <div className="flex items-center gap-2">
-                <Avatar name={contribution.user_name || contribution.user_email || "Usuário"} src={contribution.user_avatar_url || null} size="xs" />
-                <span className="truncate font-semibold text-[#344054]">{contribution.user_name || contribution.user_email || "Usuário"}</span>
-              </div>
-              <p className="text-[#344054]">
-                adicionou {contribution.quantidade} unidade(s) do item “{contribution.descricao}”
-              </p>
-              {contribution.can_edit && isOpen && (
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => editContribution(contribution)} className="rounded-md border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#0B4AA2]">
-                    Editar
-                  </button>
-                  <button type="button" onClick={() => removeContribution(contribution)} className="rounded-md border border-[#FCA5A5] px-3 py-2 text-xs font-semibold text-[#B42318]">
-                    Remover
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function ConsolidationSummary({
   detail,
   totalValue,
@@ -2260,7 +1888,6 @@ function ReviewPanel({
   detail,
   reviewTab,
   setReviewTab,
-  totalValue,
   saveMetadata,
   savingMeta,
   setActiveStage,
@@ -2268,7 +1895,6 @@ function ReviewPanel({
   detail: RoomDetail;
   reviewTab: ReviewTab;
   setReviewTab: (tab: ReviewTab) => void;
-  totalValue: number;
   saveMetadata: (event: FormEvent<HTMLFormElement>) => void;
   savingMeta: boolean;
   setActiveStage: (stage: FlowStage) => void;
@@ -2315,15 +1941,7 @@ function ReviewPanel({
         ))}
       </div>
       {reviewTab === "itens" && (
-        <>
-          <ConsolidatedItemsTable items={detail.items} />
-          <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-4 text-sm">
-            <span className="text-[#526070]">{detail.items.length} itens consolidados</span>
-            <span className="font-semibold text-[#0B3473]">
-              Valor total estimado <strong className="ml-4 text-lg text-[#0B4AA2]">{formatCurrency(totalValue)}</strong>
-            </span>
-          </div>
-        </>
+        <ConsolidatedItemsTable items={detail.items} />
       )}
       {reviewTab === "informacoes" && (
         <form onSubmit={saveMetadata} className="mt-5 grid gap-4">
@@ -2350,23 +1968,6 @@ function ReviewPanel({
           Nenhum anexo registrado nesta versão da DFD coletiva.
         </div>
       )}
-      <div className="mt-5 rounded-md border border-[#E2E8F0] bg-[#FBFCFF] p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-semibold text-[#0B3473]">Justificativa geral da DFD coletiva</h3>
-            <p className="mt-1 text-xs leading-5 text-[#526070]">
-              {detail.room.description || detail.room.scope || "Ainda não há justificativa geral registrada."}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setReviewTab("informacoes")}
-            className="inline-flex shrink-0 items-center gap-2 rounded-md border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#0B4AA2]"
-          >
-            <PencilSimple size={14} weight="bold" /> Editar justificativa
-          </button>
-        </div>
-      </div>
       <EventsPanel events={detail.events} />
     </Panel>
   );
@@ -2539,37 +2140,6 @@ function Panel({ children, className }: { children: ReactNode; className?: strin
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="mt-4 flex items-center justify-between gap-4 border-b border-[#EEF2F7] pb-3 text-sm last:border-b-0 last:pb-0">
-      <span className="text-[#526070]">{label}</span>
-      <span className="max-w-[150px] text-right font-semibold text-[#0F172A]">{value}</span>
-    </div>
-  );
-}
-
-function QuickNav({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="mt-3 flex items-center justify-between text-sm">
-      <span className="font-medium text-[#0B4AA2]">{label}</span>
-      <span className="rounded-full bg-[#EEF2F7] px-2 py-0.5 text-xs font-semibold text-[#667085]">{count}</span>
-    </div>
-  );
-}
-
-function FilterCheck({ label, checked }: { label: string; checked?: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="inline-flex items-center gap-2">
-        <span className={cn("flex h-4 w-4 items-center justify-center rounded border", checked ? "border-[#0B4AA2] bg-[#0B4AA2]" : "border-[#CBD5E1] bg-white")}>
-          {checked && <CheckCircle size={12} weight="fill" className="text-white" />}
-        </span>
-        {label}
-      </span>
-    </div>
-  );
-}
-
 function StatusBadge({ status, compact }: { status: RoomStatus; compact?: boolean }) {
   return (
     <span
@@ -2628,40 +2198,6 @@ function ApprovalStep({ index, title, description }: { index: number; title: str
         <span className="mt-1 block text-xs text-[#667085]">{description}</span>
       </span>
     </li>
-  );
-}
-
-function Avatar({
-  name,
-  src,
-  size = "md",
-}: {
-  name: string;
-  src?: string | null;
-  size?: "xs" | "sm" | "md";
-}) {
-  const [broken, setBroken] = useState(false);
-  const classes = {
-    xs: "h-6 w-6 text-[10px]",
-    sm: "h-8 w-8 text-[11px]",
-    md: "h-10 w-10 text-xs",
-  }[size];
-
-  if (!src || broken) {
-    return (
-      <div className={cn("flex shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] font-semibold text-[#0B4AA2]", classes)}>
-        {getInitial(name)}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={name}
-      onError={() => setBroken(true)}
-      className={cn("shrink-0 rounded-full object-cover", classes)}
-    />
   );
 }
 
