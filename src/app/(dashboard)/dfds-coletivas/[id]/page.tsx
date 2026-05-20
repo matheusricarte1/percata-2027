@@ -890,142 +890,146 @@ function FlowStepper({
       : status === "em_revisao"
         ? "border-[#F6DDAB] bg-[#FFF7E8] text-[#D97706]"
         : "border-[#D8E3F4] bg-[#F5F8FE] text-[#526070]";
+  const progressWidth =
+    activeIndex <= 0 ? "0%" : activeIndex === 1 ? "33.333%" : activeIndex === 2 ? "66.666%" : "100%";
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-[#DDE5EF] bg-white shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E6EDF7] px-6 py-6">
-        <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#EEF4FF] text-[#0B4AA2]">
-            <UsersThree size={30} weight="duotone" />
+    <section className="overflow-hidden rounded-[22px] border border-[#DDE5EF] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+      <div className="flex flex-col gap-4 px-5 py-5 lg:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF4FF] text-[#0B4AA2]">
+              <UsersThree size={20} weight="duotone" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold tracking-tight text-[#0F1F3D] md:text-lg">
+                Fluxo da DFD coletiva
+              </h2>
+              <p className="mt-0.5 text-xs leading-5 text-[#667085] md:text-sm">
+                Estado atual e próximo avanço da sala.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-[20px] font-semibold tracking-tight text-[#0F1F3D] md:text-[26px]">
-              Fluxo da DFD coletiva
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085] md:text-base">
-              Acompanhe o estágio atual, a próxima ação e as restrições do fluxo.
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn("inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold", statusTone)}>
+              <LockSimple size={15} weight="bold" />
+              {status === "aberta"
+                ? "Sala aberta"
+                : status === "em_revisao"
+                  ? "Sala em revisão"
+                  : status === "convertida"
+                    ? "DFD oficial gerada"
+                    : "Sala arquivada"}
+            </span>
+            {nextStage ? (
+              <motion.button
+                type="button"
+                onClick={() => onStageChange(nextStage.id)}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#0B63CE] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#0954AF]"
+              >
+                Ir para {nextStage.title}
+                <motion.span
+                  animate={{ x: [0, 3, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <ArrowRight size={15} weight="bold" />
+                </motion.span>
+              </motion.button>
+            ) : null}
           </div>
         </div>
-        <span className={cn("inline-flex h-12 items-center gap-2 rounded-full border px-5 text-sm font-semibold", statusTone)}>
-          <LockSimple size={16} weight="bold" />
-          {status === "aberta"
-            ? "Sala aberta"
-            : status === "em_revisao"
-              ? "Sala em revisão"
-              : status === "convertida"
-                ? "DFD oficial gerada"
-                : "Sala arquivada"}
-        </span>
-      </div>
 
-      <div className="px-6 py-8">
-        <div className="relative mb-6 hidden md:block">
-          <div className="absolute left-[10%] right-[10%] top-7 h-[3px] rounded-full bg-[#E5EAF2]" />
-          <div
-            className={cn(
-              "absolute left-[10%] top-7 h-[3px] rounded-full bg-[#0B63CE]",
-              activeIndex <= 0 && "w-[0%]",
-              activeIndex === 1 && "w-[26.666%]",
-              activeIndex === 2 && "w-[53.333%]",
-              activeIndex >= 3 && "w-[80%]",
-            )}
+        <div className="relative pt-2">
+          <div className="absolute left-[20px] right-[20px] top-6 hidden h-[2px] rounded-full bg-[#E5EAF2] md:block" />
+          <motion.div
+            className="absolute left-[20px] top-6 hidden h-[2px] rounded-full bg-[#0B63CE] md:block"
+            initial={false}
+            animate={{ width: `calc(${progressWidth} - 20px)` }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           />
-        </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        {FLOW_STEPS.map((step, index) => {
-          const completed =
-            index < activeIndex ||
-            (step.id === "adicionar" && itemsCount > 0) ||
-            (step.id === "consolidar" && status === "em_revisao") ||
-            (step.id === "finalizar" && status === "convertida");
-          const active = step.id === activeStage;
-          const allowed = allowedStages.includes(step.id);
-          const clickable = allowed && !active;
-          const upcoming = nextStage?.id === step.id;
-          return (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => {
-                if (!clickable) return;
-                onStageChange(step.id);
-              }}
-              disabled={!clickable}
-              aria-current={active ? "step" : undefined}
-              className={cn(
-                "group text-left transition md:px-2",
-                clickable && "cursor-pointer",
-                !clickable && !active && "cursor-default",
-              )}
-            >
-              <div className="flex flex-col items-center text-center">
-                <span
+          <div className="grid gap-4 md:grid-cols-4">
+            {FLOW_STEPS.map((step, index) => {
+              const completed =
+                index < activeIndex ||
+                (step.id === "adicionar" && itemsCount > 0) ||
+                (step.id === "consolidar" && status === "em_revisao") ||
+                (step.id === "finalizar" && status === "convertida");
+              const active = step.id === activeStage;
+              const allowed = allowedStages.includes(step.id);
+              const clickable = allowed && !active;
+              const upcoming = nextStage?.id === step.id;
+              return (
+                <motion.button
+                  key={step.id}
+                  type="button"
+                  onClick={() => {
+                    if (!clickable) return;
+                    onStageChange(step.id);
+                  }}
+                  disabled={!clickable}
+                  aria-current={active ? "step" : undefined}
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={clickable ? { y: -2 } : undefined}
+                  whileTap={clickable ? { scale: 0.985 } : undefined}
                   className={cn(
-                    "flex h-14 w-14 items-center justify-center rounded-full border-2 text-[18px] font-semibold transition",
-                    active && "border-[#0B63CE] bg-[#0B63CE] text-white shadow-[0_8px_20px_rgba(11,99,206,0.2)]",
+                    "group relative flex flex-col items-center text-center transition",
+                    clickable && "cursor-pointer",
+                    !clickable && !active && "cursor-default",
+                  )}
+                >
+                  <motion.span
+                  className={cn(
+                    "relative z-[1] flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition md:h-12 md:w-12 md:text-base",
+                    active && "border-[#0B63CE] bg-[#0B63CE] text-white shadow-[0_8px_20px_rgba(11,99,206,0.18)]",
                     upcoming && "border-[#21C5C7] bg-[#E9FCFC] text-[#12AEB0] shadow-[0_8px_20px_rgba(33,197,199,0.12)]",
                     completed && !active && !upcoming && "border-[#BFD6FB] bg-white text-[#0B63CE]",
                     !active && !completed && !upcoming && "border-[#D8DEE8] bg-[#F7F9FC] text-[#7A8699]",
                     clickable && "group-hover:border-[#8DBBFF]",
                   )}
+                  animate={active ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+                  transition={active ? { duration: 2.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                 >
                   {!allowed && step.id === "finalizar" && status !== "convertida" && status !== "arquivada" ? (
-                    <LockSimple size={20} weight="bold" />
+                    <LockSimple size={18} weight="bold" />
                   ) : completed && !active && !upcoming ? (
-                    <CheckCircle size={22} weight="fill" />
+                    <CheckCircle size={18} weight="fill" />
                   ) : (
                     index + 1
                   )}
-                </span>
-                <span className="mt-4 text-[15px] font-semibold text-[#0F1F3D]">
-                  {step.title}
-                </span>
-                <span
-                  className={cn(
-                    "mt-3 inline-flex rounded-full px-3 py-1 text-[12px] font-semibold",
-                    active && "bg-[#EAF2FF] text-[#0B63CE]",
-                    upcoming && "bg-[#E8FBFB] text-[#12AEB0]",
-                    !active && !upcoming && allowed && "bg-[#F2F4F7] text-[#667085]",
-                    !allowed && "bg-[#F2F4F7] text-[#667085]",
-                  )}
-                >
-                  {active
-                    ? "Atual"
-                    : upcoming
-                      ? "Próxima ação"
-                      : allowed
-                        ? "Disponível"
-                        : step.id === "revisao"
-                        ? "Aguardando consolidação"
-                          : "Bloqueada"}
-                </span>
-                <span className="mt-3 max-w-[220px] text-[13px] leading-6 text-[#667085]">
-                  {step.description}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-        <div className="mt-6 flex flex-col gap-3 border-t border-[#E6EDF7] pt-5 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm text-[#667085]">
-            {nextStage
-              ? `Próxima ação sugerida: ${nextStage.title}.`
-              : "A próxima mudança depende do status atual da sala."}
-          </p>
-          {nextStage ? (
-            <button
-              type="button"
-              onClick={() => onStageChange(nextStage.id)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0B63CE] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#0954AF]"
-            >
-              {nextStage.title}
-              <ArrowRight size={16} weight="bold" />
-            </button>
-          ) : null}
+                </motion.span>
+                  <span className="mt-3 text-sm font-semibold text-[#0F1F3D] md:text-[15px]">
+                    {step.title}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-2 inline-flex rounded-full px-3 py-1 text-[11px] font-semibold",
+                      active && "bg-[#EAF2FF] text-[#0B63CE]",
+                      upcoming && "bg-[#E8FBFB] text-[#12AEB0]",
+                      !active && !upcoming && allowed && "bg-[#F2F4F7] text-[#667085]",
+                      !allowed && "bg-[#F2F4F7] text-[#667085]",
+                    )}
+                  >
+                    {active
+                      ? "Atual"
+                      : upcoming
+                        ? "Próxima"
+                        : allowed
+                          ? "Disponível"
+                          : step.id === "revisao"
+                            ? "Aguardando"
+                            : "Bloqueada"}
+                  </span>
+                  <span className="mt-2 max-w-[180px] text-xs leading-5 text-[#667085] md:max-w-[220px]">
+                    {step.description}
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
