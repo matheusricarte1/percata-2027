@@ -444,10 +444,10 @@ export default function ConsolidationPage() {
 
   const centerColSpanClass = dfdMenuOpen
     ? insightsMenuOpen
-      ? "xl:col-span-6"
-      : "xl:col-span-9"
+      ? "xl:col-span-8"
+      : "xl:col-span-10"
     : insightsMenuOpen
-      ? "xl:col-span-9"
+      ? "xl:col-span-10"
       : "xl:col-span-12";
   const previewDfd = useMemo(
     () => (previewDfdId ? dfds.find((dfd) => dfd.id === previewDfdId) || null : null),
@@ -1299,93 +1299,106 @@ export default function ConsolidationPage() {
 
   return (
     <div className="min-h-screen space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
-      <div className="overflow-hidden rounded-[24px] border border-[#C7D7EA] bg-white text-[#17233C] shadow-sm">
-        <div className="border-b border-[#D9E0E8] bg-[#F7FBFF] p-4 md:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[#17233C]">
-              Consolidação Inteligente
-            </h1>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#47739F]">
-              Admin · DFDs aprovadas para PCA
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={fetchData}
-              className="h-10 rounded-xl border-[#C7D7EA] bg-white text-[#164073] hover:bg-[#EAF2FF]"
-            >
-              <ArrowsClockwise size={16} className="mr-2" />
-              Atualizar
-            </Button>
-            <Button
-              type="button"
-              onClick={exportCSV}
-              className="h-10 rounded-xl border border-[#C7D7EA] bg-white text-[#164073] hover:bg-[#EAF2FF]"
-            >
-              <DownloadSimple size={16} className="mr-2" />
-              Exportar CSV
-            </Button>
-            <Button
-              type="button"
-              onClick={exportXLSX}
-              className="h-10 rounded-xl bg-[#164073] text-white hover:bg-[#0F2E57]"
-            >
-              <DownloadSimple size={16} className="mr-2" />
-              Exportar XLSX
-            </Button>
-          </div>
+      <div className="overflow-hidden rounded-[28px] border border-[#C7D7EA] bg-white text-[#17233C] shadow-[0_16px_40px_rgba(22,64,115,0.08)]">
+        <div className="border-b border-[#D9E0E8] bg-[linear-gradient(180deg,#F8FBFF_0%,#F3F8FE_100%)] p-4 md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#47739F]">
+                Admin · Consolidação para PCA
+              </p>
+              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+                Consolidação Inteligente
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#4D5D75]">
+                Priorize o que entra primeiro no PCA. A fila abaixo é ordenada do maior score para o menor, combinando criticidade e priorização.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={fetchData}
+                className="h-10 rounded-xl border-[#C7D7EA] bg-white text-[#164073] hover:bg-[#EAF2FF]"
+              >
+                <ArrowsClockwise size={16} className="mr-2" />
+                Atualizar
+              </Button>
+              <Button
+                type="button"
+                onClick={exportCSV}
+                className="h-10 rounded-xl border border-[#C7D7EA] bg-white text-[#164073] hover:bg-[#EAF2FF]"
+              >
+                <DownloadSimple size={16} className="mr-2" />
+                Exportar CSV
+              </Button>
+              <Button
+                type="button"
+                onClick={exportXLSX}
+                className="h-10 rounded-xl bg-[#164073] text-white hover:bg-[#0F2E57]"
+              >
+                <DownloadSimple size={16} className="mr-2" />
+                Exportar XLSX
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard
-            label="Valor do recorte"
-            value={visibleValue.toLocaleString("pt-BR", {
-              style: "currency",
-              currency: "BRL",
-            })}
-          />
-          <KpiCard label="Pareto 20%" value={`${paretoCount}/${paretoLimit}`} />
-          <KpiCard label="Itens exibidos" value={`${displayItems.length}/${items.length}`} />
-          <KpiCard label="DFDs aprovadas" value={dfds.length} />
-          <KpiCard label="Filtros ativos" value={activeFilterCount} />
+        <div className="space-y-3 p-4">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <KpiCard
+              label="Valor do recorte"
+              value={visibleValue.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+              emphasis="primary"
+            />
+            <KpiCard label="Itens no Pareto" value={`${paretoCount}/${paretoLimit}`} />
+            <KpiCard label="Itens exibidos" value={`${displayItems.length}/${items.length}`} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SecondaryStat label="DFDs aprovadas" value={String(dfds.length)} />
+            <SecondaryStat label="Filtros ativos" value={String(activeFilterCount)} />
+            <SecondaryStat label="Recorte atual" value={selectedDfdId === "all" ? "Todas as DFDs" : "1 DFD selecionada"} />
+          </div>
         </div>
       </div>
 
       <div className="grid min-h-[74vh] grid-cols-1 gap-4 xl:grid-cols-12">
         <section
           className={cn(
-            "rounded-[28px] border border-black/5 bg-white shadow-sm flex flex-col min-h-[620px]",
-            dfdMenuOpen ? "xl:col-span-3" : "hidden xl:hidden",
+            "rounded-[24px] border border-[#D9E0E8] bg-white/96 shadow-[0_10px_28px_rgba(15,34,56,0.06)] flex flex-col min-h-[620px]",
+            dfdMenuOpen ? "xl:col-span-2" : "hidden xl:hidden",
           )}
         >
-          <div className="p-4 border-b border-black/5 space-y-3">
+          <div className="space-y-3 border-b border-black/5 p-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold uppercase tracking-tight text-upe-blue-upe">
-                DFDs Enviadas
-              </h2>
+              <div>
+                <h2 className="font-display text-base font-semibold uppercase tracking-tight text-upe-blue-upe">
+                  DFDs enviadas
+                </h2>
+                <p className="mt-1 text-xs text-black/50">
+                  Origem do recorte atual
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setDfdMenuOpen(false)}
-                className="h-8 w-8 rounded-lg border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice inline-flex items-center justify-center"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice"
                 title="Recolher menu de DFDs"
               >
                 <List size={16} weight="bold" />
               </button>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
-                {filteredDfds.length}
-              </span>
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-black/40">
+              <span>{filteredDfds.length} no recorte</span>
+              <span>{selectedDfdId === "all" ? "Todas" : "1 ativa"}</span>
             </div>
             <input
               value={dfdSearchTerm}
               onChange={(event) => setDfdSearchTerm(event.target.value)}
-              placeholder="Buscar protocolo, campus, solicitante..."
-              className="h-10 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
+              placeholder="Buscar protocolo ou solicitante"
+              className="h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
             />
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -1438,13 +1451,14 @@ export default function ConsolidationPage() {
                       setSelectedDfdId((prev) => (prev === dfd.id ? "all" : dfd.id))
                     }
                     className={cn(
-                      "w-full text-left p-3 border-b border-black/5 transition-colors",
+                      "w-full border-b border-black/5 px-3 py-2.5 text-left transition-colors",
                       selectedDfdId === dfd.id
-                        ? "bg-upe-blue-upe/7"
-                        : "hover:bg-upe-neutral-cool-ice",
+                        ? "bg-upe-blue-upe/6"
+                        : "hover:bg-upe-neutral-cool-ice/60",
                     )}
                   >
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-black/35 inline-flex items-center gap-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                    <p className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">
                       <span
                         className={cn(
                           "w-1.5 h-1.5 rounded-full",
@@ -1453,32 +1467,32 @@ export default function ConsolidationPage() {
                       />
                       {dfd.numero_protocolo}
                     </p>
-                    <p className="mt-1 text-[15px] font-semibold text-upe-neutral-dark-soft-black leading-snug line-clamp-2">
+                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                      {dfd.item_count} itens
+                    </span>
+                    </div>
+                    <p className="mt-1 text-[13px] font-semibold leading-snug text-upe-neutral-dark-soft-black line-clamp-2">
                       {dfd.objeto_contratacao}
                     </p>
-                    <div className="mt-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-black/45">
-                      <span>{dfd.campus_nome}</span>
-                      <span>{dfd.item_count} itens</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-black/60">
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-black/60">
                       <div className="flex min-w-0 items-center gap-2">
                         <CompactAvatar
                           name={dfd.solicitante_nome}
                           avatarUrl={dfd.solicitante_avatar_url}
                         />
-                        <span className="truncate max-w-[130px]">{dfd.unidade_nome || "local não definido"}</span>
+                        <span className="truncate">{dfd.solicitante_nome}</span>
                       </div>
-                      <span className="shrink-0">
+                      <span className="shrink-0 font-semibold text-upe-blue-upe">
                         {dfd.valor_total.toLocaleString("pt-BR", {
                           style: "currency",
                           currency: "BRL",
                         })}
                       </span>
                     </div>
-                    <p className="mt-1 text-[11px] text-black/45 truncate">
-                      {dfd.solicitante_email || "email não informado"}
+                    <p className="mt-1 text-[10px] text-black/45">
+                      {dfd.campus_nome} • {dfd.unidade_nome || "local não definido"}
                     </p>
-                    <p className="mt-1 text-[11px] text-black/45">
+                    <p className="mt-0.5 text-[10px] text-black/40">
                       {dfd.created_at
                         ? new Date(dfd.created_at).toLocaleDateString("pt-BR")
                         : "Data não informada"}
@@ -1498,7 +1512,7 @@ export default function ConsolidationPage() {
 
         <section
           className={cn(
-            "rounded-[28px] border border-[#9FB9D6] bg-white shadow-[0_18px_44px_rgba(22,64,115,0.14)] flex flex-col min-h-[720px] overflow-hidden",
+            "rounded-[26px] border border-[#A9C1DB] bg-white shadow-[0_18px_44px_rgba(22,64,115,0.12)] flex flex-col min-h-[720px] overflow-hidden",
             centerColSpanClass,
             contrastMode === "high" && "border-upe-blue-upe/30 shadow-[0_18px_44px_rgba(22,64,115,0.18)]",
           )}
@@ -2040,15 +2054,20 @@ export default function ConsolidationPage() {
 
         <section
           className={cn(
-            "rounded-[28px] border border-black/5 bg-white shadow-sm p-4 space-y-4 min-h-[620px]",
-            insightsMenuOpen ? "xl:col-span-3" : "hidden xl:hidden",
+            "rounded-[24px] border border-[#D9E0E8] bg-white/96 shadow-[0_10px_28px_rgba(15,34,56,0.06)] p-4 space-y-3 min-h-[620px]",
+            insightsMenuOpen ? "xl:col-span-2" : "hidden xl:hidden",
           )}
         >
           <div>
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-display text-lg font-semibold uppercase tracking-tight text-upe-blue-upe">
-                Opções Inteligentes
-              </h2>
+              <div>
+                <h2 className="font-display text-base font-semibold uppercase tracking-tight text-upe-blue-upe">
+                  Opções inteligentes
+                </h2>
+                <p className="mt-1 text-xs text-black/50">
+                  Ajustes e recortes da triagem
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setInsightsMenuOpen(false)}
@@ -2058,12 +2077,9 @@ export default function ConsolidationPage() {
                 <List size={16} weight="bold" />
               </button>
             </div>
-            <p className="text-xs text-black/55 mt-1">
-              Sugestões de ação para planejamento com alto volume.
-            </p>
           </div>
 
-          <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white p-3 space-y-3">
+          <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white/80 p-3 space-y-3">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-black/45 inline-flex items-center gap-2">
               <Funnel size={12} />
               Opções Visuais
@@ -2204,7 +2220,7 @@ export default function ConsolidationPage() {
             />
           </div>
 
-          <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white p-3 space-y-3">
+          <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white/80 p-3 space-y-3">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-black/45 inline-flex items-center gap-2">
               <Sparkle size={12} />
               Simulador de Corte
@@ -2384,14 +2400,45 @@ export default function ConsolidationPage() {
   );
 }
 
-function KpiCard({ label, value }: { label: string; value: string | number }) {
+function KpiCard({
+  label,
+  value,
+  emphasis = "default",
+}: {
+  label: string;
+  value: string | number;
+  emphasis?: "default" | "primary";
+}) {
   return (
-    <div className="rounded-xl border border-[#D9E0E8] bg-white px-4 py-3 shadow-sm">
+    <div
+      className={cn(
+        "rounded-2xl border px-4 py-3 shadow-sm",
+        emphasis === "primary"
+          ? "border-[#9FB9D6] bg-[linear-gradient(180deg,#F9FCFF_0%,#F2F8FF_100%)] shadow-[0_12px_28px_rgba(22,64,115,0.08)]"
+          : "border-[#D9E0E8] bg-white",
+      )}
+    >
       <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
         {label}
       </p>
-      <p className="mt-1.5 text-lg font-semibold tracking-tight text-[#164073]">{value}</p>
+      <p
+        className={cn(
+          "mt-1.5 font-semibold tracking-tight text-[#164073]",
+          emphasis === "primary" ? "text-[28px]" : "text-lg",
+        )}
+      >
+        {value}
+      </p>
     </div>
+  );
+}
+
+function SecondaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-[#D9E0E8] bg-white px-3 py-1.5 text-[10px] font-semibold text-[#526070]">
+      <span className="uppercase tracking-[0.14em] text-[#8A97A8]">{label}</span>
+      <span className="text-[#164073]">{value}</span>
+    </span>
   );
 }
 
@@ -2462,19 +2509,19 @@ function SmartAction({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full text-left rounded-2xl border p-3 transition-colors",
+        "w-full rounded-2xl border p-3 text-left transition-colors",
         active
-          ? "border-upe-blue-upe bg-upe-blue-upe/5"
-          : "border-black/5 bg-white hover:bg-upe-neutral-cool-ice",
+          ? "border-upe-blue-upe bg-upe-blue-upe/5 shadow-[0_8px_18px_rgba(22,64,115,0.08)]"
+          : "border-black/5 bg-white hover:bg-upe-neutral-cool-ice/70",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-upe-neutral-dark-soft-black">{title}</p>
-        <span className="px-2 py-0.5 rounded-lg bg-upe-neutral-cool-ice text-[10px] font-semibold text-upe-blue-upe">
+        <p className="text-[13px] font-semibold text-upe-neutral-dark-soft-black">{title}</p>
+        <span className="rounded-lg bg-upe-neutral-cool-ice px-2 py-0.5 text-[10px] font-semibold text-upe-blue-upe">
           {count}
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-black/55 leading-relaxed">{description}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-black/55">{description}</p>
     </button>
   );
 }
