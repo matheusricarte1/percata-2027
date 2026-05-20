@@ -1345,7 +1345,7 @@ export default function ConsolidationPage() {
       <div className="grid min-h-[74vh] grid-cols-1 gap-4 xl:grid-cols-12">
         <section
           className={cn(
-            "rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)] xl:col-span-8",
+            "flex min-h-[720px] flex-col overflow-hidden rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)] xl:col-span-8",
             contrastMode === "high" && "border-upe-blue-upe/30",
           )}
         >
