@@ -6,7 +6,6 @@ import {
   Plus,
   MagnifyingGlass,
   Files,
-  Clock,
   CheckCircle,
   CaretRight,
   Buildings,
@@ -19,6 +18,9 @@ import {
   Package,
   PaperPlaneTilt,
   CircleNotch,
+  DotsThree,
+  CaretDown,
+  CaretLeft,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { getSafeUser, supabase } from "@/lib/supabase";
@@ -67,11 +69,10 @@ type StatusVisual = {
   borderClassName: string;
 };
 
-const FILTERS = ["Todas", "Rascunhos", "Em Análise", "Concluídas"] as const;
+const FILTERS = ["Todas", "Rascunhos", "Em Análise", "Concluídas", "Legadas"] as const;
 type FilterOption = (typeof FILTERS)[number];
-
-const VIEW_MODES = ["Ativas", "Legadas"] as const;
-type ViewMode = (typeof VIEW_MODES)[number];
+type SortOption = "recentes" | "antigas" | "maior_valor" | "menor_valor";
+const PAGE_SIZE = 8;
 
 const STATUS_VISUALS: Record<DfdStatus, StatusVisual> = {
   rascunho: {
@@ -125,7 +126,8 @@ export default function MinhasDFDsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterOption>("Todas");
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("Ativas");
+  const [sortBy, setSortBy] = useState<SortOption>("recentes");
+  const [page, setPage] = useState(1);
   const [legacyLoading, setLegacyLoading] = useState(true);
   const [legacyRecords, setLegacyRecords] = useState<LegacyDemandSummary[]>([]);
   const [campusMap, setCampusMap] = useState<Record<string, string>>({});
@@ -328,6 +330,7 @@ export default function MinhasDFDsPage() {
         (d) => d.status === "aprovada" || d.status === "concluida",
       );
     }
+    if (filter === "Legadas") return [];
     return activeBySearch.filter(
       (d) => d.status === "triagem" || d.status === "devolvida" || d.status === "pactuando",
     );
@@ -360,6 +363,56 @@ export default function MinhasDFDsPage() {
     };
   }, [dfds, legacyRecords.length]);
   const canCreateKits = currentRole === "admin" || currentRole === "superadmin";
+
+  const sortedActiveDfds = useMemo(() => {
+    const rows = [...filteredActiveDfds];
+    rows.sort((a, b) => {
+      if (sortBy === "maior_valor") {
+        return Number(b.valor_total_estimado || 0) - Number(a.valor_total_estimado || 0);
+      }
+      if (sortBy === "menor_valor") {
+        return Number(a.valor_total_estimado || 0) - Number(b.valor_total_estimado || 0);
+      }
+      const left = new Date(a.created_at).getTime();
+      const right = new Date(b.created_at).getTime();
+      return sortBy === "antigas" ? left - right : right - left;
+    });
+    return rows;
+  }, [filteredActiveDfds, sortBy]);
+
+  const sortedLegacy = useMemo(() => {
+    const rows = [...filteredLegacy];
+    rows.sort((a, b) => {
+      if (sortBy === "maior_valor") {
+        return Number(b.total_estimated || 0) - Number(a.total_estimated || 0);
+      }
+      if (sortBy === "menor_valor") {
+        return Number(a.total_estimated || 0) - Number(b.total_estimated || 0);
+      }
+      const left = new Date(`${a.legacy_year}-01-01`).getTime();
+      const right = new Date(`${b.legacy_year}-01-01`).getTime();
+      return sortBy === "antigas" ? left - right : right - left;
+    });
+    return rows;
+  }, [filteredLegacy, sortBy]);
+
+  const isLegacyMode = filter === "Legadas";
+  const totalPages = Math.max(
+    1,
+    Math.ceil((isLegacyMode ? sortedLegacy.length : sortedActiveDfds.length) / PAGE_SIZE),
+  );
+  const paginatedActiveDfds = useMemo(
+    () => sortedActiveDfds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, sortedActiveDfds],
+  );
+  const paginatedLegacy = useMemo(
+    () => sortedLegacy.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, sortedLegacy],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search, sortBy]);
   return (
     <div className="space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
       <section className="rounded-[20px] border border-[#C7D7EA] bg-[#F7FBFF] p-6 shadow-sm">
@@ -420,57 +473,64 @@ export default function MinhasDFDsPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={
-                viewMode === "Ativas"
-                  ? "Buscar por protocolo, objeto ou campus"
-                  : "Buscar por ano, código legado ou objeto"
+                isLegacyMode
+                  ? "Buscar por ano, código legado ou objeto"
+                  : "Buscar por protocolo, objeto ou campus"
               }
               className="h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] pl-10 pr-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#4D79A8] focus:bg-white"
             />
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            {VIEW_MODES.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setViewMode(option)}
-                className={`h-10 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.12em] transition ${
-                  viewMode === option
-                    ? "bg-[#164073] text-white"
-                    : "border border-[#D9E0E8] bg-[#F4F7FA] text-[#3E4C5F] hover:bg-[#E8EDF2]"
-                }`}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-[#5B6675]">Ordenar por:</label>
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as SortOption)}
+                className="h-11 min-w-[220px] appearance-none rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-4 pr-10 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#4D79A8] focus:bg-white"
               >
-                {option}
-                <span className="ml-2 text-[10px] opacity-80">
-                  ({option === "Ativas" ? dfds.length : legacyRecords.length})
-                </span>
-              </button>
-            ))}
+                <option value="recentes">Mais recentes</option>
+                <option value="antigas">Mais antigas</option>
+                <option value="maior_valor">Maior valor</option>
+                <option value="menor_valor">Menor valor</option>
+              </select>
+              <CaretDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#5B6675]" />
+            </div>
           </div>
         </div>
 
-        {viewMode === "Ativas" && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {FILTERS.map((option) => (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {FILTERS.map((option) => {
+            const count =
+              option === "Todas"
+                ? dfds.length
+                : option === "Rascunhos"
+                  ? activeKpis.drafts
+                  : option === "Em Análise"
+                    ? activeKpis.inReview
+                    : option === "Concluídas"
+                      ? activeKpis.done
+                      : activeKpis.legacy;
+            return (
               <button
                 key={option}
                 type="button"
                 onClick={() => setFilter(option)}
-                className={`h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                className={`h-11 rounded-xl px-4 text-sm font-semibold transition ${
                   filter === option
                     ? "bg-[#164073] text-white"
                     : "border border-[#D9E0E8] bg-[#F4F7FA] text-[#3E4C5F] hover:bg-[#E8EDF2]"
                 }`}
               >
-                {option}
+                {option} ({count})
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </section>
 
-      {viewMode === "Ativas" && (
+      {!isLegacyMode && (
         <section className="space-y-4">
+          <h2 className="text-[34px] font-semibold tracking-tight text-[#172C5A]">Demandas recentes</h2>
           {loading && (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -480,7 +540,7 @@ export default function MinhasDFDsPage() {
           )}
 
           {!loading &&
-            filteredActiveDfds.map((dfd) => {
+            paginatedActiveDfds.map((dfd) => {
               const visual = STATUS_VISUALS[dfd.status] || STATUS_VISUALS.rascunho;
               const campusName = dfd.campus_id
                 ? campusMap[dfd.campus_id] || dfd.campus || "Campus UPE"
@@ -498,104 +558,95 @@ export default function MinhasDFDsPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.16 }}
-                  className="relative overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm"
+                  className="relative overflow-hidden rounded-[26px] border border-[#E2E8F0] bg-white shadow-sm"
                 >
                   <div className={`absolute left-0 top-0 h-full w-1.5 ${visual.borderClassName}`} />
-
-                  <div className="p-4 pl-5">
-                    <div className="flex flex-wrap items-start justify-between gap-2.5">
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-6">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-[#E8EDF2] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#164073]">
-                            {protocol}
-                          </span>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${visual.badgeClassName}`}
-                          >
-                            {visual.label}
-                          </span>
-                        </div>
-
-                        <h3 className="mt-2 line-clamp-2 text-base font-semibold leading-tight tracking-tight text-[#164073]">
-                          {dfd.objeto_contratacao || "Demanda sem objeto informado"}
-                        </h3>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center rounded-full border border-[#D9E0E8] bg-[#FAFBFC] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#3E4C5F]">
-                            Etapa {stage.stepIndex}/4 · {stage.label}
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`rounded-full px-4 py-1.5 text-sm font-semibold ${visual.badgeClassName}`}>{visual.label}</span>
+                          <span className="rounded-full bg-[#F4F7FA] px-4 py-1.5 text-sm font-semibold text-[#5B6675]">
+                            Etapa {stage.stepIndex}/4
                           </span>
                           {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#47739F]">
+                            <span className="rounded-full bg-[#FFF3E6] px-4 py-1.5 text-sm font-semibold text-[#D26C2D]">
                               Requer sua ação
                             </span>
                           )}
                         </div>
+                        <h3 className="mt-4 line-clamp-2 text-[28px] font-semibold tracking-tight text-[#172C5A]">
+                          {dfd.objeto_contratacao || "Demanda sem objeto informado"}
+                        </h3>
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#5B6675]">
+                          <span>{campusName}</span>
+                          <span className="text-[#B5BFCC]">•</span>
+                          <span>{localUso}</span>
+                          <span className="text-[#B5BFCC]">•</span>
+                          <span>{new Date(dfd.created_at).toLocaleDateString("pt-BR")}</span>
+                        </div>
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#7B889A]">
+                          <span>{protocol}</span>
+                        </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/dfd/${dfd.id}`)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#164073] px-3 text-[10px] font-semibold uppercase tracking-[0.11em] text-white hover:bg-[#0F2E57]"
-                      >
-                        Abrir
-                        <CaretRight size={12} weight="bold" />
-                      </button>
-                    </div>
-
-                    <div className="mt-2.5 grid grid-cols-1 gap-2 lg:grid-cols-[1fr_auto]">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <InfoPill
-                          label="Data"
-                          value={new Date(dfd.created_at).toLocaleDateString("pt-BR")}
-                          icon={<Clock size={12} />}
-                        />
-                        <InfoPill
-                          label="Campus"
-                          value={campusName}
-                          icon={<Buildings size={12} />}
-                        />
-                        <InfoPill label="Local de uso" value={localUso} />
-                        <InfoPill
-                          label="Valor"
-                          value={formatCurrency(Number(dfd.valor_total_estimado || 0))}
-                          icon={<CurrencyDollar size={12} />}
-                        />
-                      </div>
-                    </div>
-
-                    {dfd.status === "rascunho" || dfd.status === "devolvida" ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#E8EDF2] pt-3">
+                      <div className="flex min-w-[180px] flex-col items-end gap-6">
                         <button
                           type="button"
-                          onClick={() => handleSendToChefia(dfd.id)}
-                          disabled={sendingDfdId === dfd.id}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#1F6F78] px-3 text-[10px] font-semibold uppercase tracking-[0.11em] text-white hover:bg-[#1C5A6B] disabled:cursor-not-allowed disabled:opacity-60"
+                          aria-label="Mais ações"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#5B6675] hover:bg-[#F4F7FA]"
                         >
-                          {sendingDfdId === dfd.id ? (
-                            <CircleNotch size={13} className="animate-spin" />
-                          ) : (
-                            <PaperPlaneTilt size={13} weight="bold" />
-                          )}
-                          {sendingDfdId === dfd.id ? "Enviando..." : "Enviar à chefia"}
+                          <DotsThree size={20} weight="bold" />
                         </button>
+                        <p className="text-[28px] font-semibold tracking-tight text-[#172C5A]">
+                          {formatCurrency(Number(dfd.valor_total_estimado || 0))}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EDF2] pt-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendToChefia(dfd.id)}
+                            disabled={sendingDfdId === dfd.id}
+                            className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#164073] px-5 text-base font-semibold text-white hover:bg-[#0F2E57] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {sendingDfdId === dfd.id ? (
+                              <CircleNotch size={14} className="animate-spin" />
+                            ) : (
+                              <PaperPlaneTilt size={14} weight="bold" />
+                            )}
+                            {sendingDfdId === dfd.id ? "Enviando..." : "Enviar à chefia"}
+                          </button>
+                        )}
                         {canCreateKits ? (
                           <button
                             type="button"
                             onClick={() => handleMarkAsKit(dfd.id)}
                             disabled={markingKitId === dfd.id}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#C7D7EA] bg-[#F7FBFF] px-3 text-[10px] font-semibold uppercase tracking-[0.11em] text-[#164073] hover:bg-[#EAF2FF] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-white px-5 text-base font-semibold text-[#164073] hover:bg-[#F7FBFF] disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            <Package size={13} weight="bold" />
+                            <Package size={14} weight="bold" />
                             {markingKitId === dfd.id ? "Gerando..." : "Transformar em kit"}
                           </button>
                         ) : null}
                       </div>
-                    ) : null}
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/dfd/${dfd.id}`)}
+                        className="inline-flex h-11 items-center gap-2 rounded-xl px-2 text-base font-semibold text-[#164073] hover:text-[#0F2E57]"
+                      >
+                        Ver detalhes
+                        <CaretRight size={16} weight="bold" />
+                      </button>
+                    </div>
                   </div>
                 </motion.article>
               );
             })}
 
-          {!loading && filteredActiveDfds.length === 0 && (
+          {!loading && sortedActiveDfds.length === 0 && (
             <EmptyState
               icon={<Files size={30} weight="fill" />}
               title="Nenhum pedido encontrado"
@@ -610,11 +661,20 @@ export default function MinhasDFDsPage() {
               }
             />
           )}
+          {!loading && sortedActiveDfds.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              itemLabel={`${sortedActiveDfds.length} demandas`}
+            />
+          )}
         </section>
       )}
 
-      {viewMode === "Legadas" && (
+      {isLegacyMode && (
         <section className="space-y-4">
+          <h2 className="text-[34px] font-semibold tracking-tight text-[#172C5A]">Demandas legadas</h2>
           {legacyLoading && (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -624,7 +684,7 @@ export default function MinhasDFDsPage() {
           )}
 
           {!legacyLoading &&
-            filteredLegacy.map((legacy) => (
+            paginatedLegacy.map((legacy) => (
               <motion.article
                 key={`${legacy.legacy_year}-${legacy.demand_code}`}
                 initial={{ opacity: 0, y: 10 }}
@@ -688,11 +748,19 @@ export default function MinhasDFDsPage() {
               </motion.article>
             ))}
 
-          {!legacyLoading && filteredLegacy.length === 0 && (
+          {!legacyLoading && sortedLegacy.length === 0 && (
             <EmptyState
               icon={<Archive size={30} weight="fill" />}
               title="Nenhuma demanda legada encontrada"
               description="Ajuste o termo de busca para localizar registros de anos anteriores."
+            />
+          )}
+          {!legacyLoading && sortedLegacy.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              itemLabel={`${sortedLegacy.length} demandas legadas`}
             />
           )}
         </section>
@@ -730,24 +798,44 @@ function KpiCard({
   );
 }
 
-function InfoPill({
-  label,
-  value,
-  icon,
+function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+  itemLabel,
 }: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  itemLabel: string;
 }) {
+  if (totalPages <= 1) return null;
+
   return (
-    <div className="rounded-lg border border-[#E8EDF2] bg-white px-2.5 py-1.5">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
-        {label}
+    <div className="flex flex-col gap-3 rounded-[20px] border border-[#D9E0E8] bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[#5B6675]">
+        {itemLabel} · página {page} de {totalPages}
       </p>
-      <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-[#3E4C5F]">
-        {icon}
-        {value}
-      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] px-4 text-sm font-semibold text-[#164073] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <CaretLeft size={14} weight="bold" />
+          Anterior
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] px-4 text-sm font-semibold text-[#164073] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Próxima
+          <CaretRight size={14} weight="bold" />
+        </button>
+      </div>
     </div>
   );
 }
