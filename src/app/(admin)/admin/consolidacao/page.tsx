@@ -12,6 +12,7 @@ import {
   Sparkle,
   Star,
   Warning,
+  X,
 } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,13 @@ const PRIORIZACAO_TO_LEVEL: Record<string, number> = {
 
 const CRITICIDADE_LABELS = ["N/D", "Baixa", "Média", "Alta", "Crítica"];
 const PRIORIZACAO_LABELS = ["N/D", "Postergado", "Oportuno", "Relevante", "Essencial"];
+const SMART_FILTER_LABELS: Record<SmartFilter, string> = {
+  all: "Todos os itens",
+  divergencia: "Divergência de descrição",
+  outlier: "Outlier de preço",
+  incompleto: "Sem classificação",
+  pareto: "Somente Pareto",
+};
 
 function criticidadeBadgeClass(level: number): string {
   if (level >= 4) return "bg-upe-red-upe/15 text-upe-red-dark border-upe-red-upe/30";
@@ -425,6 +433,7 @@ export default function ConsolidationPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dfdMenuOpen, setDfdMenuOpen] = useState(false);
   const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
+  const [previewDfdId, setPreviewDfdId] = useState<string | null>(null);
   const [naturezaFilter, setNaturezaFilter] = useState<NaturezaDespesaFilter>("all");
   const [grupoFilter, setGrupoFilter] = useState("all");
   const [classeFilter, setClasseFilter] = useState("all");
@@ -440,6 +449,11 @@ export default function ConsolidationPage() {
     : insightsMenuOpen
       ? "xl:col-span-9"
       : "xl:col-span-12";
+  const previewDfd = useMemo(
+    () => (previewDfdId ? dfds.find((dfd) => dfd.id === previewDfdId) || null : null),
+    [dfds, previewDfdId],
+  );
+  const activeSmartFilterLabel = SMART_FILTER_LABELS[smartFilter];
 
   const recomputeItems = useCallback(
     (source: ConsolidatedItem[]) => {
@@ -1327,8 +1341,6 @@ export default function ConsolidationPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard label="DFDs aprovadas" value={dfds.length} />
-          <KpiCard label="Itens exibidos" value={`${displayItems.length}/${items.length}`} />
           <KpiCard
             label="Valor do recorte"
             value={visibleValue.toLocaleString("pt-BR", {
@@ -1337,6 +1349,8 @@ export default function ConsolidationPage() {
             })}
           />
           <KpiCard label="Pareto 20%" value={`${paretoCount}/${paretoLimit}`} />
+          <KpiCard label="Itens exibidos" value={`${displayItems.length}/${items.length}`} />
+          <KpiCard label="DFDs aprovadas" value={dfds.length} />
           <KpiCard label="Filtros ativos" value={activeFilterCount} />
         </div>
       </div>
@@ -1519,7 +1533,7 @@ export default function ConsolidationPage() {
                     Itens Consolidados
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-black/55">
-                    Área principal de decisão: revise o item, a origem, a prioridade, o valor e o Pareto.
+                    Lista ordenada do maior score para o menor. O score combina criticidade e priorização para destacar o que exige atenção primeiro.
                   </p>
                 </div>
               </div>
@@ -1530,7 +1544,7 @@ export default function ConsolidationPage() {
                 <p className="text-lg font-semibold text-upe-blue-upe">{displayItems.length}</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(280px,1fr)_auto_auto_auto]">
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(280px,1fr)_auto]">
               <input
                 value={itemSearchTerm}
                 onChange={(event) => {
@@ -1549,16 +1563,26 @@ export default function ConsolidationPage() {
                     ? "border-upe-blue-upe bg-upe-blue-upe text-white"
                     : "border-[#C7D7EA] bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice",
                 )}
-              >
-                <Funnel size={14} />
-                Filtros {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
-              </button>
-              <div className="h-11 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe shadow-sm inline-flex items-center justify-center">
-                {selectedDfdId === "all" ? "Visão geral" : "Filtrado por DFD"}
-              </div>
-              <div className="h-11 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-[10px] font-semibold uppercase tracking-widest text-black/45 shadow-sm inline-flex items-center justify-center">
-                {smartFilter}
-              </div>
+                >
+                  <Funnel size={14} />
+                  Filtros {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
+                </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#C7D7EA] bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe">
+                <Sparkle size={12} />
+                Score mais alto primeiro
+              </span>
+              {selectedDfdId !== "all" ? (
+                <span className="inline-flex h-8 items-center rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-black/55">
+                  1 DFD selecionada
+                </span>
+              ) : null}
+              {smartFilter !== "all" ? (
+                <span className="inline-flex h-8 items-center rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-black/55">
+                  {activeSmartFilterLabel}
+                </span>
+              ) : null}
             </div>
 
             {filtersOpen && (
@@ -1706,13 +1730,6 @@ export default function ConsolidationPage() {
               </select>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="h-8 rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe inline-flex items-center">
-                {selectedDfdId === "all" ? "Visão geral" : "Filtrado por DFD"}
-              </div>
-              <div className="h-8 rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-black/45 inline-flex items-center">
-                <Funnel size={12} className="mr-1" />
-                {smartFilter}
-              </div>
               {activeFilterCount > 0 && (
                 <button
                   type="button"
@@ -1755,7 +1772,7 @@ export default function ConsolidationPage() {
             )}
           >
             <span>Item</span>
-            <span className="text-right">Decisão</span>
+            <span className="text-right">Score e decisão</span>
             <span className="text-right">Pareto</span>
           </div>
 
@@ -1874,21 +1891,22 @@ export default function ConsolidationPage() {
 
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           {primaryDfd ? (
-                            <a
-                              href={`/dfd/${primaryDfd.id}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(event) => event.stopPropagation()}
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setPreviewDfdId(primaryDfd.id);
+                              }}
                               className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-[#C7D7EA] bg-white px-2.5 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe transition-colors hover:border-upe-blue-upe hover:bg-[#EAF2FF]"
                               title={
                                 item.dfd_sources.length > 1
-                                  ? `Abrir ${primaryDfd.numero_protocolo}. Este item aparece em ${item.dfd_sources.length} DFDs.`
-                                  : `Abrir ${primaryDfd.numero_protocolo}`
+                                  ? `Ver ${primaryDfd.numero_protocolo}. Este item aparece em ${item.dfd_sources.length} DFDs.`
+                                  : `Ver ${primaryDfd.numero_protocolo}`
                               }
                             >
                               <ArrowSquareOut size={13} weight="bold" />
-                              Abrir DFD
-                            </a>
+                              Ver DFD
+                            </button>
                           ) : null}
                           {item.dfd_sources.length > 1 ? (
                             <span className="text-[10px] font-medium text-black/45">
@@ -1952,11 +1970,30 @@ export default function ConsolidationPage() {
                       </div>
 
                       <div className="mt-3 grid grid-cols-3 gap-2 2xl:mt-0 2xl:grid-cols-1">
-                        <div className="rounded-xl border border-[#D9E0E8] bg-white/90 p-3 text-left shadow-sm 2xl:text-right">
+                        <div className="rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] p-3 text-left shadow-sm 2xl:text-right">
+                          <p className="text-[9px] font-semibold uppercase tracking-widest text-[#47739F]">
+                            Score
+                          </p>
+                          <p className="mt-1 text-xl font-semibold tracking-tight text-[#164073]">
+                            {Math.round(item.rank_score)}
+                          </p>
+                          <p className="mt-1 text-[10px] font-medium text-[#47739F]">
+                            define a ordem da lista
+                          </p>
+                          {showScoreBars && (
+                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/10 2xl:ml-auto 2xl:w-[120px]">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-blue-medium to-upe-blue-upe"
+                                style={{ width: `${scoreWidth}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:text-right">
                           <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
                             Valor total
                           </p>
-                          <p className="mt-1 text-lg font-semibold tracking-tight text-upe-blue-upe">
+                          <p className="mt-1 text-base font-semibold tracking-tight text-upe-blue-upe">
                             {item.valor_total.toLocaleString("pt-BR", {
                               style: "currency",
                               currency: "BRL",
@@ -1971,22 +2008,6 @@ export default function ConsolidationPage() {
                             {item.quantidade_total}
                           </p>
                         </div>
-                        <div className="rounded-lg border border-black/5 bg-white/70 p-2.5 text-left 2xl:text-right">
-                          <p className="text-[9px] font-semibold uppercase tracking-widest text-black/35">
-                            Score
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-upe-neutral-dark-soft-black">
-                            {Math.round(item.rank_score)}
-                          </p>
-                          {showScoreBars && (
-                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 2xl:ml-auto 2xl:w-[104px]">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-blue-medium to-upe-blue-upe"
-                                style={{ width: `${scoreWidth}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
                       </div>
 
                       <div className="mt-3 rounded-lg border border-black/5 bg-white/70 p-2.5 2xl:mt-0 2xl:border-0 2xl:bg-transparent 2xl:p-0">
@@ -1994,9 +2015,6 @@ export default function ConsolidationPage() {
                           Pareto
                         </p>
                         <div className="mt-1 flex items-center justify-between gap-2 2xl:flex-col 2xl:items-end">
-                          <span className="text-[10px] font-semibold uppercase tracking-widest text-black/45">
-                            {item.is_highlight ? "Top 20%" : "Acompanhar"}
-                          </span>
                           <div className="flex justify-start 2xl:justify-end">
                         <span
                           className={cn(
@@ -2254,6 +2272,114 @@ export default function ConsolidationPage() {
           </div>
         </section>
       </div>
+
+      {previewDfd ? (
+        <>
+          <button
+            type="button"
+            aria-label="Fechar painel da DFD"
+            className="fixed inset-0 z-40 bg-[#0F2238]/18 backdrop-blur-[1px]"
+            onClick={() => setPreviewDfdId(null)}
+          />
+          <aside className="fixed inset-y-4 right-4 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-[28px] border border-[#9FB9D6] bg-white shadow-[0_24px_56px_rgba(15,34,56,0.22)]">
+            <div className="flex h-full flex-col">
+              <div className="flex items-start justify-between gap-3 border-b border-[#D9E0E8] bg-[#F7FBFF] px-5 py-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#47739F]">
+                    Contexto da DFD
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-[#164073]">
+                    {previewDfd.numero_protocolo}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDfdId(null)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice"
+                >
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-black/35">
+                    Objeto
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-upe-neutral-dark-soft-black">
+                    {previewDfd.objeto_contratacao}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <KpiCard label="Itens" value={previewDfd.item_count} />
+                  <KpiCard
+                    label="Valor total"
+                    value={previewDfd.valor_total.toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white p-4 space-y-3">
+                  <MetricLine label="Campus" value={previewDfd.campus_nome || "Não informado"} />
+                  <MetricLine label="Unidade" value={previewDfd.unidade_nome || "Não informada"} />
+                  <MetricLine
+                    label="Criada em"
+                    value={
+                      previewDfd.created_at
+                        ? new Date(previewDfd.created_at).toLocaleString("pt-BR")
+                        : "Data não informada"
+                    }
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-black/5 bg-white p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-black/35">
+                    Solicitante
+                  </p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <CompactAvatar
+                      name={previewDfd.solicitante_nome}
+                      avatarUrl={previewDfd.solicitante_avatar_url}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-upe-neutral-dark-soft-black">
+                        {previewDfd.solicitante_nome}
+                      </p>
+                      <p className="truncate text-xs text-black/50">
+                        {previewDfd.solicitante_email || "email não informado"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {previewDfd.itens_sem_classificacao > 0 ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest">
+                      Atenção
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                      {previewDfd.itens_sem_classificacao} item(ns) ainda sem classificação completa.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="border-t border-[#D9E0E8] px-5 py-4">
+                <a
+                  href={`/dfd/${previewDfd.id}`}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#164073] px-4 text-sm font-semibold text-white hover:bg-[#0F2E57]"
+                >
+                  <ArrowSquareOut size={16} weight="bold" />
+                  Abrir DFD completa
+                </a>
+              </div>
+            </div>
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }
