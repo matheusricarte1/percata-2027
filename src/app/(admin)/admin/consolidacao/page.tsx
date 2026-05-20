@@ -47,6 +47,8 @@ type RawItem = {
   id?: string;
   dfd_id: string;
   codigo_tce: string;
+  codigo_item_efisco?: string | null;
+  item_key: string;
   descricao: string;
   quantidade: number;
   valor_unitario_estimado: number;
@@ -62,6 +64,7 @@ type RawItem = {
 };
 
 type ConsolidatedItem = {
+  item_key: string;
   siad: string;
   descricao: string;
   grupo_nome: string;
@@ -205,6 +208,16 @@ function getInitials(fullName: string) {
   );
 }
 
+function resolveConsolidationItemCode(row: Record<string, unknown>): string {
+  const tce = String(row.codigo_tce || "").trim();
+  if (tce) return tce;
+
+  const efisco = String(row.codigo_item_efisco || "").trim();
+  if (efisco) return efisco;
+
+  return "";
+}
+
 function deriveGroupFromGnd(gnd: string): string {
   const normalized = String(gnd || "").trim();
   if (normalized.startsWith("4.")) return "Capital";
@@ -281,8 +294,8 @@ function applyPareto(
     return String(a.siad || "").localeCompare(String(b.siad || ""), "pt-BR");
   });
 
-  const topSet = new Set(sorted.slice(0, limit).map((item) => item.siad));
-  return scored.map((item) => ({ ...item, is_highlight: topSet.has(item.siad) }));
+  const topSet = new Set(sorted.slice(0, limit).map((item) => item.item_key));
+  return scored.map((item) => ({ ...item, is_highlight: topSet.has(item.item_key) }));
 }
 
 function percentile(values: number[], p: number): number {
@@ -564,7 +577,7 @@ export default function ConsolidationPage() {
         itemsRes = await supabase
           .from("dfd_items")
           .select(
-            "id, dfd_id, codigo_tce, descricao, quantidade, valor_unitario_estimado, is_highlight_item, gnd, link_referencia, justificativa_item, justificativa_quantidade",
+            "id, dfd_id, codigo_tce, codigo_item_efisco, descricao, quantidade, valor_unitario_estimado, is_highlight_item, gnd, link_referencia, justificativa_item, justificativa_quantidade",
           )
           .in("dfd_id", dfdIds);
       }
@@ -572,11 +585,19 @@ export default function ConsolidationPage() {
 
       const itemsRows = ((itemsRes.data || []) as any[])
         .map(
-          (row) =>
-            ({
+          (row) => {
+            const itemCode = resolveConsolidationItemCode(row);
+            return {
               id: String(row.id || ""),
               dfd_id: String(row.dfd_id || ""),
-              codigo_tce: String(row.codigo_tce || "").trim(),
+              codigo_tce: itemCode,
+              codigo_item_efisco: String(row.codigo_item_efisco || "").trim() || null,
+              item_key:
+                itemCode ||
+                [String(row.descricao || "").trim().toLowerCase(), String(row.gnd || "").trim().toLowerCase()]
+                  .filter(Boolean)
+                  .join("|") ||
+                String(row.id || ""),
               descricao: String(row.descricao || "").trim() || "Descrição não informada",
               quantidade: Math.max(0, Number(row.quantidade || 0)),
               valor_unitario_estimado: Math.max(0, Number(row.valor_unitario_estimado || 0)),
@@ -589,9 +610,10 @@ export default function ConsolidationPage() {
               justificativa_quantidade: row.justificativa_quantidade || null,
               local_uso: row.local_uso || null,
               raw: row,
-            }) satisfies RawItem,
+            } satisfies RawItem;
+          },
         )
-        .filter((row) => row.dfd_id && row.codigo_tce);
+        .filter((row) => row.dfd_id && row.item_key);
 
       const campusMap = new Map(
         ((campiRes.data || []) as any[]).map((campus) => [
@@ -656,6 +678,7 @@ export default function ConsolidationPage() {
       const consolidated = new Map<
         string,
         {
+          item_key: string;
           siad: string;
           descricao: string;
           descricaoSet: Set<string>;
@@ -699,9 +722,10 @@ export default function ConsolidationPage() {
         if (!row.criticidade || !row.moscow_categoria) dfdStat.sem_classificacao += 1;
         dfdStats.set(row.dfd_id, dfdStat);
 
-        if (!consolidated.has(row.codigo_tce)) {
-          consolidated.set(row.codigo_tce, {
-            siad: row.codigo_tce,
+        if (!consolidated.has(row.item_key)) {
+          consolidated.set(row.item_key, {
+            item_key: row.item_key,
+            siad: row.codigo_tce || row.codigo_item_efisco || "Sem código",
             descricao: row.descricao,
             descricaoSet: new Set<string>(),
             quantidade_total: 0,
@@ -724,7 +748,7 @@ export default function ConsolidationPage() {
           });
         }
 
-        const entry = consolidated.get(row.codigo_tce)!;
+        const entry = consolidated.get(row.item_key)!;
         entry.descricaoSet.add(row.descricao);
         entry.quantidade_total += Number(row.quantidade || 0);
         entry.valor_total += itemSubtotal;
@@ -797,7 +821,7 @@ export default function ConsolidationPage() {
         string,
         { grupo: string; classe: string; tipo: "Material" | "Serviço" }
       >();
-      const uniqueCodes = Array.from(new Set(itemsRows.map((row) => row.codigo_tce))).filter(
+      const uniqueCodes = Array.from(new Set(itemsRows.map((row) => row.codigo_tce || row.codigo_item_efisco || ""))).filter(
         Boolean,
       );
       try {
@@ -846,6 +870,7 @@ export default function ConsolidationPage() {
         const tipo = taxo?.tipo || deriveTypeFromGnd(dominantGnd);
 
         return {
+          item_key: entry.item_key,
           siad: entry.siad,
           descricao: entry.descricao,
           grupo_nome: grupo,
@@ -925,13 +950,13 @@ export default function ConsolidationPage() {
   }, [grupoFilter]);
 
   const updateItemLevel = (
-    siad: string,
+    itemKey: string,
     field: "criticidade_level" | "priorizacao_level",
     nextValue: number,
   ) => {
     const safeValue = clampLevel(nextValue);
     setBaseItems((prev) =>
-      prev.map((item) => (item.siad === siad ? { ...item, [field]: safeValue } : item)),
+      prev.map((item) => (item.item_key === itemKey ? { ...item, [field]: safeValue } : item)),
     );
   };
 
@@ -939,7 +964,7 @@ export default function ConsolidationPage() {
     if (selectedDfdId === "all") return null;
     const codes = rawItems
       .filter((item) => item.dfd_id === selectedDfdId)
-      .map((item) => item.codigo_tce);
+      .map((item) => item.item_key);
     return new Set(codes);
   }, [selectedDfdId, rawItems]);
 
@@ -963,7 +988,7 @@ export default function ConsolidationPage() {
     let next = items;
 
     if (selectedDfdCodeSet) {
-      next = next.filter((item) => selectedDfdCodeSet.has(item.siad));
+      next = next.filter((item) => selectedDfdCodeSet.has(item.item_key));
     }
 
     if (query) {
@@ -1627,8 +1652,32 @@ export default function ConsolidationPage() {
                 ))}
               </div>
             ) : displayItems.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-center p-6 text-sm font-semibold text-black/40">
-                Sem itens para o recorte atual.
+              <div className="flex h-full items-center justify-center px-6 py-10">
+                <div className="flex max-w-md flex-col items-center text-center">
+                  <img
+                    src="/guidance/triage-empty-queue.png"
+                    alt="Sem itens no recorte"
+                    className="h-auto w-full max-w-[240px]"
+                  />
+                  <h3 className="mt-5 text-lg font-semibold text-upe-blue-upe">
+                    Nenhum item neste recorte
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-black/55">
+                    Ajuste os filtros ou escolha outra DFD de origem para voltar a enxergar a fila de priorização.
+                  </p>
+                  {activeFilterCount > 0 || selectedDfdId !== "all" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetFilters();
+                        setActivePreset("custom");
+                      }}
+                      className="mt-4 inline-flex h-10 items-center justify-center rounded-2xl border border-[#C7D7EA] bg-white px-4 text-sm font-semibold text-upe-blue-upe hover:bg-[#F3F8FF]"
+                    >
+                      Limpar recorte
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <Virtuoso
