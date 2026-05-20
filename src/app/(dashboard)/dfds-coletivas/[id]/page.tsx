@@ -448,8 +448,6 @@ export default function DfdColetivaDetailPage() {
       metadata: Boolean(detail?.room.description || detail?.room.scope),
     };
   }, [detail]);
-  const stageGuide = STAGE_GUIDANCE[activeStage];
-
   const canEdit = Boolean(detail?.room.can_edit_metadata);
   const isOpen = detail?.room.status === "aberta";
   const activeCartItem = useMemo(
@@ -870,14 +868,6 @@ export default function DfdColetivaDetailPage() {
           onStageChange={setActiveStage}
         />
 
-        <StageCompass
-          stage={activeStage}
-          guide={stageGuide}
-          itemCount={detail.items.length}
-          participantCount={detail.participants.length}
-          totalValue={totalValue}
-        />
-
         {activeStage === "adicionar" && (
           <section className="grid gap-4 2xl:grid-cols-[300px_minmax(0,1fr)]">
             <SideRail detail={detail} activeStage={activeStage} />
@@ -1046,9 +1036,59 @@ function FlowStepper({
     arquivada: ["finalizar"],
   };
   const allowedStages = allowedStagesByStatus[status] || [activeStage];
+  const stageGuide = STAGE_GUIDANCE[activeStage];
+  const nextStage =
+    FLOW_STEPS.find((step, index) => index > activeIndex && allowedStages.includes(step.id)) || null;
+  const statusTone =
+    status === "aberta"
+      ? "border-[#CFE8D8] bg-[#F3FCF6] text-[#168A5A]"
+      : status === "em_revisao"
+        ? "border-[#F6DDAB] bg-[#FFF7E8] text-[#D97706]"
+        : "border-[#D8E3F4] bg-[#F5F8FE] text-[#526070]";
+
   return (
-    <section className="rounded-lg border border-[#DDE5EF] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-      <div className="grid gap-4 md:grid-cols-4">
+    <section className="overflow-hidden rounded-[28px] border border-[#DDE5EF] bg-white shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E6EDF7] px-6 py-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#EEF4FF] text-[#0B4AA2]">
+            <UsersThree size={30} weight="duotone" />
+          </div>
+          <div>
+            <h2 className="text-[20px] font-semibold tracking-tight text-[#0F1F3D] md:text-[26px]">
+              Fluxo da DFD coletiva
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#667085] md:text-base">
+              Acompanhe o estágio atual, a próxima ação e as restrições do fluxo.
+            </p>
+          </div>
+        </div>
+        <span className={cn("inline-flex h-12 items-center gap-2 rounded-full border px-5 text-sm font-semibold", statusTone)}>
+          <LockSimple size={16} weight="bold" />
+          {status === "aberta"
+            ? "Sala aberta"
+            : status === "em_revisao"
+              ? "Sala em revisão"
+              : status === "convertida"
+                ? "DFD oficial gerada"
+                : "Sala arquivada"}
+        </span>
+      </div>
+
+      <div className="px-6 py-8">
+        <div className="relative mb-6 hidden md:block">
+          <div className="absolute left-[10%] right-[10%] top-7 h-[3px] rounded-full bg-[#E5EAF2]" />
+          <div
+            className={cn(
+              "absolute left-[10%] top-7 h-[3px] rounded-full bg-[#0B63CE]",
+              activeIndex <= 0 && "w-[0%]",
+              activeIndex === 1 && "w-[26.666%]",
+              activeIndex === 2 && "w-[53.333%]",
+              activeIndex >= 3 && "w-[80%]",
+            )}
+          />
+        </div>
+
+      <div className="grid gap-6 md:grid-cols-4">
         {FLOW_STEPS.map((step, index) => {
           const completed =
             index < activeIndex ||
@@ -1058,6 +1098,7 @@ function FlowStepper({
           const active = step.id === activeStage;
           const allowed = allowedStages.includes(step.id);
           const clickable = allowed && !active;
+          const upcoming = nextStage?.id === step.id;
           return (
             <button
               key={step.id}
@@ -1069,101 +1110,116 @@ function FlowStepper({
               disabled={!clickable}
               aria-current={active ? "step" : undefined}
               className={cn(
-                "group grid grid-cols-[36px_1fr] gap-3 rounded-xl px-2 py-2 text-left transition",
-                clickable && "cursor-pointer hover:bg-[#F7FBFF]",
-                !clickable && !active && "cursor-not-allowed opacity-72",
+                "group text-left transition md:px-2",
+                clickable && "cursor-pointer",
+                !clickable && !active && "cursor-default",
               )}
             >
-              <span
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition",
-                  active && "bg-[#0B63CE] text-white shadow-sm",
-                  completed && !active && "bg-[#D9F8E7] text-[#168A5A]",
-                  !active && !completed && "bg-[#EEF2F7] text-[#526070]",
-                  clickable && "ring-1 ring-transparent group-hover:ring-[#BBD6FF]",
-                )}
-              >
-                {completed && !active ? <CheckCircle size={17} weight="fill" /> : index + 1}
-              </span>
-              <span>
+              <div className="flex flex-col items-center text-center">
                 <span
                   className={cn(
-                    "block text-sm font-semibold",
-                    active ? "text-[#0B3473]" : "text-[#0F172A]",
-                    clickable && "group-hover:text-[#0B4AA2]",
+                    "flex h-14 w-14 items-center justify-center rounded-full border-2 text-[18px] font-semibold transition",
+                    active && "border-[#0B63CE] bg-[#0B63CE] text-white shadow-[0_8px_20px_rgba(11,99,206,0.2)]",
+                    upcoming && "border-[#21C5C7] bg-[#E9FCFC] text-[#12AEB0] shadow-[0_8px_20px_rgba(33,197,199,0.12)]",
+                    completed && !active && !upcoming && "border-[#BFD6FB] bg-white text-[#0B63CE]",
+                    !active && !completed && !upcoming && "border-[#D8DEE8] bg-[#F7F9FC] text-[#7A8699]",
+                    clickable && "group-hover:border-[#8DBBFF]",
                   )}
                 >
+                  {!allowed && step.id === "finalizar" && status !== "convertida" && status !== "arquivada" ? (
+                    <LockSimple size={20} weight="bold" />
+                  ) : completed && !active && !upcoming ? (
+                    <CheckCircle size={22} weight="fill" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <span className="mt-4 text-[15px] font-semibold text-[#0F1F3D]">
                   {step.title}
                 </span>
-                <span className={cn("mt-1 block text-xs", active ? "text-[#0B4AA2]" : "text-[#667085]")}>
-                  {step.description}
-                </span>
-                <span className="mt-1 block text-[11px] font-semibold text-[#7D98B8]">
+                <span
+                  className={cn(
+                    "mt-3 inline-flex rounded-full px-3 py-1 text-[12px] font-semibold",
+                    active && "bg-[#EAF2FF] text-[#0B63CE]",
+                    upcoming && "bg-[#E8FBFB] text-[#12AEB0]",
+                    !active && !upcoming && allowed && "bg-[#F2F4F7] text-[#667085]",
+                    !allowed && "bg-[#F2F4F7] text-[#667085]",
+                  )}
+                >
                   {active
-                    ? "Etapa atual"
-                    : clickable
-                      ? "Clique para revisar"
+                    ? "Atual"
+                    : upcoming
+                      ? "Próxima ação"
                       : allowed
-                        ? "Disponível nesta fase"
-                        : "Bloqueada nesta fase"}
+                        ? "Disponível"
+                        : step.id === "revisao"
+                          ? "Aguardando consolidação"
+                          : "Bloqueada"}
                 </span>
-              </span>
+                <span className="mt-3 max-w-[220px] text-[13px] leading-6 text-[#667085]">
+                  {step.id === "adicionar"
+                    ? "Coletar e ajustar contribuições"
+                    : step.id === "consolidar"
+                      ? "Revisar escopo e consolidar"
+                      : step.id === "revisao"
+                        ? "Validar a DFD coletiva"
+                        : "Liberada após a revisão"}
+                </span>
+              </div>
             </button>
           );
         })}
       </div>
-      <div className="mt-4 rounded-md border border-[#E2E8F0] bg-[#FBFCFF] px-4 py-3 text-xs leading-5 text-[#526070]">
-        Você só pode voltar para etapas que ainda façam sentido no status atual da sala. Depois que a sala sai de
-        <strong className="mx-1 text-[#0B3473]">aberta</strong>, ela não volta para receber novas contribuições pela barra.
-        Depois da geração da DFD oficial, o fluxo fica apenas para acompanhamento.
-      </div>
-    </section>
-  );
-}
 
-function StageCompass({
-  stage,
-  guide,
-  itemCount,
-  participantCount,
-  totalValue,
-}: {
-  stage: FlowStage;
-  guide: (typeof STAGE_GUIDANCE)[FlowStage];
-  itemCount: number;
-  participantCount: number;
-  totalValue: number;
-}) {
-  return (
-    <section className="rounded-lg border border-[#DDE5EF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] p-6 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0B4AA2]">{guide.eyebrow}</p>
-          <h2 className="mt-2 text-2xl font-semibold text-[#0F1F3D]">{guide.title}</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-[#526070]">{guide.description}</p>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {guide.highlights.map((highlight) => (
-              <div
-                key={highlight}
-                className="rounded-lg border border-[#DDE5EF] bg-white/90 p-4 text-sm leading-6 text-[#445164]"
-              >
-                <div className="mb-3 h-2 w-10 rounded-full bg-[#CFE2FF]" />
-                {highlight}
-              </div>
-            ))}
+      <div className="mt-8 rounded-[22px] border border-[#E2E8F0] bg-[#FBFCFF] px-5 py-5">
+        <div className="grid gap-5 lg:grid-cols-3">
+          <div className="flex gap-4 lg:border-r lg:border-[#E2E8F0] lg:pr-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#0B63CE]">
+              <CheckCircle size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-[#0B63CE]">Agora</p>
+              <p className="mt-2 text-[14px] font-medium leading-7 text-[#344054]">{stageGuide.title}</p>
+              <p className="mt-1 text-[13px] leading-6 text-[#667085]">{stageGuide.highlights[0]}</p>
+            </div>
+          </div>
+
+          <div className="flex gap-4 lg:border-r lg:border-[#E2E8F0] lg:px-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#0B63CE]">
+              <ArrowRight size={24} weight="bold" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-[#0B63CE]">Próxima ação</p>
+              {nextStage ? (
+                <button
+                  type="button"
+                  onClick={() => onStageChange(nextStage.id)}
+                  className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#0B63CE] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[#0954AF]"
+                >
+                  {nextStage.title}
+                  <ArrowRight size={16} weight="bold" />
+                </button>
+              ) : (
+                <p className="mt-2 text-[13px] leading-6 text-[#667085]">
+                  O próximo avanço depende do status atual da sala.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-4 lg:pl-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#0B63CE]">
+              <LockSimple size={24} weight="bold" />
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-[#0B63CE]">Regra do fluxo</p>
+              <p className="mt-2 text-[13px] leading-6 text-[#344054]">
+                Após sair do estado <strong className="text-[#0B3473]">aberta</strong>, a sala não volta a receber novas contribuições por esta barra. Depois da DFD oficial, o fluxo fica apenas para acompanhamento.
+              </p>
+            </div>
           </div>
         </div>
-        <div className="rounded-lg border border-[#DDE5EF] bg-white p-5">
-          <p className="text-sm font-semibold text-[#0B3473]">Pulso da sala nesta etapa</p>
-          <div className="mt-4 grid gap-3">
-            <StageMetric label="Participantes visíveis" value={participantCount} />
-            <StageMetric label="Itens consolidados" value={itemCount} />
-            <StageMetric
-              label={stage === "adicionar" ? "Valor já consolidado" : "Valor estimado"}
-              value={formatCurrency(totalValue)}
-            />
-          </div>
-        </div>
+      </div>
       </div>
     </section>
   );
@@ -1458,15 +1514,6 @@ function CatalogPanel(props: {
         )}
       </div>
     </Panel>
-  );
-}
-
-function StageMetric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border border-[#E2E8F0] bg-[#FBFCFF] p-3">
-      <p className="text-xs text-[#667085]">{label}</p>
-      <p className="mt-1 text-base font-semibold text-[#0F172A]">{value}</p>
-    </div>
   );
 }
 
