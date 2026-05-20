@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -128,6 +128,11 @@ const EXPERIENCES = [
   },
 ];
 
+const LANDING_HEROES = [
+  "/brands/landing-petrolina-high.png",
+  "/brands/landing-ouricuri-high.png",
+];
+
 export function HumanLandingPage({
   loadingGoogle,
   onGoogleLogin,
@@ -136,22 +141,42 @@ export function HumanLandingPage({
   onGoogleLogin: () => Promise<void> | void;
 }) {
   const reduceMotion = useReducedMotion();
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setActiveHeroIndex((current) => (current + 1) % LANDING_HEROES.length);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   return (
     <main className="bg-white text-[#1E2430]">
       <section className="relative overflow-hidden border-b border-[#E8EDF2] bg-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(243,208,190,0.28),transparent_34%),radial-gradient(circle_at_78%_16%,rgba(199,215,234,0.65),transparent_28%),linear-gradient(180deg,#ffffff_0%,#f8fbff_72%,#ffffff_100%)]" />
         <div className="absolute inset-y-0 right-0 hidden w-[56%] md:block">
-          <img
-            src="/brands/dashboard-hero-petrolina-v3.png"
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-cover object-center opacity-[0.94]"
-            style={{
-              maskImage:
-                "linear-gradient(to left, rgba(0,0,0,1) 60%, rgba(0,0,0,0.1) 88%, rgba(0,0,0,0) 100%)",
-            }}
-          />
+          {LANDING_HEROES.map((heroSrc, index) => (
+            <motion.img
+              key={heroSrc}
+              src={heroSrc}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              animate={{
+                opacity: activeHeroIndex === index ? 0.94 : 0,
+                scale: activeHeroIndex === index ? 1 : 1.018,
+              }}
+              transition={{
+                duration: reduceMotion ? 0.2 : 1.6,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              style={{
+                maskImage:
+                  "linear-gradient(to left, rgba(0,0,0,1) 60%, rgba(0,0,0,0.1) 88%, rgba(0,0,0,0) 100%)",
+              }}
+            />
+          ))}
         </div>
 
         <div className="relative mx-auto flex min-h-[90vh] w-full max-w-[1280px] flex-col justify-center px-6 py-16 md:px-8 lg:px-10">
@@ -308,9 +333,9 @@ export function HumanLandingPage({
           <div className="flex flex-col justify-between rounded-[28px] border border-[#E8EDF2] bg-[#F8FBFF] p-8 shadow-sm">
             <div>
               <img
-                src="/brands/upe-wordmark-login.png"
+                src="/brands/upe-logo-color.png"
                 alt="Universidade de Pernambuco"
-                className="h-auto w-[220px] object-contain mix-blend-multiply"
+                className="h-auto w-[220px] object-contain"
               />
               <p className="mt-6 text-sm leading-7 text-[#566273]">
                 O sistema organiza demandas, colaboração e análise em uma experiência mais compreensível para o ciclo institucional.
@@ -333,7 +358,12 @@ export function HumanLandingPage({
         <div className="mx-auto w-full max-w-[1280px] px-6 py-16 md:px-8 lg:px-10">
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="max-w-[700px]">
-              <h2 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">
+              <img
+                src="/brands/upe-logo-monochrome-positive.png"
+                alt="Universidade de Pernambuco"
+                className="h-auto w-[180px] object-contain opacity-95"
+              />
+              <h2 className="mt-6 font-display text-3xl font-semibold tracking-tight md:text-4xl">
                 Entre quando quiser. O caminho continua mais claro lá dentro.
               </h2>
               <p className="mt-4 text-base leading-8 text-white/82">
