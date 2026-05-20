@@ -1,17 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import {
   ArrowsClockwise,
   DownloadSimple,
   ArrowSquareOut,
   Funnel,
-  Lightning,
-  List,
   Sparkle,
   Star,
-  Warning,
   X,
 } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
@@ -21,10 +18,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { downloadWorkbookFromSheets } from "@/lib/export-excel";
 import {
-  buildCsv,
   buildDfdItemDetailRows,
   buildDfdSheetRows,
-  collectExportHeaders,
   protectReportRow,
 } from "@/lib/admin-reports";
 
@@ -102,6 +97,7 @@ type SmartFilter = "all" | "divergencia" | "outlier" | "incompleto" | "pareto";
 type DensityMode = "comfortable" | "compact";
 type ContrastMode = "soft" | "high";
 type NaturezaDespesaFilter = "all" | "custeio" | "permanente" | "sem_gnd";
+type QuickFocus = "none" | "criticos" | "essenciais";
 type FilterPresetKey =
   | "custom"
   | "executivo_pareto"
@@ -127,14 +123,6 @@ const PRIORIZACAO_TO_LEVEL: Record<string, number> = {
 
 const CRITICIDADE_LABELS = ["N/D", "Baixa", "Média", "Alta", "Crítica"];
 const PRIORIZACAO_LABELS = ["N/D", "Postergado", "Oportuno", "Relevante", "Essencial"];
-const SMART_FILTER_LABELS: Record<SmartFilter, string> = {
-  all: "Todos os itens",
-  divergencia: "Divergência de descrição",
-  outlier: "Outlier de preço",
-  incompleto: "Sem classificação",
-  pareto: "Somente Pareto",
-};
-
 function criticidadeBadgeClass(level: number): string {
   if (level >= 4) return "bg-upe-red-upe/15 text-upe-red-dark border-upe-red-upe/30";
   if (level === 3) return "bg-upe-warm-light-terracotta/15 text-upe-warm-light-terracotta border-upe-warm-light-terracotta/35";
@@ -177,6 +165,14 @@ function compactList(values: string[], max = 2): string {
   if (clean.length === 0) return "N/D";
   if (clean.length <= max) return clean.join(", ");
   return `${clean.slice(0, max).join(", ")} +${clean.length - max}`;
+}
+
+function formatUpdatedAtLabel(date: Date | null) {
+  if (!date) return "Ainda não atualizado";
+  return `Atualizado às ${date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 function formatCompactCurrencyRange(min: number, max: number): string {
@@ -434,6 +430,9 @@ export default function ConsolidationPage() {
   const [dfdMenuOpen, setDfdMenuOpen] = useState(false);
   const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
   const [previewDfdId, setPreviewDfdId] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [sortBy, setSortBy] = useState<"score_desc" | "value_desc" | "quantity_desc">("score_desc");
+  const [quickFocus, setQuickFocus] = useState<QuickFocus>("none");
   const [naturezaFilter, setNaturezaFilter] = useState<NaturezaDespesaFilter>("all");
   const [grupoFilter, setGrupoFilter] = useState("all");
   const [classeFilter, setClasseFilter] = useState("all");
@@ -442,18 +441,10 @@ export default function ConsolidationPage() {
   const [localUsoFilter, setLocalUsoFilter] = useState("all");
   const [activePreset, setActivePreset] = useState<FilterPresetKey>("custom");
 
-  const centerColSpanClass = dfdMenuOpen
-    ? insightsMenuOpen
-      ? "xl:col-span-8"
-      : "xl:col-span-10"
-    : insightsMenuOpen
-      ? "xl:col-span-10"
-      : "xl:col-span-12";
   const previewDfd = useMemo(
     () => (previewDfdId ? dfds.find((dfd) => dfd.id === previewDfdId) || null : null),
     [dfds, previewDfdId],
   );
-  const activeSmartFilterLabel = SMART_FILTER_LABELS[smartFilter];
 
   const recomputeItems = useCallback(
     (source: ConsolidatedItem[]) => {
@@ -467,6 +458,7 @@ export default function ConsolidationPage() {
     setItemSearchTerm("");
     setSmartFilter("all");
     setHighlightOnly(false);
+    setQuickFocus("none");
     setNaturezaFilter("all");
     setGrupoFilter("all");
     setClasseFilter("all");
@@ -539,6 +531,7 @@ export default function ConsolidationPage() {
         setRawItems([]);
         setBaseItems([]);
         setItems([]);
+        setLastUpdatedAt(new Date());
         return;
       }
 
@@ -949,6 +942,7 @@ export default function ConsolidationPage() {
       setRawItems(itemsRows);
       setBaseItems(normalized);
       setItems(applyPareto(normalized, criticidadeWeight, priorizacaoWeight));
+      setLastUpdatedAt(new Date());
     } catch (error: any) {
       toast.error("Erro ao carregar consolidação: " + (error?.message || "erro desconhecido"));
     } finally {
@@ -1058,6 +1052,12 @@ export default function ConsolidationPage() {
       next = next.filter((item) => item.is_highlight);
     }
 
+    if (quickFocus === "criticos") {
+      next = next.filter((item) => item.criticidade_level >= 4);
+    } else if (quickFocus === "essenciais") {
+      next = next.filter((item) => item.priorizacao_level >= 4);
+    }
+
     if (smartFilter === "divergencia") {
       next = next.filter((item) => item.description_variants > 1);
     } else if (smartFilter === "outlier") {
@@ -1069,6 +1069,17 @@ export default function ConsolidationPage() {
     }
 
     return [...next].sort((a, b) => {
+      if (sortBy === "value_desc") {
+        const valueDiff = b.valor_total - a.valor_total;
+        if (valueDiff !== 0) return valueDiff;
+        return b.rank_score - a.rank_score;
+      }
+      if (sortBy === "quantity_desc") {
+        const quantityDiff = b.quantidade_total - a.quantidade_total;
+        if (quantityDiff !== 0) return quantityDiff;
+        return b.rank_score - a.rank_score;
+      }
+
       const scoreDiff = b.rank_score - a.rank_score;
       if (scoreDiff !== 0) return scoreDiff;
       return b.valor_total - a.valor_total;
@@ -1081,9 +1092,11 @@ export default function ConsolidationPage() {
     items,
     localUsoFilter,
     naturezaFilter,
+    quickFocus,
     selectedDfdCodeSet,
     servidorFilter,
     smartFilter,
+    sortBy,
     tipoFilter,
   ]);
   const maxVisibleScore = useMemo(
@@ -1158,7 +1171,6 @@ export default function ConsolidationPage() {
     () => items.filter((item) => item.is_highlight).length,
     [items],
   );
-  const paretoLimit = useMemo(() => getHighlightLimit(items.length), [items]);
 
   const divergenciasCount = useMemo(
     () => items.filter((item) => item.description_variants > 1).length,
@@ -1174,6 +1186,14 @@ export default function ConsolidationPage() {
         .length,
     [items],
   );
+  const criticosCount = useMemo(
+    () => items.filter((item) => item.criticidade_level >= 4).length,
+    [items],
+  );
+  const essenciaisCount = useMemo(
+    () => items.filter((item) => item.priorizacao_level >= 4).length,
+    [items],
+  );
   const visibleValue = useMemo(
     () => displayItems.reduce((acc, item) => acc + Number(item.valor_total || 0), 0),
     [displayItems],
@@ -1185,6 +1205,7 @@ export default function ConsolidationPage() {
         Boolean(itemSearchTerm.trim()),
         smartFilter !== "all",
         highlightOnly,
+        quickFocus !== "none",
         naturezaFilter !== "all",
         grupoFilter !== "all",
         classeFilter !== "all",
@@ -1199,6 +1220,7 @@ export default function ConsolidationPage() {
       itemSearchTerm,
       localUsoFilter,
       naturezaFilter,
+      quickFocus,
       selectedDfdId,
       servidorFilter,
       smartFilter,
@@ -1206,51 +1228,6 @@ export default function ConsolidationPage() {
     ],
   );
   const simulation = useMemo(() => simulateBudgetCut(items, cutPercent), [cutPercent, items]);
-
-  const exportCSV = () => {
-    if (displayItems.length === 0) {
-      toast.info("Sem linhas para exportar.");
-      return;
-    }
-
-    const rows = buildConsolidatedExportRows(displayItems);
-    const headers = collectExportHeaders(rows, [
-      "codigo_efisco",
-      "descricao",
-      "grupo",
-      "gnd_dominante",
-      "natureza_despesa",
-      "classe",
-      "tipo",
-      "qtd_total",
-      "valor_total",
-      "dfds",
-      "itens_origem",
-      "campi",
-      "servidores",
-      "departamentos_laboratorios",
-      "criticidade",
-      "priorizacao",
-      "score",
-      "pareto",
-      "dfds_origem",
-    ]);
-
-    const csv = buildCsv(rows, headers);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `consolidacao_pca_${new Date().toLocaleDateString("pt-BR").replaceAll("/", "-")}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    toast.success("CSV completo exportado.");
-  };
 
   const exportXLSX = async () => {
     if (displayItems.length === 0) {
@@ -1299,304 +1276,208 @@ export default function ConsolidationPage() {
 
   return (
     <div className="min-h-screen space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
-      <div className="overflow-hidden rounded-[28px] border border-[#C7D7EA] bg-white text-[#17233C] shadow-[0_16px_40px_rgba(22,64,115,0.08)]">
-        <div className="border-b border-[#D9E0E8] bg-[linear-gradient(180deg,#F8FBFF_0%,#F3F8FE_100%)] p-4 md:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#47739F]">
-                Admin · Consolidação para PCA
-              </p>
-              <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+      <section className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0D2C59_0%,#123A73_55%,#1A4D91_100%)] text-white shadow-[0_24px_56px_rgba(13,44,89,0.28)]">
+        <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-5 md:px-8 md:py-6">
+          <div className="flex items-start gap-4">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-sm">
+              <Sparkle size={24} weight="fill" className="text-white" />
+            </div>
+            <div>
+              <h1 className="font-display text-[32px] font-semibold tracking-tight">
                 Consolidação Inteligente
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#4D5D75]">
-                Priorize o que entra primeiro no PCA. A fila abaixo é ordenada do maior score para o menor, combinando criticidade e priorização.
+              <p className="mt-1 text-base text-white/78">
+                Admin · DFDs aprovadas para PCA
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={fetchData}
-                className="h-10 rounded-xl border-[#C7D7EA] bg-white text-[#164073] hover:bg-[#EAF2FF]"
-              >
-                <ArrowsClockwise size={16} className="mr-2" />
-                Atualizar
-              </Button>
-              <Button
-                type="button"
-                onClick={exportCSV}
-                className="h-10 rounded-xl border border-[#C7D7EA] bg-white text-[#164073] hover:bg-[#EAF2FF]"
-              >
-                <DownloadSimple size={16} className="mr-2" />
-                Exportar CSV
-              </Button>
-              <Button
-                type="button"
-                onClick={exportXLSX}
-                className="h-10 rounded-xl bg-[#164073] text-white hover:bg-[#0F2E57]"
-              >
-                <DownloadSimple size={16} className="mr-2" />
-                Exportar XLSX
-              </Button>
-            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/18 bg-white/6 px-4 text-sm font-medium text-white/84 backdrop-blur-sm">
+              <ArrowsClockwise size={16} />
+              {formatUpdatedAtLabel(lastUpdatedAt)}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={fetchData}
+              className="h-11 rounded-2xl border-white/20 bg-white/6 px-5 text-white hover:bg-white/12 hover:text-white"
+            >
+              <ArrowsClockwise size={16} className="mr-2" />
+              Atualizar dados
+            </Button>
+            <Button
+              type="button"
+              onClick={exportXLSX}
+              className="h-11 rounded-2xl bg-[#2D7BFF] px-5 text-white hover:bg-[#2267D8]"
+            >
+              <DownloadSimple size={16} className="mr-2" />
+              Exportar XLSX
+            </Button>
           </div>
         </div>
+      </section>
 
-        <div className="space-y-3 p-4">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <KpiCard
-              label="Valor do recorte"
-              value={visibleValue.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
-              emphasis="primary"
-            />
-            <KpiCard label="Itens no Pareto" value={`${paretoCount}/${paretoLimit}`} />
-            <KpiCard label="Itens exibidos" value={`${displayItems.length}/${items.length}`} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <SecondaryStat label="DFDs aprovadas" value={String(dfds.length)} />
-            <SecondaryStat label="Filtros ativos" value={String(activeFilterCount)} />
-            <SecondaryStat label="Recorte atual" value={selectedDfdId === "all" ? "Todas as DFDs" : "1 DFD selecionada"} />
+      <section className="rounded-[28px] border border-[#D9E6F3] bg-white px-5 py-4 shadow-[0_12px_30px_rgba(22,64,115,0.08)]">
+        <div className="grid gap-3 xl:grid-cols-[1.35fr_1.15fr_1fr_1fr_1fr_1.25fr]">
+          <TopMetric
+            icon={<span className="text-[#2D7BFF]">$</span>}
+            title="Valor do recorte"
+            value={visibleValue.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
+            subtitle="Total estimado"
+            highlight
+          />
+          <TopMetric title="Itens consolidados" value={String(displayItems.length)} subtitle="Itens no recorte" />
+          <TopMetric title="DFDs aprovadas" value={String(dfds.length)} subtitle="DFDs de origem" />
+          <TopMetric title="Pareto (20%)" value={String(paretoCount)} subtitle="Itens prioritários" />
+          <TopMetric title="Filtros ativos" value={String(activeFilterCount)} subtitle={activeFilterCount > 0 ? "Recorte aplicado" : "Nenhum filtro aplicado"} />
+          <div className="rounded-2xl border border-[#E5EDF7] bg-[#F8FBFF] p-4">
+            <p className="text-sm font-semibold text-[#2456B6]">Insight do recorte</p>
+            <p className="mt-2 text-sm leading-6 text-[#3D4E67]">
+              {paretoCount} itens concentram o recorte prioritário.
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
       <div className="grid min-h-[74vh] grid-cols-1 gap-4 xl:grid-cols-12">
         <section
           className={cn(
-            "rounded-[24px] border border-[#D9E0E8] bg-white/96 shadow-[0_10px_28px_rgba(15,34,56,0.06)] flex flex-col min-h-[620px]",
-            dfdMenuOpen ? "xl:col-span-2" : "hidden xl:hidden",
-          )}
-        >
-          <div className="space-y-3 border-b border-black/5 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-display text-base font-semibold uppercase tracking-tight text-upe-blue-upe">
-                  DFDs enviadas
-                </h2>
-                <p className="mt-1 text-xs text-black/50">
-                  Origem do recorte atual
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDfdMenuOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice"
-                title="Recolher menu de DFDs"
-              >
-                <List size={16} weight="bold" />
-              </button>
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-black/40">
-              <span>{filteredDfds.length} no recorte</span>
-              <span>{selectedDfdId === "all" ? "Todas" : "1 ativa"}</span>
-            </div>
-            <input
-              value={dfdSearchTerm}
-              onChange={(event) => setDfdSearchTerm(event.target.value)}
-              placeholder="Buscar protocolo ou solicitante"
-              className="h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedDfdId("all")}
-                className={cn(
-                  "h-9 rounded-xl text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                  selectedDfdId === "all"
-                    ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                    : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                )}
-              >
-                Todas
-              </button>
-              <button
-                type="button"
-                onClick={() => setHighlightOnly((prev) => !prev)}
-                className={cn(
-                  "h-9 rounded-xl text-[10px] uppercase tracking-widest font-semibold border transition-colors inline-flex items-center justify-center gap-1",
-                  highlightOnly
-                    ? "bg-upe-accent-matte-gold text-white border-upe-accent-matte-gold"
-                    : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                )}
-              >
-                <Star size={12} weight="fill" />
-                Pareto
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0">
-            {loading ? (
-              <div className="p-4 space-y-3">
-                {[...Array(5)].map((_, index) => (
-                  <Skeleton key={index} className="h-24 rounded-2xl" />
-                ))}
-              </div>
-            ) : filteredDfds.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-center p-6 text-sm font-semibold text-black/40">
-                Sem DFDs para o filtro informado.
-              </div>
-            ) : (
-              <Virtuoso
-                className="h-full"
-                data={filteredDfds}
-                itemContent={(_, dfd) => (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedDfdId((prev) => (prev === dfd.id ? "all" : dfd.id))
-                    }
-                    className={cn(
-                      "w-full border-b border-black/5 px-3 py-2.5 text-left transition-colors",
-                      selectedDfdId === dfd.id
-                        ? "bg-upe-blue-upe/6"
-                        : "hover:bg-upe-neutral-cool-ice/60",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                    <p className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">
-                      <span
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          selectedDfdId === dfd.id ? "bg-upe-blue-upe" : "bg-black/25",
-                        )}
-                      />
-                      {dfd.numero_protocolo}
-                    </p>
-                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">
-                      {dfd.item_count} itens
-                    </span>
-                    </div>
-                    <p className="mt-1 text-[13px] font-semibold leading-snug text-upe-neutral-dark-soft-black line-clamp-2">
-                      {dfd.objeto_contratacao}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-black/60">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <CompactAvatar
-                          name={dfd.solicitante_nome}
-                          avatarUrl={dfd.solicitante_avatar_url}
-                        />
-                        <span className="truncate">{dfd.solicitante_nome}</span>
-                      </div>
-                      <span className="shrink-0 font-semibold text-upe-blue-upe">
-                        {dfd.valor_total.toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[10px] text-black/45">
-                      {dfd.campus_nome} • {dfd.unidade_nome || "local não definido"}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-black/40">
-                      {dfd.created_at
-                        ? new Date(dfd.created_at).toLocaleDateString("pt-BR")
-                        : "Data não informada"}
-                    </p>
-                    {dfd.itens_sem_classificacao > 0 && (
-                      <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 uppercase tracking-widest">
-                        <Warning size={12} />
-                        {dfd.itens_sem_classificacao} sem classificação
-                      </p>
-                    )}
-                  </button>
-                )}
-              />
-            )}
-          </div>
-        </section>
-
-        <section
-          className={cn(
-            "rounded-[26px] border border-[#A9C1DB] bg-white shadow-[0_18px_44px_rgba(22,64,115,0.12)] flex flex-col min-h-[720px] overflow-hidden",
-            centerColSpanClass,
-            contrastMode === "high" && "border-upe-blue-upe/30 shadow-[0_18px_44px_rgba(22,64,115,0.18)]",
+            "rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)] xl:col-span-8",
+            contrastMode === "high" && "border-upe-blue-upe/30",
           )}
         >
           <div className="border-b border-[#C7D7EA] bg-[#F7FBFF] p-4 md:p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="min-w-0">
+                <h2 className="font-display text-[22px] font-semibold tracking-tight text-upe-blue-upe">
+                  Itens consolidados do recorte
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-black/55">
+                  Lista ordenada por prioridade, do maior para o menor, combinando criticidade e impacto.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setDfdMenuOpen((prev) => !prev)}
-                  className="h-9 px-3 rounded-xl border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice text-[10px] uppercase tracking-widest font-semibold inline-flex items-center gap-1.5"
-                  title={dfdMenuOpen ? "Ocultar menu de DFDs" : "Mostrar menu de DFDs"}
+                  onClick={() => setDfdMenuOpen(true)}
+                  className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-sm font-semibold text-upe-blue-upe shadow-sm hover:bg-[#F3F8FF]"
                 >
-                  <List size={14} weight="bold" />
-                  DFDs
+                  <ArrowSquareOut size={16} />
+                  Ver DFDs de origem ({dfds.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setInsightsMenuOpen((prev) => !prev)}
-                  className="h-9 px-3 rounded-xl border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice text-[10px] uppercase tracking-widest font-semibold inline-flex items-center gap-1.5"
-                  title={
-                    insightsMenuOpen
-                      ? "Ocultar menu de opções inteligentes"
-                      : "Mostrar menu de opções inteligentes"
-                  }
+                  className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-sm font-semibold text-upe-blue-upe shadow-sm hover:bg-[#F3F8FF] xl:hidden"
                 >
-                  <List size={14} weight="bold" />
-                  Opções
+                  <Funnel size={16} />
+                  Painel
                 </button>
-                <div className="min-w-0">
-                  <h2 className="font-display text-xl font-semibold uppercase tracking-tight text-upe-blue-upe">
-                    Itens Consolidados
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-black/55">
-                    Lista ordenada do maior score para o menor. O score combina criticidade e priorização para destacar o que exige atenção primeiro.
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-[#C7D7EA] bg-white px-4 py-2 text-right shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
-                  Itens no recorte
-                </p>
-                <p className="text-lg font-semibold text-upe-blue-upe">{displayItems.length}</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(280px,1fr)_auto]">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,1fr)_auto]">
               <input
                 value={itemSearchTerm}
                 onChange={(event) => {
                   setItemSearchTerm(event.target.value);
                   setActivePreset("custom");
                 }}
-                placeholder="Buscar nos itens consolidados..."
+                placeholder="Buscar por item, protocolo, campus, solicitante ou descrição..."
                 className="h-11 min-w-0 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-upe-blue-medium/20"
               />
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((prev) => !prev)}
-                className={cn(
-                  "h-11 rounded-2xl border px-4 text-[10px] font-semibold uppercase tracking-widest shadow-sm transition-colors inline-flex items-center justify-center gap-2",
-                  filtersOpen
-                    ? "border-upe-blue-upe bg-upe-blue-upe text-white"
-                    : "border-[#C7D7EA] bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice",
-                )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen((prev) => !prev)}
+                  className={cn(
+                    "inline-flex h-11 items-center justify-center gap-2 rounded-2xl border px-4 text-[10px] font-semibold uppercase tracking-widest shadow-sm transition-colors",
+                    filtersOpen
+                      ? "border-upe-blue-upe bg-upe-blue-upe text-white"
+                      : "border-[#C7D7EA] bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice",
+                  )}
                 >
                   <Funnel size={14} />
-                  Filtros {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}
+                  Filtros
                 </button>
+                <select
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value as "score_desc" | "value_desc" | "quantity_desc")}
+                  className="h-11 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-sm font-semibold text-upe-blue-upe outline-none shadow-sm"
+                >
+                  <option value="score_desc">Maior score</option>
+                  <option value="value_desc">Maior valor</option>
+                  <option value="quantity_desc">Maior quantidade</option>
+                </select>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#C7D7EA] bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe">
-                <Sparkle size={12} />
-                Score mais alto primeiro
-              </span>
-              {selectedDfdId !== "all" ? (
-                <span className="inline-flex h-8 items-center rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-black/55">
-                  1 DFD selecionada
-                </span>
-              ) : null}
-              {smartFilter !== "all" ? (
-                <span className="inline-flex h-8 items-center rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-black/55">
-                  {activeSmartFilterLabel}
-                </span>
-              ) : null}
+              <QuickFilterChip
+                label="Todos"
+                count={items.length}
+                active={smartFilter === "all" && !highlightOnly && quickFocus === "none"}
+                onClick={() => {
+                  setSmartFilter("all");
+                  setHighlightOnly(false);
+                  setQuickFocus("none");
+                }}
+              />
+              <QuickFilterChip
+                label="Pareto"
+                count={paretoCount}
+                active={smartFilter === "pareto" || highlightOnly}
+                onClick={() => {
+                  setSmartFilter("pareto");
+                  setHighlightOnly(false);
+                  setQuickFocus("none");
+                }}
+                tone="gold"
+              />
+              <QuickFilterChip
+                label="Críticos"
+                count={criticosCount}
+                active={quickFocus === "criticos"}
+                onClick={() => {
+                  setSmartFilter("all");
+                  setHighlightOnly(false);
+                  setQuickFocus("criticos");
+                }}
+                tone="red"
+              />
+              <QuickFilterChip
+                label="Essenciais"
+                count={essenciaisCount}
+                active={quickFocus === "essenciais"}
+                onClick={() => {
+                  setSmartFilter("all");
+                  setHighlightOnly(false);
+                  setQuickFocus("essenciais");
+                }}
+                tone="blue"
+              />
+              <QuickFilterChip
+                label="Outliers"
+                count={outliersCount}
+                active={smartFilter === "outlier"}
+                onClick={() => {
+                  setSmartFilter("outlier");
+                  setHighlightOnly(false);
+                  setQuickFocus("none");
+                }}
+                tone="orange"
+              />
+              <QuickFilterChip
+                label="Sem classificação"
+                count={incompletosCount}
+                active={smartFilter === "incompleto"}
+                onClick={() => {
+                  setSmartFilter("incompleto");
+                  setHighlightOnly(false);
+                  setQuickFocus("none");
+                }}
+              />
             </div>
 
             {filtersOpen && (
@@ -1646,133 +1527,133 @@ export default function ConsolidationPage() {
                     Limpar
                   </button>
                 </div>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6">
-              <input
-                value={itemSearchTerm}
-                onChange={(event) => {
-                  setItemSearchTerm(event.target.value);
-                  setActivePreset("custom");
-                }}
-                placeholder="Buscar código, descrição, servidor, local..."
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-blue-medium/20 md:col-span-2 xl:col-span-2"
-              />
-              <select
-                value={naturezaFilter}
-                onChange={(event) => {
-                  setNaturezaFilter(event.target.value as NaturezaDespesaFilter);
-                  setActivePreset("custom");
-                }}
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
-              >
-                <option value="all">Natureza: todas</option>
-                <option value="custeio">Custeio</option>
-                <option value="permanente">Permanente</option>
-                <option value="sem_gnd">Sem GND</option>
-              </select>
-              <select
-                value={grupoFilter}
-                onChange={(event) => {
-                  setGrupoFilter(event.target.value);
-                  setActivePreset("custom");
-                }}
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
-              >
-                <option value="all">Grupo: todos</option>
-                {grupoOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={classeFilter}
-                onChange={(event) => {
-                  setClasseFilter(event.target.value);
-                  setActivePreset("custom");
-                }}
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
-              >
-                <option value="all">Classe: todas</option>
-                {classeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={tipoFilter}
-                onChange={(event) => {
-                  setTipoFilter(event.target.value as "all" | "Material" | "Serviço");
-                  setActivePreset("custom");
-                }}
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
-              >
-                <option value="all">Tipo: todos</option>
-                <option value="Material">Material</option>
-                <option value="Serviço">Serviço</option>
-              </select>
-              <select
-                value={servidorFilter}
-                onChange={(event) => {
-                  setServidorFilter(event.target.value);
-                  setActivePreset("custom");
-                }}
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20 xl:col-span-2"
-              >
-                <option value="all">Servidor: todos</option>
-                {servidorOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={localUsoFilter}
-                onChange={(event) => {
-                  setLocalUsoFilter(event.target.value);
-                  setActivePreset("custom");
-                }}
-                className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20 md:col-span-2 xl:col-span-2"
-              >
-                <option value="all">Departamento/Lab: todos</option>
-                <option value="__LAB__">Somente laboratórios</option>
-                {localUsoOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-              {activeFilterCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetFilters();
-                    setActivePreset("custom");
-                  }}
-                  className="h-8 rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe hover:bg-upe-neutral-cool-ice"
-                >
-                  Remover filtros
-                </button>
-              )}
-              </div>
-            {showLegends && (
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-red-upe/15 text-upe-red-dark border-upe-red-upe/30">
-                  Criticidade alta
-                </span>
-                <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-blue-upe/15 text-upe-blue-upe border-upe-blue-upe/30">
-                  Priorização essencial
-                </span>
-                <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-accent-matte-gold/20 text-upe-accent-matte-gold border-upe-accent-matte-gold/30">
-                  Top Pareto
-                </span>
-                <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-amber-100 text-amber-700 border-amber-200">
-                  Atenção de qualidade
-                </span>
-              </div>
-            )}
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6">
+                  <input
+                    value={itemSearchTerm}
+                    onChange={(event) => {
+                      setItemSearchTerm(event.target.value);
+                      setActivePreset("custom");
+                    }}
+                    placeholder="Buscar código, descrição, servidor, local..."
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-blue-medium/20 md:col-span-2 xl:col-span-2"
+                  />
+                  <select
+                    value={naturezaFilter}
+                    onChange={(event) => {
+                      setNaturezaFilter(event.target.value as NaturezaDespesaFilter);
+                      setActivePreset("custom");
+                    }}
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
+                  >
+                    <option value="all">Natureza: todas</option>
+                    <option value="custeio">Custeio</option>
+                    <option value="permanente">Permanente</option>
+                    <option value="sem_gnd">Sem GND</option>
+                  </select>
+                  <select
+                    value={grupoFilter}
+                    onChange={(event) => {
+                      setGrupoFilter(event.target.value);
+                      setActivePreset("custom");
+                    }}
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
+                  >
+                    <option value="all">Grupo: todos</option>
+                    {grupoOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={classeFilter}
+                    onChange={(event) => {
+                      setClasseFilter(event.target.value);
+                      setActivePreset("custom");
+                    }}
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
+                  >
+                    <option value="all">Classe: todas</option>
+                    {classeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={tipoFilter}
+                    onChange={(event) => {
+                      setTipoFilter(event.target.value as "all" | "Material" | "Serviço");
+                      setActivePreset("custom");
+                    }}
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
+                  >
+                    <option value="all">Tipo: todos</option>
+                    <option value="Material">Material</option>
+                    <option value="Serviço">Serviço</option>
+                  </select>
+                  <select
+                    value={servidorFilter}
+                    onChange={(event) => {
+                      setServidorFilter(event.target.value);
+                      setActivePreset("custom");
+                    }}
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20 xl:col-span-2"
+                  >
+                    <option value="all">Servidor: todos</option>
+                    {servidorOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={localUsoFilter}
+                    onChange={(event) => {
+                      setLocalUsoFilter(event.target.value);
+                      setActivePreset("custom");
+                    }}
+                    className="h-10 min-w-0 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-upe-blue-upe outline-none focus:ring-2 focus:ring-upe-blue-medium/20 md:col-span-2 xl:col-span-2"
+                  >
+                    <option value="all">Departamento/Lab: todos</option>
+                    <option value="__LAB__">Somente laboratórios</option>
+                    {localUsoOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetFilters();
+                        setActivePreset("custom");
+                      }}
+                      className="h-8 rounded-lg border border-black/10 bg-white px-3 text-[10px] font-semibold uppercase tracking-widest text-upe-blue-upe hover:bg-upe-neutral-cool-ice"
+                    >
+                      Remover filtros
+                    </button>
+                  )}
+                </div>
+                {showLegends && (
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-red-upe/15 text-upe-red-dark border-upe-red-upe/30">
+                      Criticidade alta
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-blue-upe/15 text-upe-blue-upe border-upe-blue-upe/30">
+                      Priorização essencial
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-accent-matte-gold/20 text-upe-accent-matte-gold border-upe-accent-matte-gold/30">
+                      Top Pareto
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-amber-100 text-amber-700 border-amber-200">
+                      Atenção de qualidade
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2054,182 +1935,214 @@ export default function ConsolidationPage() {
 
         <section
           className={cn(
-            "rounded-[24px] border border-[#D9E0E8] bg-white/96 shadow-[0_10px_28px_rgba(15,34,56,0.06)] p-4 space-y-3 min-h-[620px]",
-            insightsMenuOpen ? "xl:col-span-2" : "hidden xl:hidden",
+            "rounded-[28px] border border-[#D9E6F3] bg-white p-4 shadow-[0_14px_32px_rgba(22,64,115,0.08)] xl:col-span-4",
+            insightsMenuOpen ? "block" : "hidden xl:block",
           )}
         >
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="font-display text-base font-semibold uppercase tracking-tight text-upe-blue-upe">
-                  Opções inteligentes
-                </h2>
-                <p className="mt-1 text-xs text-black/50">
-                  Ajustes e recortes da triagem
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setInsightsMenuOpen(false)}
-                className="h-8 w-8 rounded-lg border border-black/10 bg-white text-upe-blue-upe hover:bg-upe-neutral-cool-ice inline-flex items-center justify-center"
-                title="Recolher menu de opções"
-              >
-                <List size={16} weight="bold" />
-              </button>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="font-display text-[22px] font-semibold tracking-tight text-upe-blue-upe">
+                Painel de atenção
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-black/55">
+                Problemas e ações sugeridas para o recorte atual.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setInsightsMenuOpen(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[#D9E6F3] bg-white text-upe-blue-upe hover:bg-[#F3F8FF] xl:hidden"
+            >
+              <X size={16} weight="bold" />
+            </button>
           </div>
 
-          <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white/80 p-3 space-y-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-black/45 inline-flex items-center gap-2">
-              <Funnel size={12} />
-              Opções Visuais
-            </p>
-
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-                Densidade
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDensityMode("comfortable")}
-                  className={cn(
-                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                    densityMode === "comfortable"
-                      ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                  )}
-                >
-                  Confortável
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDensityMode("compact")}
-                  className={cn(
-                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                    densityMode === "compact"
-                      ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                  )}
-                >
-                  Compacta
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-                Contraste
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setContrastMode("soft")}
-                  className={cn(
-                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                    contrastMode === "soft"
-                      ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                  )}
-                >
-                  Suave
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setContrastMode("high")}
-                  className={cn(
-                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                    contrastMode === "high"
-                      ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                  )}
-                >
-                  Alto
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setShowLegends((prev) => !prev)}
-                className={cn(
-                  "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                  showLegends
-                    ? "bg-upe-support-blue-neutral-aqua/30 text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua"
-                    : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                )}
-              >
-                Legendas
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowScoreBars((prev) => !prev)}
-                className={cn(
-                  "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                  showScoreBars
-                    ? "bg-upe-support-blue-neutral-aqua/30 text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua"
-                    : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                )}
-              >
-                Barra Score
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <SmartAction
-              title="Divergência de descrição"
+          <div className="space-y-3">
+            <AttentionCard
+              title="Outliers de preço"
+              count={outliersCount}
+              description="Itens com preço elevado para o mesmo código."
+              tone="orange"
+              onClick={() => {
+                setSmartFilter("outlier");
+                setHighlightOnly(false);
+                setQuickFocus("none");
+              }}
+            />
+            <AttentionCard
+              title="Divergências de descrição"
               count={divergenciasCount}
               description="Mesmo código e-fisco com textos diferentes."
-              active={smartFilter === "divergencia"}
+              tone="blue"
               onClick={() => {
-                setSmartFilter((prev) => (prev === "divergencia" ? "all" : "divergencia"));
-                setActivePreset("custom");
+                setSmartFilter("divergencia");
+                setHighlightOnly(false);
+                setQuickFocus("none");
               }}
             />
-            <SmartAction
-              title="Outlier de preço"
-              count={outliersCount}
-              description="Spread de preço elevado para o mesmo código."
-              active={smartFilter === "outlier"}
-              onClick={() => {
-                setSmartFilter((prev) => (prev === "outlier" ? "all" : "outlier"));
-                setActivePreset("custom");
-              }}
-            />
-            <SmartAction
+            <AttentionCard
               title="Sem classificação"
               count={incompletosCount}
               description="Itens sem criticidade ou priorização definida."
-              active={smartFilter === "incompleto"}
+              tone="violet"
               onClick={() => {
-                setSmartFilter((prev) => (prev === "incompleto" ? "all" : "incompleto"));
-                setActivePreset("custom");
+                setSmartFilter("incompleto");
+                setHighlightOnly(false);
+                setQuickFocus("none");
               }}
             />
-            <SmartAction
-              title="Top Pareto"
+            <AttentionCard
+              title="Itens Pareto"
               count={paretoCount}
-              description="Itens estratégicos que concentram impacto."
-              active={smartFilter === "pareto"}
+              description="Itens que concentram o recorte prioritário."
+              tone="green"
               onClick={() => {
-                setSmartFilter((prev) => (prev === "pareto" ? "all" : "pareto"));
-                setActivePreset("custom");
+                setSmartFilter("pareto");
+                setHighlightOnly(false);
+                setQuickFocus("none");
               }}
             />
           </div>
 
-          <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white/80 p-3 space-y-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-black/45 inline-flex items-center gap-2">
-              <Sparkle size={12} />
-              Simulador de Corte
-            </p>
+          <div className="space-y-3 rounded-[24px] border border-[#E5EDF7] bg-[#F8FBFF] p-4">
             <div>
-              <div className="flex items-center justify-between text-[10px] uppercase tracking-widest font-semibold text-black/45">
-                <span>Corte orçamentário</span>
-                <span>{cutPercent}%</span>
+              <h3 className="text-lg font-semibold text-[#164073]">Ações sugeridas</h3>
+              <p className="mt-1 text-sm text-black/55">
+                Atalhos para análise e exportações.
+              </p>
+            </div>
+            <ActionShortcut
+              label="Revisar outliers"
+              onClick={() => {
+                setSmartFilter("outlier");
+                setHighlightOnly(false);
+                setQuickFocus("none");
+              }}
+            />
+            <ActionShortcut
+              label="Ver itens Pareto"
+              onClick={() => {
+                setSmartFilter("pareto");
+                setHighlightOnly(false);
+                setQuickFocus("none");
+              }}
+            />
+            <ActionShortcut
+              label="Exportar relatório"
+              onClick={exportXLSX}
+            />
+          </div>
+
+          <div className="space-y-3 rounded-[24px] border border-[#E5EDF7] bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-black/45">
+                  Ajustes visuais
+                </h3>
               </div>
+            </div>
+            <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white/80 p-3 space-y-3">
+              <div className="space-y-1.5">
+                <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
+                  Densidade
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDensityMode("comfortable")}
+                    className={cn(
+                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
+                      densityMode === "comfortable"
+                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
+                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
+                    )}
+                  >
+                    Confortável
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDensityMode("compact")}
+                    className={cn(
+                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
+                      densityMode === "compact"
+                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
+                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
+                    )}
+                  >
+                    Compacta
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
+                  Contraste
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setContrastMode("soft")}
+                    className={cn(
+                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
+                      contrastMode === "soft"
+                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
+                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
+                    )}
+                  >
+                    Suave
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContrastMode("high")}
+                    className={cn(
+                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
+                      contrastMode === "high"
+                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
+                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
+                    )}
+                  >
+                    Alto
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLegends((prev) => !prev)}
+                  className={cn(
+                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
+                    showLegends
+                      ? "bg-upe-support-blue-neutral-aqua/30 text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua"
+                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
+                  )}
+                >
+                  Legendas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowScoreBars((prev) => !prev)}
+                  className={cn(
+                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
+                    showScoreBars
+                      ? "bg-upe-support-blue-neutral-aqua/30 text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua"
+                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
+                  )}
+                >
+                  Barra score
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-[#E5EDF7] bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-[#164073]">Simulador de corte</p>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-black/45">
+                {cutPercent}%
+              </span>
+            </div>
+            <div>
               <input
                 type="range"
                 min={0}
@@ -2240,7 +2153,7 @@ export default function ConsolidationPage() {
                 className="w-full h-2 rounded-lg slider-prio"
               />
             </div>
-            <div className="rounded-xl border border-black/5 bg-white p-3 space-y-2">
+            <div className="mt-3 rounded-xl border border-black/5 bg-[#F8FBFF] p-3 space-y-2">
               <MetricLine
                 label="Meta de corte"
                 value={simulation.targetCut.toLocaleString("pt-BR", {
@@ -2268,26 +2181,121 @@ export default function ConsolidationPage() {
               />
             </div>
           </div>
-
-          <div className="rounded-2xl border border-black/5 bg-white p-3 space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-black/45 inline-flex items-center gap-1">
-              <Lightning size={12} />
-              Recomendações
-            </p>
-            <ul className="space-y-1 text-xs text-black/65">
-              <li className="leading-relaxed">
-                Priorizar correção dos {incompletosCount} itens sem classificação.
-              </li>
-              <li className="leading-relaxed">
-                Revisar {divergenciasCount} códigos com descrição divergente antes da exportação.
-              </li>
-              <li className="leading-relaxed">
-                Validar outliers de preço para evitar distorção no PCA.
-              </li>
-            </ul>
-          </div>
         </section>
       </div>
+
+      {dfdMenuOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Fechar lista de DFDs"
+            className="fixed inset-0 z-40 bg-[#0F2238]/18 backdrop-blur-[1px]"
+            onClick={() => setDfdMenuOpen(false)}
+          />
+          <aside className="fixed inset-y-4 left-4 z-50 w-[400px] max-w-[calc(100vw-2rem)] rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_24px_56px_rgba(15,34,56,0.18)]">
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between gap-3 border-b border-black/5 px-5 py-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+                    Origem do recorte
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-[#164073]">
+                    DFDs de origem
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDfdMenuOpen(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-upe-blue-upe hover:bg-[#F3F8FF]"
+                >
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+              <div className="space-y-3 border-b border-black/5 px-5 py-4">
+                <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                  <span>{filteredDfds.length} no recorte</span>
+                  <span>{selectedDfdId === "all" ? "Todas" : "1 ativa"}</span>
+                </div>
+                <input
+                  value={dfdSearchTerm}
+                  onChange={(event) => setDfdSearchTerm(event.target.value)}
+                  placeholder="Buscar protocolo ou solicitante"
+                  className="h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-blue-medium/20"
+                />
+              </div>
+              <div className="flex-1 min-h-0">
+                {loading ? (
+                  <div className="p-4 space-y-3">
+                    {[...Array(5)].map((_, index) => (
+                      <Skeleton key={index} className="h-24 rounded-2xl" />
+                    ))}
+                  </div>
+                ) : filteredDfds.length === 0 ? (
+                  <div className="flex h-full items-center justify-center p-6 text-center text-sm font-semibold text-black/40">
+                    Sem DFDs para o filtro informado.
+                  </div>
+                ) : (
+                  <Virtuoso
+                    className="h-full"
+                    data={filteredDfds}
+                    itemContent={(_, dfd) => (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDfdId((prev) => (prev === dfd.id ? "all" : dfd.id));
+                          setDfdMenuOpen(false);
+                        }}
+                        className={cn(
+                          "w-full border-b border-black/5 px-4 py-3 text-left transition-colors",
+                          selectedDfdId === dfd.id
+                            ? "bg-upe-blue-upe/6"
+                            : "hover:bg-upe-neutral-cool-ice/60",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="inline-flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                            <span
+                              className={cn(
+                                "h-1.5 w-1.5 rounded-full",
+                                selectedDfdId === dfd.id ? "bg-upe-blue-upe" : "bg-black/25",
+                              )}
+                            />
+                            {dfd.numero_protocolo}
+                          </p>
+                          <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-black/35">
+                            {dfd.item_count} itens
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-snug text-upe-neutral-dark-soft-black">
+                          {dfd.objeto_contratacao}
+                        </p>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-black/60">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <CompactAvatar
+                              name={dfd.solicitante_nome}
+                              avatarUrl={dfd.solicitante_avatar_url}
+                            />
+                            <span className="truncate">{dfd.solicitante_nome}</span>
+                          </div>
+                          <span className="shrink-0 font-semibold text-upe-blue-upe">
+                            {dfd.valor_total.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[10px] text-black/45">
+                          {dfd.campus_nome} • {dfd.unidade_nome || "local não definido"}
+                        </p>
+                      </button>
+                    )}
+                  />
+                )}
+              </div>
+            </div>
+          </aside>
+        </>
+      ) : null}
 
       {previewDfd ? (
         <>
@@ -2433,12 +2441,175 @@ function KpiCard({
   );
 }
 
-function SecondaryStat({ label, value }: { label: string; value: string }) {
+function TopMetric({
+  title,
+  value,
+  subtitle,
+  icon,
+  highlight = false,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon?: ReactNode;
+  highlight?: boolean;
+}) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[#D9E0E8] bg-white px-3 py-1.5 text-[10px] font-semibold text-[#526070]">
-      <span className="uppercase tracking-[0.14em] text-[#8A97A8]">{label}</span>
-      <span className="text-[#164073]">{value}</span>
-    </span>
+    <div
+      className={cn(
+        "flex h-full items-center gap-4 rounded-2xl border p-4",
+        highlight
+          ? "border-[#CFE0FF] bg-[linear-gradient(180deg,#FFFFFF_0%,#F5F9FF_100%)]"
+          : "border-[#E5EDF7] bg-white",
+      )}
+    >
+      {icon ? (
+        <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-xl font-semibold text-[#2456B6]">
+          {icon}
+        </div>
+      ) : null}
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-[#526070]">{title}</p>
+        <p className="mt-1 text-[18px] font-semibold tracking-tight text-[#164073] md:text-[20px]">
+          {value}
+        </p>
+        <p className="mt-1 text-sm text-black/45">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function QuickFilterChip({
+  label,
+  count,
+  active,
+  onClick,
+  tone = "default",
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  tone?: "default" | "gold" | "red" | "blue" | "orange";
+}) {
+  const toneClasses = {
+    default: active
+      ? "border-[#2456B6] bg-[#164073] text-white"
+      : "border-[#D9E6F3] bg-white text-[#164073] hover:bg-[#F5F9FF]",
+    gold: active
+      ? "border-[#A67A15] bg-[#7F5E11] text-white"
+      : "border-[#F0E2B8] bg-white text-[#7F5E11] hover:bg-[#FFF9EA]",
+    red: active
+      ? "border-[#C14953] bg-[#C14953] text-white"
+      : "border-[#F1C7CC] bg-white text-[#C14953] hover:bg-[#FFF6F7]",
+    blue: active
+      ? "border-[#2456B6] bg-[#2456B6] text-white"
+      : "border-[#CFE0FF] bg-white text-[#2456B6] hover:bg-[#F5F9FF]",
+    orange: active
+      ? "border-[#D97706] bg-[#D97706] text-white"
+      : "border-[#F6D4A7] bg-white text-[#C46A00] hover:bg-[#FFF8EE]",
+  } as const;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-10 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition-colors",
+        toneClasses[tone],
+      )}
+    >
+      <span>{label}</span>
+      <span
+        className={cn(
+          "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
+          active ? "bg-white/20 text-current" : "bg-black/5 text-current",
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function AttentionCard({
+  title,
+  count,
+  description,
+  tone,
+  onClick,
+}: {
+  title: string;
+  count: number;
+  description: string;
+  tone: "orange" | "blue" | "violet" | "green";
+  onClick: () => void;
+}) {
+  const tones = {
+    orange: {
+      border: "border-[#F3D4B0]",
+      bg: "bg-[#FFF8F1]",
+      accent: "text-[#C46A00]",
+      button: "border-[#F3D4B0] text-[#C46A00] hover:bg-[#FFF1DE]",
+    },
+    blue: {
+      border: "border-[#D7E4FF]",
+      bg: "bg-[#F7FAFF]",
+      accent: "text-[#2456B6]",
+      button: "border-[#D7E4FF] text-[#2456B6] hover:bg-[#EEF4FF]",
+    },
+    violet: {
+      border: "border-[#E4D9FF]",
+      bg: "bg-[#FAF7FF]",
+      accent: "text-[#7A4CC4]",
+      button: "border-[#E4D9FF] text-[#7A4CC4] hover:bg-[#F2ECFF]",
+    },
+    green: {
+      border: "border-[#CFE9DA]",
+      bg: "bg-[#F6FCF8]",
+      accent: "text-[#2F8A57]",
+      button: "border-[#CFE9DA] text-[#2F8A57] hover:bg-[#ECF9F1]",
+    },
+  } as const;
+
+  const toneStyle = tones[tone];
+
+  return (
+    <div className={cn("rounded-[24px] border p-4", toneStyle.border, toneStyle.bg)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={cn("text-sm font-semibold", toneStyle.accent)}>{title}</p>
+          <p className="mt-2 text-[34px] font-semibold leading-none tracking-tight text-[#164073]">
+            {count}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-black/55">{description}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClick}
+          className={cn(
+            "inline-flex h-10 shrink-0 items-center gap-2 rounded-2xl border bg-white px-4 text-sm font-semibold transition-colors",
+            toneStyle.button,
+          )}
+        >
+          Revisar
+          <ArrowSquareOut size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActionShortcut({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-12 w-full items-center justify-between rounded-2xl border border-[#D9E6F3] bg-white px-4 text-sm font-semibold text-[#164073] transition-colors hover:bg-[#F5F9FF]"
+    >
+      <span>{label}</span>
+      <ArrowSquareOut size={14} />
+    </button>
   );
 }
 
@@ -2488,41 +2659,6 @@ function AvatarGroup({
         </span>
       ) : null}
     </div>
-  );
-}
-
-function SmartAction({
-  title,
-  count,
-  description,
-  active,
-  onClick,
-}: {
-  title: string;
-  count: number;
-  description: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "w-full rounded-2xl border p-3 text-left transition-colors",
-        active
-          ? "border-upe-blue-upe bg-upe-blue-upe/5 shadow-[0_8px_18px_rgba(22,64,115,0.08)]"
-          : "border-black/5 bg-white hover:bg-upe-neutral-cool-ice/70",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] font-semibold text-upe-neutral-dark-soft-black">{title}</p>
-        <span className="rounded-lg bg-upe-neutral-cool-ice px-2 py-0.5 text-[10px] font-semibold text-upe-blue-upe">
-          {count}
-        </span>
-      </div>
-      <p className="mt-1 text-[11px] leading-relaxed text-black/55">{description}</p>
-    </button>
   );
 }
 
