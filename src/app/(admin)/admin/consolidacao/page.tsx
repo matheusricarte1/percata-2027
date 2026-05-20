@@ -296,43 +296,6 @@ function percentile(values: number[], p: number): number {
   return sorted[lower] * (1 - ratio) + sorted[upper] * ratio;
 }
 
-function simulateBudgetCut(items: ConsolidatedItem[], cutPercent: number) {
-  const total = items.reduce((acc, item) => acc + Number(item.valor_total || 0), 0);
-  if (total <= 0 || cutPercent <= 0) {
-    return {
-      total,
-      targetCut: 0,
-      simulatedCut: 0,
-      remaining: total,
-      affectedCount: 0,
-    };
-  }
-
-  const targetCut = (total * cutPercent) / 100;
-  let simulatedCut = 0;
-  let affectedCount = 0;
-
-  const removable = [...items].sort((a, b) => {
-    const aBucket =
-      Number(a.is_highlight) * 10 +
-      (a.priorizacao_level === 4 ? 4 : a.priorizacao_level === 3 ? 3 : a.priorizacao_level);
-    const bBucket =
-      Number(b.is_highlight) * 10 +
-      (b.priorizacao_level === 4 ? 4 : b.priorizacao_level === 3 ? 3 : b.priorizacao_level);
-    if (aBucket !== bBucket) return aBucket - bBucket;
-    return b.valor_total - a.valor_total;
-  });
-
-  for (const item of removable) {
-    if (simulatedCut >= targetCut) break;
-    simulatedCut += Number(item.valor_total || 0);
-    affectedCount += 1;
-  }
-
-  const remaining = Math.max(0, total - simulatedCut);
-  return { total, targetCut, simulatedCut, remaining, affectedCount };
-}
-
 function buildConsolidatedExportRows(source: ConsolidatedItem[]) {
   return source.map((item) =>
     protectReportRow({
@@ -420,7 +383,6 @@ export default function ConsolidationPage() {
   const [smartFilter, setSmartFilter] = useState<SmartFilter>("all");
   const [criticidadeWeight] = useState(1);
   const [priorizacaoWeight] = useState(1);
-  const [cutPercent, setCutPercent] = useState(10);
   const [highlightOnly, setHighlightOnly] = useState(false);
   const [densityMode, setDensityMode] = useState<DensityMode>("comfortable");
   const [contrastMode, setContrastMode] = useState<ContrastMode>("soft");
@@ -428,7 +390,6 @@ export default function ConsolidationPage() {
   const [showScoreBars, setShowScoreBars] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dfdMenuOpen, setDfdMenuOpen] = useState(false);
-  const [insightsMenuOpen, setInsightsMenuOpen] = useState(false);
   const [previewDfdId, setPreviewDfdId] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -1173,10 +1134,6 @@ export default function ConsolidationPage() {
     [items],
   );
 
-  const divergenciasCount = useMemo(
-    () => items.filter((item) => item.description_variants > 1).length,
-    [items],
-  );
   const outliersCount = useMemo(
     () => items.filter((item) => item.spread_percent >= 80).length,
     [items],
@@ -1228,8 +1185,6 @@ export default function ConsolidationPage() {
       tipoFilter,
     ],
   );
-  const simulation = useMemo(() => simulateBudgetCut(items, cutPercent), [cutPercent, items]);
-
   const exportXLSX = async () => {
     if (displayItems.length === 0) {
       toast.info("Sem linhas para exportar.");
@@ -1343,10 +1298,10 @@ export default function ConsolidationPage() {
         </div>
       </section>
 
-      <div className="grid min-h-[74vh] grid-cols-1 gap-4 xl:grid-cols-12">
+      <div className="min-h-[74vh]">
         <section
           className={cn(
-            "flex min-h-[720px] flex-col overflow-hidden rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)] xl:col-span-8",
+            "flex min-h-[720px] flex-col overflow-hidden rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)]",
             contrastMode === "high" && "border-upe-blue-upe/30",
           )}
         >
@@ -1368,14 +1323,6 @@ export default function ConsolidationPage() {
                 >
                   <ArrowSquareOut size={16} />
                   Ver DFDs de origem ({dfds.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInsightsMenuOpen((prev) => !prev)}
-                  className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[#C7D7EA] bg-white px-4 text-sm font-semibold text-upe-blue-upe shadow-sm hover:bg-[#F3F8FF] xl:hidden"
-                >
-                  <Funnel size={16} />
-                  Painel
                 </button>
               </div>
             </div>
@@ -1948,256 +1895,6 @@ export default function ConsolidationPage() {
             )}
           </div>
         </section>
-
-        <section
-          className={cn(
-            "rounded-[28px] border border-[#D9E6F3] bg-white p-4 shadow-[0_14px_32px_rgba(22,64,115,0.08)] xl:col-span-4",
-            insightsMenuOpen ? "block" : "hidden xl:block",
-          )}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="font-display text-[22px] font-semibold tracking-tight text-upe-blue-upe">
-                Painel de atenção
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-black/55">
-                Problemas e ações sugeridas para o recorte atual.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setInsightsMenuOpen(false)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[#D9E6F3] bg-white text-upe-blue-upe hover:bg-[#F3F8FF] xl:hidden"
-            >
-              <X size={16} weight="bold" />
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <AttentionCard
-              title="Outliers de preço"
-              count={outliersCount}
-              description="Itens com preço elevado para o mesmo código."
-              tone="orange"
-              onClick={() => {
-                setSmartFilter("outlier");
-                setHighlightOnly(false);
-                setQuickFocus("none");
-              }}
-            />
-            <AttentionCard
-              title="Divergências de descrição"
-              count={divergenciasCount}
-              description="Mesmo código e-fisco com textos diferentes."
-              tone="blue"
-              onClick={() => {
-                setSmartFilter("divergencia");
-                setHighlightOnly(false);
-                setQuickFocus("none");
-              }}
-            />
-            <AttentionCard
-              title="Sem classificação"
-              count={incompletosCount}
-              description="Itens sem criticidade ou priorização definida."
-              tone="violet"
-              onClick={() => {
-                setSmartFilter("incompleto");
-                setHighlightOnly(false);
-                setQuickFocus("none");
-              }}
-            />
-            <AttentionCard
-              title="Itens Pareto"
-              count={paretoCount}
-              description="Itens que concentram o recorte prioritário."
-              tone="green"
-              onClick={() => {
-                setSmartFilter("pareto");
-                setHighlightOnly(false);
-                setQuickFocus("none");
-              }}
-            />
-          </div>
-
-          <div className="space-y-3 rounded-[24px] border border-[#E5EDF7] bg-[#F8FBFF] p-4">
-            <div>
-              <h3 className="text-lg font-semibold text-[#164073]">Ações sugeridas</h3>
-              <p className="mt-1 text-sm text-black/55">
-                Atalhos para análise e exportações.
-              </p>
-            </div>
-            <ActionShortcut
-              label="Revisar outliers"
-              onClick={() => {
-                setSmartFilter("outlier");
-                setHighlightOnly(false);
-                setQuickFocus("none");
-              }}
-            />
-            <ActionShortcut
-              label="Ver itens Pareto"
-              onClick={() => {
-                setSmartFilter("pareto");
-                setHighlightOnly(false);
-                setQuickFocus("none");
-              }}
-            />
-            <ActionShortcut
-              label="Exportar relatório"
-              onClick={exportXLSX}
-            />
-          </div>
-
-          <div className="space-y-3 rounded-[24px] border border-[#E5EDF7] bg-white p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-black/45">
-                  Ajustes visuais
-                </h3>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-black/5 bg-upe-neutral-cool-off-white/80 p-3 space-y-3">
-              <div className="space-y-1.5">
-                <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-                  Densidade
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDensityMode("comfortable")}
-                    className={cn(
-                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                      densityMode === "comfortable"
-                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                    )}
-                  >
-                    Confortável
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDensityMode("compact")}
-                    className={cn(
-                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                      densityMode === "compact"
-                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                    )}
-                  >
-                    Compacta
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-                  Contraste
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setContrastMode("soft")}
-                    className={cn(
-                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                      contrastMode === "soft"
-                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                    )}
-                  >
-                    Suave
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setContrastMode("high")}
-                    className={cn(
-                      "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                      contrastMode === "high"
-                        ? "bg-upe-blue-upe text-white border-upe-blue-upe"
-                        : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                    )}
-                  >
-                    Alto
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowLegends((prev) => !prev)}
-                  className={cn(
-                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                    showLegends
-                      ? "bg-upe-support-blue-neutral-aqua/30 text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua"
-                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                  )}
-                >
-                  Legendas
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowScoreBars((prev) => !prev)}
-                  className={cn(
-                    "h-8 rounded-lg text-[10px] uppercase tracking-widest font-semibold border transition-colors",
-                    showScoreBars
-                      ? "bg-upe-support-blue-neutral-aqua/30 text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua"
-                      : "bg-white text-upe-blue-upe border-black/10 hover:bg-upe-neutral-cool-ice",
-                  )}
-                >
-                  Barra score
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[24px] border border-[#E5EDF7] bg-white p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[#164073]">Simulador de corte</p>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-black/45">
-                {cutPercent}%
-              </span>
-            </div>
-            <div>
-              <input
-                type="range"
-                min={0}
-                max={30}
-                step={1}
-                value={cutPercent}
-                onChange={(event) => setCutPercent(Number(event.target.value) || 0)}
-                className="w-full h-2 rounded-lg slider-prio"
-              />
-            </div>
-            <div className="mt-3 rounded-xl border border-black/5 bg-[#F8FBFF] p-3 space-y-2">
-              <MetricLine
-                label="Meta de corte"
-                value={simulation.targetCut.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              />
-              <MetricLine
-                label="Corte simulado"
-                value={simulation.simulatedCut.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              />
-              <MetricLine
-                label="Itens afetados"
-                value={`${simulation.affectedCount}`}
-              />
-              <MetricLine
-                label="Saldo projetado"
-                value={simulation.remaining.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              />
-            </div>
-          </div>
-        </section>
       </div>
 
       {dfdMenuOpen ? (
@@ -2544,87 +2241,6 @@ function QuickFilterChip({
       >
         {count}
       </span>
-    </button>
-  );
-}
-
-function AttentionCard({
-  title,
-  count,
-  description,
-  tone,
-  onClick,
-}: {
-  title: string;
-  count: number;
-  description: string;
-  tone: "orange" | "blue" | "violet" | "green";
-  onClick: () => void;
-}) {
-  const tones = {
-    orange: {
-      border: "border-[#F3D4B0]",
-      bg: "bg-[#FFF8F1]",
-      accent: "text-[#C46A00]",
-      button: "border-[#F3D4B0] text-[#C46A00] hover:bg-[#FFF1DE]",
-    },
-    blue: {
-      border: "border-[#D7E4FF]",
-      bg: "bg-[#F7FAFF]",
-      accent: "text-[#2456B6]",
-      button: "border-[#D7E4FF] text-[#2456B6] hover:bg-[#EEF4FF]",
-    },
-    violet: {
-      border: "border-[#E4D9FF]",
-      bg: "bg-[#FAF7FF]",
-      accent: "text-[#7A4CC4]",
-      button: "border-[#E4D9FF] text-[#7A4CC4] hover:bg-[#F2ECFF]",
-    },
-    green: {
-      border: "border-[#CFE9DA]",
-      bg: "bg-[#F6FCF8]",
-      accent: "text-[#2F8A57]",
-      button: "border-[#CFE9DA] text-[#2F8A57] hover:bg-[#ECF9F1]",
-    },
-  } as const;
-
-  const toneStyle = tones[tone];
-
-  return (
-    <div className={cn("rounded-[24px] border p-4", toneStyle.border, toneStyle.bg)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={cn("text-sm font-semibold", toneStyle.accent)}>{title}</p>
-          <p className="mt-2 text-[34px] font-semibold leading-none tracking-tight text-[#164073]">
-            {count}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-black/55">{description}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClick}
-          className={cn(
-            "inline-flex h-10 shrink-0 items-center gap-2 rounded-2xl border bg-white px-4 text-sm font-semibold transition-colors",
-            toneStyle.button,
-          )}
-        >
-          Revisar
-          <ArrowSquareOut size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ActionShortcut({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex h-12 w-full items-center justify-between rounded-2xl border border-[#D9E6F3] bg-white px-4 text-sm font-semibold text-[#164073] transition-colors hover:bg-[#F5F9FF]"
-    >
-      <span>{label}</span>
-      <ArrowSquareOut size={14} />
     </button>
   );
 }
