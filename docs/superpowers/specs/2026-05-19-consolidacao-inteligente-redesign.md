@@ -36,12 +36,13 @@ Com isso, a hierarquia funcional da tela passa a ser:
 
 Adotar o modelo:
 
-- esquerda = origem
+- topo institucional forte
 - centro = fila principal de decisão
-- direita = ferramentas e inteligência
+- direita = painel de atenção e ações sugeridas
+- origem das DFDs = painel sob demanda, não coluna fixa
 - laterais contextuais = aprofundamento sem sair da triagem
 
-O centro precisa dominar visualmente. As laterais devem parecer suporte operacional, não colunas equivalentes.
+O centro precisa dominar visualmente. A direita deve parecer painel de atenção. A origem das DFDs deixa de disputar largura permanente com a fila principal.
 
 ## Arquitetura da tela
 
@@ -65,7 +66,7 @@ Conteúdo:
 
 Métricas administrativas como `DFDs aprovadas` e `Filtros ativos` devem ser rebaixadas visualmente ou deslocadas para contexto secundário.
 
-### 2. Coluna esquerda: DFDs enviadas
+### 2. Origem das DFDs sob demanda
 
 Função:
 
@@ -74,9 +75,11 @@ Função:
 
 Regras:
 
-- lista escaneável e compacta
-- foco em protocolo, objeto curto, valor, avatar, quantidade de itens
-- sem excesso de microtexto
+- não ocupar coluna fixa
+- abrir por ação explícita como `Ver DFDs de origem`
+- aparecer em painel lateral ou drawer
+- mostrar protocolo, objeto curto, valor, avatar e quantidade de itens
+- preservar a triagem no centro como superfície principal
 
 ### 3. Centro: fila principal
 
@@ -90,21 +93,25 @@ Regras:
 - ordenação por score explicitada
 - cada linha tratada como unidade de triagem rápida
 
-### 4. Coluna direita: opções inteligentes
+### 4. Coluna direita: painel de atenção
 
 Função:
 
-- filtros
-- presets
-- ajustes visuais
-- simulador
-- recomendações
+- problemas do recorte
+- filtros e recortes rápidos
+- ações sugeridas
+- acesso a ajustes complementares
 
 Regras:
 
-- aparência de bandeja de controle
-- blocos mais compactos
-- peso visual inferior ao centro
+- aparência de painel executivo de atenção
+- blocos compactos com contagem e ação
+- peso visual inferior ao centro, mas superior ao de ferramentas puramente cosméticas
+- dar visibilidade a:
+  - outliers
+  - divergências
+  - sem classificação
+  - itens pareto
 
 ### 5. Painéis laterais contextuais
 
@@ -114,9 +121,21 @@ Função:
 
 Regras:
 
-- clique em DFD abre painel lateral contextual
-- clique em item pode evoluir para painel próprio na próxima fase
+- clique em `Ver DFDs de origem` abre painel lateral contextual de origem
+- clique em item deve evoluir para painel próprio na próxima fase
 - abrir nova aba só como ação explícita final
+
+## Modelo visual de referência
+
+A tela deve se aproximar de um padrão com:
+
+- hero superior escuro institucional
+- faixa única de KPIs
+- lista central com chips de recorte e ordenação explícita
+- painel direito de atenção com cartões de problema e atalhos
+- cards de item mais limpos, com score, valor, origem e ações rápidas
+
+Esse modelo substitui a arquitetura anterior de três colunas equivalentes.
 
 ## Hierarquia da linha do item
 
@@ -144,13 +163,14 @@ Regra:
 
 o score deve ser o primeiro sinal visual da linha e explicar por que o item aparece naquela posição.
 
-### Bloco C: estado de atenção
+### Bloco C: estado e ações
 
 Conteúdo:
 
 - estrela de pareto
 - sinais de pendência
-- acesso ao contexto lateral
+- ação de ver detalhes
+- ação de ver origem
 
 ### Deve sair da primeira leitura
 
@@ -208,7 +228,8 @@ Isso deve aparecer:
 
 ### Contexto sem fuga de fluxo
 
-- `Ver DFD` abre painel lateral
+- `Ver DFDs de origem` abre painel lateral
+- `Ver origem` na linha abre o mesmo ecossistema contextual sem abrir nova aba
 - o usuário só abre a DFD completa se quiser aprofundar além do suficiente para a triagem
 
 ### Controles mortos
@@ -234,7 +255,8 @@ Exemplos:
 ### Fase 1
 
 - reequilibrar a superfície geral
-- reduzir peso das laterais
+- remover a coluna fixa de DFDs
+- transformar a direita em painel de atenção
 - reforçar que o centro é a fila principal
 - limpar rótulos mortos
 
@@ -243,12 +265,13 @@ Exemplos:
 - tornar score o principal bloco da linha
 - reorganizar valor, quantidade e pareto
 - reduzir ruído de chips e metadados
+- aproximar as linhas do padrão da referência aprovada
 
 ### Fase 3
 
-- transformar o acesso a DFD em painel lateral contextual
-- compactar coluna direita
-- revisar coluna esquerda para leitura mais rápida
+- transformar o acesso a DFDs de origem em painel lateral contextual
+- consolidar ações rápidas no item
+- fortalecer o painel de atenção com recortes acionáveis
 
 ### Fase 4
 
