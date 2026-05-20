@@ -16,7 +16,6 @@ import {
   ClipboardText,
   FunnelSimple,
   ChartLineUp,
-  EnvelopeSimple,
   Package,
   PaperPlaneTilt,
   CircleNotch,
@@ -26,9 +25,8 @@ import { getSafeUser, supabase } from "@/lib/supabase";
 import { DfdCardSkeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { resolveCampusBranding } from "@/lib/campus-branding";
 import { normalizeRole, type UserRole } from "@/lib/access";
-import { DFD_PROCESS_STEPS, getDfdProcessStage } from "@/lib/dfd-process-guide";
+import { getDfdProcessStage } from "@/lib/dfd-process-guide";
 import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
 
 type DfdStatus =
@@ -60,12 +58,6 @@ type LegacyDemandSummary = {
   object: string | null;
   total_estimated: number | null;
   items_count: number | null;
-};
-
-type AuthorProfile = {
-  fullName: string;
-  email: string;
-  avatarUrl: string | null;
 };
 
 type StatusVisual = {
@@ -127,14 +119,6 @@ function formatCurrency(value: number) {
   });
 }
 
-function getInitials(fullName: string) {
-  const safe = String(fullName || "").trim();
-  if (!safe) return "US";
-  const parts = safe.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase();
-}
-
 export default function MinhasDFDsPage() {
   const router = useRouter();
   const [dfds, setDfds] = useState<DfdRow[]>([]);
@@ -150,11 +134,6 @@ export default function MinhasDFDsPage() {
   const [sendingDfdId, setSendingDfdId] = useState<string | null>(null);
   const [submittedDfd, setSubmittedDfd] = useState<{ id: string; protocol?: string | null } | null>(null);
   const [markingKitId, setMarkingKitId] = useState<string | null>(null);
-  const [author, setAuthor] = useState<AuthorProfile>({
-    fullName: "Solicitante",
-    email: "",
-    avatarUrl: null,
-  });
 
   const fetchActiveDfds = useCallback(async () => {
     setLoading(true);
@@ -169,23 +148,6 @@ export default function MinhasDFDsPage() {
         .maybeSingle();
 
       setCurrentRole(normalizeRole(profileData?.role, user.email));
-      setAuthor({
-        fullName:
-          String(
-            profileData?.full_name ||
-              user.user_metadata?.full_name ||
-              user.user_metadata?.name ||
-              "Solicitante",
-          ).trim() || "Solicitante",
-        email: String(profileData?.email || user.email || "").trim(),
-        avatarUrl:
-          String(
-            profileData?.avatar_url ||
-              user.user_metadata?.avatar_url ||
-              user.user_metadata?.picture ||
-              "",
-          ).trim() || null,
-      });
 
       const { data, error } = await supabase
         .from("dfds")
@@ -398,21 +360,6 @@ export default function MinhasDFDsPage() {
     };
   }, [dfds, legacyRecords.length]);
   const canCreateKits = currentRole === "admin" || currentRole === "superadmin";
-  const requesterGuides = [
-    {
-      title: "Rascunho ainda é espaço de ajuste",
-      description: "Use esta fase para conferir objeto, itens, justificativas e referências antes do envio.",
-    },
-    {
-      title: "Envie só quando a leitura estiver madura",
-      description: "Depois do envio, a chefia analisa a coerência da demanda e pode devolver com orientação.",
-    },
-    {
-      title: "Acompanhe o status sem perder o fio",
-      description: "Cada DFD mostra em que etapa está e o que tende a acontecer a seguir.",
-    },
-  ] as const;
-
   return (
     <div className="space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
       <section className="rounded-[20px] border border-[#C7D7EA] bg-[#F7FBFF] p-6 shadow-sm">
@@ -444,45 +391,6 @@ export default function MinhasDFDsPage() {
               <Plus size={16} weight="bold" />
               Nova Demanda
             </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {requesterGuides.map((item) => (
-          <div key={item.title} className="rounded-[20px] border border-[#D9E0E8] bg-white p-5 shadow-sm">
-            <div className="mb-3 h-2 w-10 rounded-full bg-[#DCEAF0]" />
-            <h2 className="text-base font-semibold text-[#164073]">{item.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-[#52627A]">{item.description}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="rounded-[20px] border border-[#D9E0E8] bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
-              Guia rápido
-            </p>
-            <h2 className="mt-1 text-lg font-semibold text-[#164073]">
-              O que fazer com cada DFD
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#52627A]">
-              Rascunhos ficam com você. Quando a leitura estiver pronta, envie à chefia. Depois disso, acompanhe se a demanda foi homologada ou devolvida com orientação.
-            </p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[560px]">
-            {DFD_PROCESS_STEPS.map((step, index) => (
-              <div key={step.id} className="rounded-2xl border border-[#E8EDF2] bg-[#FAFBFC] p-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#164073] text-[10px] font-bold text-white">
-                    {index + 1}
-                  </span>
-                  <p className="text-xs font-semibold text-[#164073]">{step.label}</p>
-                </div>
-                <p className="mt-2 text-[11px] leading-5 text-[#5B6675]">{step.description}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -577,7 +485,6 @@ export default function MinhasDFDsPage() {
               const campusName = dfd.campus_id
                 ? campusMap[dfd.campus_id] || dfd.campus || "Campus UPE"
                 : dfd.campus || "Campus UPE";
-              const branding = resolveCampusBranding(campusName);
               const protocol = String(dfd.numero_protocolo || `DFD-${dfd.id.slice(0, 8)}`);
               const localUso =
                 dfd.unidade_id && dfd.tipo_unidade
@@ -616,7 +523,6 @@ export default function MinhasDFDsPage() {
                           <span className="inline-flex items-center rounded-full border border-[#D9E0E8] bg-[#FAFBFC] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#3E4C5F]">
                             Etapa {stage.stepIndex}/4 · {stage.label}
                           </span>
-                          <span className="text-xs text-[#66758A]">{stage.description}</span>
                           {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
                             <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#47739F]">
                               Requer sua ação
@@ -652,26 +558,6 @@ export default function MinhasDFDsPage() {
                           label="Valor"
                           value={formatCurrency(Number(dfd.valor_total_estimado || 0))}
                           icon={<CurrencyDollar size={12} />}
-                        />
-                      </div>
-
-                      <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-2.5 py-2">
-                        <AuthorAvatar author={author} />
-                        <div className="min-w-0">
-                          <p className="truncate text-[11px] font-semibold text-[#3E4C5F]">
-                            {author.fullName}
-                          </p>
-                          {author.email ? (
-                            <p className="mt-0.5 inline-flex items-center gap-1 truncate text-[10px] text-[#5B6675]">
-                              <EnvelopeSimple size={11} />
-                              {author.email}
-                            </p>
-                          ) : null}
-                        </div>
-                        <img
-                          src={branding.logoSrc}
-                          alt={branding.label}
-                          className="hidden h-5 w-auto object-contain opacity-95 xl:block"
                         />
                       </div>
                     </div>
@@ -863,27 +749,6 @@ function InfoPill({
         {value}
       </p>
     </div>
-  );
-}
-
-function AuthorAvatar({ author }: { author: AuthorProfile }) {
-  const [broken, setBroken] = useState(false);
-
-  if (!author.avatarUrl || broken) {
-    return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#D9E0E8] bg-[#E8EDF2] text-[10px] font-semibold uppercase text-[#164073]">
-        {getInitials(author.fullName)}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={author.avatarUrl}
-      alt={author.fullName}
-      className="h-8 w-8 rounded-full border border-[#D9E0E8] object-cover"
-      onError={() => setBroken(true)}
-    />
   );
 }
 
