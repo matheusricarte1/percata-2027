@@ -466,6 +466,10 @@ export default function DfdColetivaDetailPage() {
   }, [detail, viewerUserId]);
   const canDeleteRequestedContribution =
     detail?.room.actor_role === "admin" || detail?.room.actor_role === "superadmin";
+  const canConsolidateRoom =
+    detail?.room.actor_role === "chefia" ||
+    detail?.room.actor_role === "admin" ||
+    detail?.room.actor_role === "superadmin";
   const itemsFromOtherPeople = useMemo(() => {
     if (!detail) return [];
     return detail.items.filter((item) =>
@@ -474,6 +478,12 @@ export default function DfdColetivaDetailPage() {
       ),
     );
   }, [detail, viewerUserId]);
+
+  function finalizeMyContributions() {
+    setSelectionDrawerOpen(false);
+    toast.success("Suas contribuições foram finalizadas nesta sala.");
+    router.push("/dfds-coletivas");
+  }
 
   async function saveMetadata(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1098,6 +1108,7 @@ export default function DfdColetivaDetailPage() {
               pendingCount={cartItems.length}
               consolidatedCount={detail.items.length}
               requestedCount={myRequestedContributions.length}
+              canConsolidate={canConsolidateRoom}
               totalValue={totalValue}
               pendingCartValue={pendingCartValue}
               cartPulseKey={cartPulseKey}
@@ -1110,7 +1121,13 @@ export default function DfdColetivaDetailPage() {
                 setSelectionDrawerSection("requested");
                 setSelectionDrawerOpen(true);
               }}
-              onContinue={() => setActiveStage("consolidar")}
+              onContinue={() => {
+                if (canConsolidateRoom) {
+                  setActiveStage("consolidar");
+                  return;
+                }
+                finalizeMyContributions();
+              }}
             />
             <FlyingCartItems
               items={flyingCartItems}
@@ -1139,9 +1156,14 @@ export default function DfdColetivaDetailPage() {
               savingCart={savingCart}
               detail={detail}
               pendingCartValue={pendingCartValue}
+              canConsolidate={canConsolidateRoom}
               onContinue={() => {
-                setSelectionDrawerOpen(false);
-                setActiveStage("consolidar");
+                if (canConsolidateRoom) {
+                  setSelectionDrawerOpen(false);
+                  setActiveStage("consolidar");
+                  return;
+                }
+                finalizeMyContributions();
               }}
             />
           </>
@@ -1588,6 +1610,7 @@ function SelectionFloatingBar({
   pendingCount,
   consolidatedCount,
   requestedCount,
+  canConsolidate,
   totalValue,
   pendingCartValue,
   cartPulseKey,
@@ -1600,6 +1623,7 @@ function SelectionFloatingBar({
   pendingCount: number;
   consolidatedCount: number;
   requestedCount: number;
+  canConsolidate: boolean;
   totalValue: number;
   pendingCartValue: number;
   cartPulseKey: number;
@@ -1677,10 +1701,10 @@ function SelectionFloatingBar({
               <button
                 type="button"
                 onClick={onContinue}
-                disabled={consolidatedCount === 0}
+                disabled={canConsolidate && consolidatedCount === 0}
                 className="h-10 rounded-full bg-[#063F8F] px-5 text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Consolidar
+                {canConsolidate ? "Consolidar" : "Finalizar"}
               </button>
             </div>
           </div>
@@ -1755,6 +1779,7 @@ function SelectedItemDrawer({
   savingCart,
   detail,
   pendingCartValue,
+  canConsolidate,
   onContinue,
 }: {
   open: boolean;
@@ -1777,6 +1802,7 @@ function SelectedItemDrawer({
   savingCart: boolean;
   detail: RoomDetail;
   pendingCartValue: number;
+  canConsolidate: boolean;
   onContinue: () => void;
 }) {
   const cartSectionRef = useRef<HTMLDivElement | null>(null);
@@ -2006,10 +2032,10 @@ function SelectedItemDrawer({
                 <button
                   type="button"
                   onClick={onContinue}
-                  disabled={detail.items.length === 0}
+                  disabled={canConsolidate && detail.items.length === 0}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#CBD5E1] bg-white text-sm font-semibold text-[#0B4AA2] transition hover:bg-[#F7FBFF] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Consolidar <ArrowRight size={17} weight="bold" />
+                  {canConsolidate ? "Consolidar" : "Finalizar"} <ArrowRight size={17} weight="bold" />
                 </button>
               </div>
               <p className="mt-3 text-center text-xs text-[#667085]">
