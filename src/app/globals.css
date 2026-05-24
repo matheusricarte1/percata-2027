@@ -715,15 +715,11 @@ html[data-route-pending="1"] {
 
   .m3-date-input::-webkit-calendar-picker-indicator {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    right: 10px;
+    width: 18px;
+    height: 18px;
     opacity: 0;
     cursor: pointer;
-  }
-
-  .m3-date-placeholder {
-    @apply pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#A7B1BD];
   }
 
   .m3-date-trigger {

@@ -1658,7 +1658,7 @@ export default function NovaDFDPage() {
                       <GndBudgetPanel summary={groupGndSummary} />
                     </div>
 
-                    <Field className="xl:col-span-3" label="Previsão de recebimento">
+                    <Field className="xl:col-span-3" label="Quando você espera receber?">
                       <div className="m3-date-shell">
                         <input
                           id={`previsao-data-${gIdx}`}
@@ -1673,9 +1673,6 @@ export default function NovaDFDPage() {
                             "m3-date-input pr-11 font-medium tabular-nums",
                           )}
                         />
-                        {!group.formData.previsao_data && (
-                          <span className="m3-date-placeholder">dd/mm/aaaa</span>
-                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -1696,11 +1693,12 @@ export default function NovaDFDPage() {
                         </button>
                       </div>
                       <p className="mt-1 text-[11px] text-[#7D98B8]">
-                        Permitido somente a partir de {formatIsoDateToPtBr(NEXT_YEAR_MIN_DATE)}.
+                        Informe uma data prevista (a partir de{" "}
+                        {formatIsoDateToPtBr(NEXT_YEAR_MIN_DATE)}).
                       </p>
                     </Field>
 
-                    <Field className="xl:col-span-5" label="Motivo do roteamento">
+                    <Field className="xl:col-span-5" label="Por que essa unidade vai analisar?">
                       <input
                         type="text"
                         value={group.formData.analysis_routing_reason}
@@ -1712,7 +1710,7 @@ export default function NovaDFDPage() {
                           )
                         }
                         className={inputClass}
-                        placeholder="Ex: demanda curricular do curso, uso transversal ou disciplina específica."
+                        placeholder="Ex.: o uso é do laboratório, mas a aprovação precisa ser da coordenação do curso."
                       />
                     </Field>
 
@@ -1734,7 +1732,7 @@ export default function NovaDFDPage() {
 
                     <Field
                       className="xl:col-span-5"
-                      label="Base de cálculo (quantidades)"
+                      label="Como você definiu as quantidades?"
                       icon={<Info size={14} />}
                     >
                       <textarea
@@ -1748,7 +1746,7 @@ export default function NovaDFDPage() {
                           )
                         }
                         className={textareaClass}
-                        placeholder="Informe como o quantitativo foi definido: consumo histórico, demanda projetada, turmas, equipes ou séries anteriores."
+                        placeholder="Explique o cálculo: número de turmas, pessoas atendidas, consumo médio e período de uso."
                       />
                     </Field>
 
@@ -2220,6 +2218,83 @@ function gndClassBadgeStyle(expenseClass: string) {
   return "bg-slate-100 text-slate-600";
 }
 
+function purposeTone(value: DfdPurpose) {
+  if (value === "ensino") {
+    return {
+      activeCard:
+        "border-[#2A6EC8] bg-[#F2F8FF] shadow-[0_8px_18px_rgba(42,110,200,0.12)]",
+      idleCard: "border-[#D9E0E8] bg-white hover:border-[#BFD3EE] hover:bg-[#F8FBFF]",
+      iconActive: "bg-[#E2EEFF] text-[#1F5DAF]",
+      iconIdle: "bg-[#EAF1FB] text-[#1F5DAF]",
+      selectedTag: "bg-[#EAF3FF] text-[#1F5DAF]",
+    };
+  }
+  if (value === "pesquisa") {
+    return {
+      activeCard:
+        "border-[#1A8F88] bg-[#F0FCFA] shadow-[0_8px_18px_rgba(26,143,136,0.12)]",
+      idleCard: "border-[#D9E0E8] bg-white hover:border-[#BEE3DF] hover:bg-[#F7FDFC]",
+      iconActive: "bg-[#DBF4F1] text-[#146D68]",
+      iconIdle: "bg-[#E6F5F3] text-[#146D68]",
+      selectedTag: "bg-[#E8F8F6] text-[#146D68]",
+    };
+  }
+  if (value === "extensao") {
+    return {
+      activeCard:
+        "border-[#8D5BD1] bg-[#FAF6FF] shadow-[0_8px_18px_rgba(141,91,209,0.12)]",
+      idleCard: "border-[#D9E0E8] bg-white hover:border-[#D8C6F2] hover:bg-[#FCFAFF]",
+      iconActive: "bg-[#F0E7FF] text-[#6C42A8]",
+      iconIdle: "bg-[#F3ECFF] text-[#6C42A8]",
+      selectedTag: "bg-[#F3ECFF] text-[#6C42A8]",
+    };
+  }
+  return {
+    activeCard:
+      "border-[#C9852B] bg-[#FFF9F1] shadow-[0_8px_18px_rgba(201,133,43,0.12)]",
+    idleCard: "border-[#D9E0E8] bg-white hover:border-[#E8D2B5] hover:bg-[#FFFCF6]",
+    iconActive: "bg-[#FCEEDB] text-[#9D651A]",
+    iconIdle: "bg-[#FBF1E4] text-[#9D651A]",
+    selectedTag: "bg-[#FBF1E4] text-[#9D651A]",
+  };
+}
+
+function contextTone(value: AcademicContext) {
+  if (value === "disciplina") {
+    return {
+      activeCard: "border-[#2A6EC8] bg-[#F2F8FF]",
+      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#BFD3EE] hover:bg-[#F8FBFF]",
+      badge: "bg-[#EAF3FF] text-[#1F5DAF]",
+    };
+  }
+  if (value === "laboratorio_sem_disciplina") {
+    return {
+      activeCard: "border-[#1A8F88] bg-[#F0FCFA]",
+      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#BEE3DF] hover:bg-[#F7FDFC]",
+      badge: "bg-[#E8F8F6] text-[#146D68]",
+    };
+  }
+  if (value === "projeto") {
+    return {
+      activeCard: "border-[#8D5BD1] bg-[#FAF6FF]",
+      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#D8C6F2] hover:bg-[#FCFAFF]",
+      badge: "bg-[#F3ECFF] text-[#6C42A8]",
+    };
+  }
+  if (value === "rotina_administrativa") {
+    return {
+      activeCard: "border-[#C9852B] bg-[#FFF9F1]",
+      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#E8D2B5] hover:bg-[#FFFCF6]",
+      badge: "bg-[#FBF1E4] text-[#9D651A]",
+    };
+  }
+  return {
+    activeCard: "border-[#2C7FA8] bg-[#F1FAFF]",
+    idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#C7DFEC] hover:bg-[#F7FCFF]",
+    badge: "bg-[#EAF7FF] text-[#1C5F80]",
+  };
+}
+
 function VisualOptionGroup({
   title,
   description,
@@ -2233,6 +2308,7 @@ function VisualOptionGroup({
   value: DfdPurpose | "";
   onChange: (value: DfdPurpose) => void;
 }) {
+  const selectedTone = value ? purposeTone(value) : null;
   return (
     <div className="rounded-2xl border border-[#D9E0E8] bg-[#F8FAFC] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2241,7 +2317,12 @@ function VisualOptionGroup({
           <p className="text-xs leading-5 text-[#5B6675]">{description}</p>
         </div>
         {value ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold",
+              selectedTone?.selectedTag,
+            )}
+          >
             <CheckCircle size={14} />
             {purposeLabel(value)}
           </span>
@@ -2251,6 +2332,7 @@ function VisualOptionGroup({
         {options.map((option) => {
           const Icon = option.icon;
           const active = value === option.value;
+          const tone = purposeTone(option.value);
           return (
             <button
               key={option.value}
@@ -2258,15 +2340,13 @@ function VisualOptionGroup({
               onClick={() => onChange(option.value)}
               className={cn(
                 "min-h-[112px] rounded-xl border p-3 text-left transition",
-                active
-                  ? "border-[#164073] bg-white shadow-[0_8px_18px_rgba(15,46,87,0.10)]"
-                  : "border-[#D9E0E8] bg-white/70 hover:bg-white",
+                active ? tone.activeCard : tone.idleCard,
               )}
             >
               <span
                 className={cn(
                   "inline-flex h-9 w-9 items-center justify-center rounded-lg",
-                  active ? "bg-[#164073] text-white" : "bg-[#E8EDF2] text-[#164073]",
+                  active ? tone.iconActive : tone.iconIdle,
                 )}
               >
                 <Icon size={18} weight="bold" />
@@ -2304,6 +2384,7 @@ function ContextOptionGroup({
       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
         {CONTEXT_OPTIONS.map((option) => {
           const active = value === option.value;
+          const tone = contextTone(option.value);
           return (
             <button
               key={option.value}
@@ -2311,12 +2392,17 @@ function ContextOptionGroup({
               onClick={() => onChange(option.value)}
               className={cn(
                 "min-h-[92px] rounded-xl border px-3 py-2 text-left transition",
-                active
-                  ? "border-[#164073] bg-[#E8EDF2]"
-                  : "border-[#D9E0E8] bg-[#FAFBFC] hover:bg-[#F4F7FA]",
+                active ? tone.activeCard : tone.idleCard,
               )}
             >
-              <p className="text-sm font-bold text-[#164073]">{option.title}</p>
+              <span
+                className={cn(
+                  "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                  tone.badge,
+                )}
+              >
+                {option.title}
+              </span>
               <p className="mt-1 text-xs leading-5 text-[#5B6675]">
                 {option.description}
               </p>
