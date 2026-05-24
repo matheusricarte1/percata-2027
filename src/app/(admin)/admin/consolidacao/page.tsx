@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import {
   ArrowsClockwise,
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { downloadWorkbookFromSheets } from "@/lib/export-excel";
 import {
   buildDfdItemDetailRows,
@@ -110,6 +111,27 @@ type FilterPresetKey =
   | "materiais"
   | "laboratorios";
 
+type StarConfettiPiece = {
+  id: string;
+  left: number;
+  size: number;
+  durationMs: number;
+  delayMs: number;
+  driftPx: number;
+  rotateDeg: number;
+  color: string;
+  round: boolean;
+};
+
+const STAR_CONFETTI_COLORS = [
+  "#EC2029",
+  "#2456B6",
+  "#16A34A",
+  "#C46A00",
+  "#7F5E11",
+  "#7C3AED",
+];
+
 const CRITICIDADE_TO_LEVEL: Record<string, number> = {
   baixa: 1,
   media: 2,
@@ -137,6 +159,20 @@ function normalizeDfdStatus(value: unknown): string {
   return String(value || "")
     .trim()
     .toLocaleLowerCase("pt-BR");
+}
+
+function buildStarConfettiPieces(total = 36): StarConfettiPiece[] {
+  return Array.from({ length: total }, (_, index) => ({
+    id: `star-confetti-${Date.now()}-${index}`,
+    left: 4 + Math.random() * 92,
+    size: 6 + Math.random() * 8,
+    durationMs: 1100 + Math.round(Math.random() * 900),
+    delayMs: Math.round(Math.random() * 280),
+    driftPx: -48 + Math.round(Math.random() * 96),
+    rotateDeg: -220 + Math.round(Math.random() * 440),
+    color: STAR_CONFETTI_COLORS[index % STAR_CONFETTI_COLORS.length],
+    round: Math.random() > 0.65,
+  }));
 }
 
 function criticidadeBadgeClass(level: number): string {
@@ -398,6 +434,8 @@ function buildSourceItemRows(rawItems: RawItem[], dfds: ApprovedDfd[]) {
 }
 
 export default function ConsolidationPage() {
+  const reducedMotion = useReducedMotion();
+  const starConfettiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [dfds, setDfds] = useState<ApprovedDfd[]>([]);
   const [rawItems, setRawItems] = useState<RawItem[]>([]);
@@ -428,6 +466,7 @@ export default function ConsolidationPage() {
   const [servidorFilter, setServidorFilter] = useState("all");
   const [localUsoFilter, setLocalUsoFilter] = useState("all");
   const [activePreset, setActivePreset] = useState<FilterPresetKey>("custom");
+  const [starConfettiPieces, setStarConfettiPieces] = useState<StarConfettiPiece[]>([]);
 
   const previewDfd = useMemo(
     () => (previewDfdId ? dfds.find((dfd) => dfd.id === previewDfdId) || null : null),
@@ -489,6 +528,27 @@ export default function ConsolidationPage() {
     },
     [resetFilters],
   );
+
+  const triggerStarCelebration = useCallback(() => {
+    if (reducedMotion) return;
+    if (starConfettiTimeoutRef.current) {
+      clearTimeout(starConfettiTimeoutRef.current);
+      starConfettiTimeoutRef.current = null;
+    }
+    setStarConfettiPieces(buildStarConfettiPieces());
+    starConfettiTimeoutRef.current = setTimeout(() => {
+      setStarConfettiPieces([]);
+      starConfettiTimeoutRef.current = null;
+    }, 2200);
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    return () => {
+      if (starConfettiTimeoutRef.current) {
+        clearTimeout(starConfettiTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -1381,10 +1441,13 @@ export default function ConsolidationPage() {
       <div className="min-h-[74vh]">
         <section
           className={cn(
-            "flex min-h-[720px] flex-col overflow-hidden rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)]",
+            "relative flex min-h-[720px] flex-col overflow-hidden rounded-[28px] border border-[#D9E6F3] bg-white shadow-[0_14px_32px_rgba(22,64,115,0.08)]",
             contrastMode === "high" && "border-upe-blue-upe/30",
           )}
         >
+          {starConfettiPieces.length > 0 ? (
+            <StarConfettiRain pieces={starConfettiPieces} />
+          ) : null}
           <div className="border-b border-[#C7D7EA] bg-[#F7FBFF] p-4 md:p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
@@ -1460,6 +1523,7 @@ export default function ConsolidationPage() {
                   setSmartFilter("pareto");
                   setHighlightOnly(false);
                   setQuickFocus("none");
+                  triggerStarCelebration();
                 }}
                 tone="gold"
               />
@@ -2255,6 +2319,48 @@ function KpiCard({
       >
         {value}
       </p>
+    </div>
+  );
+}
+
+function StarConfettiRain({ pieces }: { pieces: StarConfettiPiece[] }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden="true">
+      {pieces.map((piece) => (
+        <span
+          key={piece.id}
+          className={cn("absolute -top-5 opacity-95 will-change-transform", piece.round ? "rounded-full" : "rounded-[2px]")}
+          style={{
+            left: `${piece.left}%`,
+            width: `${piece.size}px`,
+            height: `${piece.round ? piece.size : piece.size * 1.6}px`,
+            backgroundColor: piece.color,
+            transform: `translate3d(0,-16px,0) rotate(0deg)`,
+            animationName: "star-confetti-fall",
+            animationDuration: `${piece.durationMs}ms`,
+            animationDelay: `${piece.delayMs}ms`,
+            animationTimingFunction: "cubic-bezier(0.22, 0.7, 0.3, 1)",
+            animationFillMode: "forwards",
+            ["--star-drift" as string]: `${piece.driftPx}px`,
+            ["--star-rotate" as string]: `${piece.rotateDeg}deg`,
+          }}
+        />
+      ))}
+      <style jsx>{`
+        @keyframes star-confetti-fall {
+          0% {
+            transform: translate3d(0, -16px, 0) rotate(0deg);
+            opacity: 0;
+          }
+          12% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate3d(var(--star-drift), 560px, 0) rotate(var(--star-rotate));
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
