@@ -126,6 +126,19 @@ const PRIORIZACAO_TO_LEVEL: Record<string, number> = {
 
 const CRITICIDADE_LABELS = ["N/D", "Baixa", "Média", "Alta", "Crítica"];
 const PRIORIZACAO_LABELS = ["N/D", "Postergado", "Oportuno", "Relevante", "Essencial"];
+const CONSOLIDATION_ELIGIBLE_STATUSES = new Set([
+  "aprovada",
+  "pactuando",
+  "concluida",
+  "homologada",
+]);
+
+function normalizeDfdStatus(value: unknown): string {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
 function criticidadeBadgeClass(level: number): string {
   if (level >= 4) return "bg-upe-red-upe/15 text-upe-red-dark border-upe-red-upe/30";
   if (level === 3) return "bg-upe-warm-light-terracotta/15 text-upe-warm-light-terracotta border-upe-warm-light-terracotta/35";
@@ -513,7 +526,7 @@ export default function ConsolidationPage() {
       let dfdsRes: any = await supabase
         .from("dfds")
         .select("*")
-        .eq("status", "aprovada")
+        .in("status", Array.from(CONSOLIDATION_ELIGIBLE_STATUSES))
         .order("created_at", { ascending: false });
 
       if (
@@ -525,12 +538,24 @@ export default function ConsolidationPage() {
           .select(
             "id, numero_protocolo, objeto_contratacao, created_at, campus_id, solicitante_id, valor_total_estimado",
           )
-          .eq("status", "aprovada")
+          .in("status", Array.from(CONSOLIDATION_ELIGIBLE_STATUSES))
           .order("created_at", { ascending: false });
       }
       if (dfdsRes.error) throw dfdsRes.error;
 
-      const approvedDfdsRows = (dfdsRes.data || []) as any[];
+      let approvedDfdsRows = (dfdsRes.data || []) as any[];
+      if (approvedDfdsRows.length === 0) {
+        // Fallback defensivo para ambientes onde o status foi persistido com variação legada.
+        const allDfdsRes: any = await supabase
+          .from("dfds")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (allDfdsRes.error) throw allDfdsRes.error;
+        approvedDfdsRows = ((allDfdsRes.data || []) as any[]).filter((row) =>
+          CONSOLIDATION_ELIGIBLE_STATUSES.has(normalizeDfdStatus(row?.status)),
+        );
+      }
+
       if (approvedDfdsRows.length === 0) {
         setDfds([]);
         setRawItems([]);
@@ -993,6 +1018,7 @@ export default function ConsolidationPage() {
     const codes = rawItems
       .filter((item) => item.dfd_id === selectedDfdId)
       .map((item) => item.item_key);
+    if (codes.length === 0) return null;
     return new Set(codes);
   }, [selectedDfdId, rawItems]);
 
