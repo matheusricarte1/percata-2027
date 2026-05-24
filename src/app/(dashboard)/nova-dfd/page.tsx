@@ -1614,7 +1614,7 @@ export default function NovaDFDPage() {
                     </div>
 
                     <Field
-                      className="xl:col-span-4"
+                      className="xl:col-span-6"
                       label="Local de uso"
                       icon={<Buildings size={14} />}
                     >
@@ -1653,7 +1653,7 @@ export default function NovaDFDPage() {
                     </Field>
 
                     <Field
-                      className="xl:col-span-4"
+                      className="xl:col-span-6"
                       label="Responsável pela análise"
                       icon={<Buildings size={14} />}
                     >
