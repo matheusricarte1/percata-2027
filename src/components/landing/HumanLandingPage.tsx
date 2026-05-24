@@ -129,8 +129,8 @@ const EXPERIENCES = [
 ];
 
 const LANDING_HEROES = [
-  "/brands/landing-petrolina-high.png",
-  "/brands/landing-ouricuri-high.png",
+  "/brands/dashboard-hero-petrolina-v3.png",
+  "/brands/dashboard-hero-ouricuri-v3.png",
 ];
 
 export function HumanLandingPage({
@@ -146,7 +146,7 @@ export function HumanLandingPage({
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setActiveHeroIndex((current) => (current + 1) % LANDING_HEROES.length);
-    }, 5000);
+    }, 6200);
 
     return () => window.clearInterval(intervalId);
   }, []);
@@ -164,11 +164,13 @@ export function HumanLandingPage({
               aria-hidden="true"
               className="absolute inset-0 h-full w-full object-cover object-center"
               animate={{
-                opacity: activeHeroIndex === index ? 0.94 : 0,
-                scale: activeHeroIndex === index ? 1 : 1.018,
+                opacity: activeHeroIndex === index ? 0.95 : 0,
+                scale: activeHeroIndex === index ? 1.01 : 1.06,
+                x: activeHeroIndex === index ? 0 : 16,
+                filter: activeHeroIndex === index ? "blur(0px)" : "blur(5px)",
               }}
               transition={{
-                duration: reduceMotion ? 0.2 : 1.6,
+                duration: reduceMotion ? 0.2 : 1.9,
                 ease: [0.22, 1, 0.36, 1],
               }}
               style={{
