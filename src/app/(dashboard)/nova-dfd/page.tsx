@@ -2105,8 +2105,8 @@ export default function NovaDFDPage() {
       </AnimatePresence>
 
       <Dialog open={showFinalizeFlow} onOpenChange={setShowFinalizeFlow}>
-        <DialogContent className="max-w-[560px] rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
-          <DialogHeader className="border-b border-[#E8EDF2] p-5">
+        <DialogContent className="max-h-[90vh] max-w-[560px] overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
+          <DialogHeader className="border-b border-[#E8EDF2] p-5 pr-12">
             <DialogTitle className="text-xl font-semibold text-[#164073]">
               {finalizeMode === "triagem"
                 ? "Confirmar encaminhamento à chefia"
@@ -2121,7 +2121,7 @@ export default function NovaDFDPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 px-5 pb-5 pt-2 text-sm text-[#3E4C5F]">
+          <div className="max-h-[52vh] space-y-3 overflow-y-auto px-5 pb-5 pt-2 text-sm text-[#3E4C5F]">
             <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
               {dfdGroups.map((group, index) => {
                 const local = userUnits.find(
