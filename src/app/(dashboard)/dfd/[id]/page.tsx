@@ -732,32 +732,50 @@ export default function DfdDetailsPage() {
                       key={item.id}
                       className="rounded-xl border border-[var(--semantic-neutral-border)] bg-[#FCFEFF] p-4 shadow-sm"
                     >
-                      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--semantic-action)] text-lg font-bold text-white">
-                              {String(index + 1).padStart(2, "0")}
-                            </span>
-                            <div>
-                              <p className="text-sm text-[var(--semantic-text-muted)]">Código</p>
-                              <p className="text-lg font-bold text-[var(--semantic-action)]">#{item.codigo_tce || "N/A"}</p>
-                            </div>
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_460px] lg:items-start">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--semantic-action)] to-[#1B57E0] text-lg font-bold text-white shadow-md">
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm text-[var(--semantic-text-muted)]">Código</p>
+                            <p className="truncate text-2xl font-bold tracking-tight text-[var(--semantic-action)]">
+                              #{item.codigo_tce || "N/A"}
+                            </p>
                           </div>
-                          <h3 className="mt-3 break-words text-base font-semibold leading-[1.5] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
-                            {formatCatalogDescription(item.descricao)}
-                          </h3>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <MetricChip label="QTD." value={String(qtd)} />
-                          <MetricChip label="Valor unitário" value={formatCurrency(unit)} />
-                          <MetricChip label="Subtotal" value={formatCurrency(subtotal)} />
+                        <div className="rounded-xl border border-[var(--semantic-action-border)] bg-gradient-to-r from-white to-[var(--semantic-action-soft)] px-3 py-2.5">
+                          <p className="text-sm font-semibold uppercase tracking-[0.03em] text-[var(--semantic-action)]">
+                            Resumo financeiro
+                          </p>
+                          <div className="mt-2 grid grid-cols-3 divide-x divide-[var(--semantic-action-border)]">
+                            <MetricChip variant="summary" label="Qtd." value={String(qtd)} />
+                            <MetricChip variant="summary" label="Valor unitário" value={formatCurrency(unit)} />
+                            <MetricChip variant="summary" label="Subtotal" value={formatCurrency(subtotal)} />
+                          </div>
                         </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                        <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
-                        <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
-                        <SmallInfo label="GND" value={item.gnd || "Não informado"} />
+                      <div className="mt-4 border-t border-[var(--semantic-neutral-border)] pt-4">
+                        <div className="flex items-start gap-3">
+                          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--semantic-action-soft)] text-[var(--semantic-action)]">
+                            <Package size={22} weight="duotone" />
+                          </span>
+                          <h3 className="break-words text-lg font-semibold leading-[1.45] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
+                            {formatCatalogDescription(item.descricao)}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-xl border border-[var(--semantic-neutral-border)] bg-[var(--semantic-neutral-soft)] p-3">
+                        <p className="text-sm font-semibold uppercase tracking-[0.03em] text-[var(--semantic-insight)]">
+                          Dados administrativos
+                        </p>
+                        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                          <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
+                          <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
+                          <SmallInfo label="GND" value={item.gnd || "Não informado"} />
+                        </div>
                       </div>
 
                       {justificationText ? (
@@ -785,9 +803,9 @@ export default function DfdDetailsPage() {
                           href={item.link_referencia}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--semantic-action)] hover:underline"
+                          className="mt-3 inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white px-4 text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)]"
                         >
-                          <Paperclip size={14} />
+                          <Paperclip size={16} />
                           Abrir referência técnica
                         </a>
                       ) : null}
@@ -961,7 +979,28 @@ function SmallInfo({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MetricChip({ label, value }: { label: string; value: string }) {
+function MetricChip({
+  label,
+  value,
+  variant = "default",
+}: {
+  label: string;
+  value: string;
+  variant?: "default" | "summary";
+}) {
+  if (variant === "summary") {
+    return (
+      <div className="px-3 first:pl-0 last:pr-0">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.03em] text-[var(--semantic-text-muted)]">
+          {label}
+        </p>
+        <p className="mt-1 break-words text-2xl font-bold leading-tight text-[var(--semantic-action)]">
+          {value}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-w-0 rounded-xl border border-[#D7E2F1] bg-[#F3F8FF] px-3 py-3 text-center">
       <p className="text-xs font-semibold text-[#60748D]">{label}</p>
