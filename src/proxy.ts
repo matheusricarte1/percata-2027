@@ -13,6 +13,7 @@ const PUBLIC_PATHS = [
   "/login",
   ACCESS_LOCK_PATH,
   "/verificar-dfd",
+  "/api/health",
   "/api/dfd/verify",
   "/api/dev/audit-login",
 ];
@@ -49,7 +50,12 @@ async function isAllowedLoginEmail(supabase: any, email: string): Promise<boolea
 }
 
 function isAccessLockBypassPath(pathname: string): boolean {
-  return pathname === ACCESS_LOCK_PATH || pathname === "/login" || pathname.startsWith("/auth/");
+  return (
+    pathname === ACCESS_LOCK_PATH ||
+    pathname === "/login" ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/auth/")
+  );
 }
 
 async function loadAccessLock(supabase: any) {
