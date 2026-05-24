@@ -458,22 +458,22 @@ export default function DfdDetailsPage() {
               >
                 <ArrowLeft size={16} />
               </button>
-              <h1 className="text-3xl font-bold tracking-tight text-[var(--semantic-action)] md:text-4xl">
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--semantic-action)] md:text-3xl">
                 {dfd.numero_protocolo || `DFD #${dfd.id.slice(0, 8).toUpperCase()}`}
               </h1>
               <span className={`rounded-full px-4 py-1 text-sm font-semibold ${status.className}`}>
                 {status.label}
               </span>
             </div>
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-lg text-[var(--semantic-text-muted)]">
-              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[var(--semantic-action)]">
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-base text-[var(--semantic-text-muted)]">
+              <p className="inline-flex items-center gap-2 text-base font-semibold text-[var(--semantic-action)]">
                 <Buildings size={24} />
-                <span className="text-xl">{campusLabel}</span>
+                <span className="text-lg">{campusLabel}</span>
               </p>
               <span>|</span>
-              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[var(--semantic-action)]">
+              <p className="inline-flex items-center gap-2 text-base font-semibold text-[var(--semantic-action)]">
                 <CalendarBlank size={24} />
-                <span className="text-xl">Ciclo: {String(dfd.exercicio || 2027)}</span>
+                <span className="text-lg">Ciclo: {String(dfd.exercicio || 2027)}</span>
               </p>
             </div>
           </div>
@@ -622,12 +622,12 @@ export default function DfdDetailsPage() {
             })}
             className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white p-5 shadow-[0_8px_22px_rgba(23,35,60,0.06)]"
           >
-            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[var(--semantic-action)]">
+            <h2 className="inline-flex items-center gap-2 text-lg font-bold text-[var(--semantic-action)]">
               <FileText size={30} weight="fill" />
               Justificativa da DFD
             </h2>
             <div className="mt-4 rounded-xl border border-[var(--semantic-action-border)] bg-[var(--semantic-action-soft)] p-5">
-              <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--semantic-text)]">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--semantic-text)]">
                 {dfd.justificativa_contratacao || "Sem justificativa registrada para esta solicitação."}
               </p>
               {dfd.analysis_routing_reason ? (
@@ -647,14 +647,14 @@ export default function DfdDetailsPage() {
             className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white shadow-[0_8px_22px_rgba(23,35,60,0.06)]"
           >
             <div className="flex items-center justify-between border-b border-[var(--semantic-neutral-border)] px-5 py-4">
-              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[var(--semantic-action)]">
+              <h2 className="inline-flex items-center gap-2 text-lg font-bold text-[var(--semantic-action)]">
                 <Package size={30} weight="fill" />
                 Itens da DFD
                 <span className="rounded-full bg-[var(--semantic-action-soft)] px-3 py-1 text-sm font-semibold text-[var(--semantic-action)]">
                   {items.length} item{items.length === 1 ? "" : "s"}
                 </span>
               </h2>
-              <p className="text-xl font-bold text-[var(--semantic-action)]">{formatCurrency(totalGeral)}</p>
+              <p className="text-lg font-bold text-[var(--semantic-action)]">{formatCurrency(totalGeral)}</p>
             </div>
 
             {items.length === 0 ? (
@@ -688,15 +688,15 @@ export default function DfdDetailsPage() {
                       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--semantic-action)] text-xl font-bold text-white">
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--semantic-action)] text-lg font-bold text-white">
                               {String(index + 1).padStart(2, "0")}
                             </span>
                             <div>
                               <p className="text-sm text-[var(--semantic-text-muted)]">Código</p>
-                              <p className="text-xl font-bold text-[var(--semantic-action)]">#{item.codigo_tce || "N/A"}</p>
+                              <p className="text-lg font-bold text-[var(--semantic-action)]">#{item.codigo_tce || "N/A"}</p>
                             </div>
                           </div>
-                          <h3 className="mt-3 break-words text-lg font-semibold leading-[1.5] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
+                          <h3 className="mt-3 break-words text-base font-semibold leading-[1.5] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
                             {formatCatalogDescription(item.descricao)}
                           </h3>
                         </div>
@@ -760,11 +760,11 @@ export default function DfdDetailsPage() {
           })}
           className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white p-5 shadow-[0_8px_22px_rgba(23,35,60,0.06)] lg:sticky lg:top-4 lg:h-fit"
         >
-          <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[var(--semantic-action)]">
+          <h2 className="inline-flex items-center gap-2 text-lg font-bold text-[var(--semantic-action)]">
             <Clock size={30} weight="fill" />
             Histórico de tramitação
           </h2>
-          <p className="mt-2 text-base leading-6 text-[var(--semantic-text-muted)]">
+          <p className="mt-2 text-sm leading-6 text-[var(--semantic-text-muted)]">
             Acompanhe as etapas e movimentações desta DFD.
           </p>
 
@@ -785,7 +785,7 @@ export default function DfdDetailsPage() {
                     <span className={`z-10 mt-1 h-5 w-5 rounded-full border-4 ${meta.dot}`} />
                     <div className={`flex-1 rounded-xl border px-4 py-3 ${isLatest ? "border-[#BFD4F2] bg-[#F5F9FF]" : "border-[#E1EAF6] bg-white"}`}>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-bold text-[var(--semantic-action)]">{meta.label}</p>
+                        <p className="text-sm font-bold text-[var(--semantic-action)]">{meta.label}</p>
                         {isLatest ? (
                           <span className="rounded-full bg-[#E4EEFF] px-2 py-0.5 text-xs font-bold text-[#1B57E0]">
                             ATUAL
@@ -809,7 +809,7 @@ export default function DfdDetailsPage() {
           <button
             type="button"
             onClick={() => router.push("/historico")}
-            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white text-base font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)]"
+            className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)]"
           >
             <ListBullets size={18} />
             Ver todas as movimentações
@@ -847,9 +847,9 @@ function MetaCard({
 
   return (
     <div className={`rounded-xl border p-4 ${toneMap[tone] || toneMap.blue}`}>
-      <p className="text-sm font-medium tracking-[0.02em] opacity-85">{label}</p>
+      <p className="text-xs font-medium tracking-[0.02em] opacity-85">{label}</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="inline-flex min-w-0 items-start gap-2 text-lg font-semibold leading-tight">
+        <p className="inline-flex min-w-0 items-start gap-2 text-base font-semibold leading-tight">
           <Icon size={20} className="mt-0.5 shrink-0" />
           <span className="line-clamp-2 break-words">{value}</span>
         </p>
@@ -862,8 +862,8 @@ function MetaCard({
 function ValueCard({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className={`rounded-xl border border-[#79B3F8] bg-gradient-to-r from-[#0F97E7] via-[#33A1F0] to-[#3F6DEB] p-4 text-white ${className || ""}`}>
-      <p className="text-base font-semibold opacity-95">{label}</p>
-      <p className="mt-1 text-2xl font-bold leading-tight">{value}</p>
+      <p className="text-sm font-semibold opacity-95">{label}</p>
+      <p className="mt-1 text-xl font-bold leading-tight">{value}</p>
     </div>
   );
 }
@@ -871,8 +871,8 @@ function ValueCard({ label, value, className }: { label: string; value: string; 
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#D7E2F1] bg-[#F8FBFF] px-3 py-2.5">
-      <p className="text-sm font-medium text-[#60748D]">{label}</p>
-      <p className="mt-1 text-lg font-semibold leading-tight text-[#1E3E6A]">{value}</p>
+      <p className="text-xs font-medium text-[#60748D]">{label}</p>
+      <p className="mt-1 text-base font-semibold leading-tight text-[#1E3E6A]">{value}</p>
     </div>
   );
 }
@@ -880,8 +880,8 @@ function SmallInfo({ label, value }: { label: string; value: string }) {
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-[#D7E2F1] bg-[#F3F8FF] px-3 py-3 text-center">
-      <p className="text-sm font-semibold text-[#60748D]">{label}</p>
-      <p className="mt-1 break-words text-xl font-bold leading-tight text-[#124078]">{value}</p>
+      <p className="text-xs font-semibold text-[#60748D]">{label}</p>
+      <p className="mt-1 break-words text-lg font-bold leading-tight text-[#124078]">{value}</p>
     </div>
   );
 }
