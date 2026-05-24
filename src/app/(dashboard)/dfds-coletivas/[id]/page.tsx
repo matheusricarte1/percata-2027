@@ -16,7 +16,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { recordCatalogSearchClick } from "@/lib/catalog-search-events";
 import {
@@ -1635,34 +1635,20 @@ function PulsingCtaButton({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   pulse?: boolean;
 }) {
-  const prefersReducedMotion = useReducedMotion();
-  const shouldPulse = Boolean(pulse && !prefersReducedMotion && !disabled);
+  const shouldPulse = Boolean(pulse && !disabled);
 
   return (
-    <motion.button
+    <button
       {...props}
       disabled={disabled}
-      className={className}
-      animate={
-        shouldPulse
-          ? {
-              scale: [1, 1.015, 1],
-              boxShadow: [
-                "0 0 0 0 rgba(11, 74, 162, 0.2)",
-                "0 0 0 8px rgba(11, 74, 162, 0)",
-                "0 0 0 0 rgba(11, 74, 162, 0)",
-              ],
-            }
-          : { scale: 1, boxShadow: "0 0 0 0 rgba(11, 74, 162, 0)" }
-      }
-      transition={
-        shouldPulse
-          ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
-          : { duration: 0.2 }
-      }
+      className={cn(
+        className,
+        shouldPulse &&
+          "motion-safe:animate-pulse motion-reduce:animate-none ring-2 ring-[#0B4AA2]/20 ring-offset-2 ring-offset-white",
+      )}
     >
       {children}
-    </motion.button>
+    </button>
   );
 }
 
