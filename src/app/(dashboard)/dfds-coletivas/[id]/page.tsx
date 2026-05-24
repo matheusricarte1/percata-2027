@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
+  ButtonHTMLAttributes,
   Dispatch,
   FormEvent,
   MouseEvent,
@@ -15,7 +16,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { recordCatalogSearchClick } from "@/lib/catalog-search-events";
 import {
@@ -1625,6 +1626,46 @@ function CatalogPanel(props: {
   );
 }
 
+function PulsingCtaButton({
+  pulse = false,
+  className,
+  disabled,
+  children,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  pulse?: boolean;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+  const shouldPulse = Boolean(pulse && !prefersReducedMotion && !disabled);
+
+  return (
+    <motion.button
+      {...props}
+      disabled={disabled}
+      className={className}
+      animate={
+        shouldPulse
+          ? {
+              scale: [1, 1.015, 1],
+              boxShadow: [
+                "0 0 0 0 rgba(11, 74, 162, 0.2)",
+                "0 0 0 8px rgba(11, 74, 162, 0)",
+                "0 0 0 0 rgba(11, 74, 162, 0)",
+              ],
+            }
+          : { scale: 1, boxShadow: "0 0 0 0 rgba(11, 74, 162, 0)" }
+      }
+      transition={
+        shouldPulse
+          ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
+          : { duration: 0.2 }
+      }
+    >
+      {children}
+    </motion.button>
+  );
+}
+
 function SelectionFloatingBar({
   activeCartItem,
   pendingCount,
@@ -1718,14 +1759,15 @@ function SelectionFloatingBar({
               >
                 {hasPendingItems ? "Revisar" : "Ver resumo"}
               </button>
-              <button
+              <PulsingCtaButton
                 type="button"
                 onClick={onContinue}
                 disabled={canConsolidate && consolidatedCount === 0}
+                pulse
                 className="h-10 rounded-full bg-[#063F8F] px-5 text-sm font-semibold text-white transition hover:bg-[#083A7E] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {canConsolidate ? "Consolidar" : "Finalizar"}
-              </button>
+              </PulsingCtaButton>
             </div>
           </div>
         </motion.div>
@@ -2049,14 +2091,15 @@ function SelectedItemDrawer({
                     {savingCart ? "Enviando..." : "Enviar itens para a sala"} <Plus size={17} weight="bold" />
                   </button>
                 </form>
-                <button
+                <PulsingCtaButton
                   type="button"
                   onClick={onContinue}
                   disabled={canConsolidate && detail.items.length === 0}
+                  pulse
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#CBD5E1] bg-white text-sm font-semibold text-[#0B4AA2] transition hover:bg-[#F7FBFF] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {canConsolidate ? "Consolidar" : "Finalizar"} <ArrowRight size={17} weight="bold" />
-                </button>
+                </PulsingCtaButton>
               </div>
               <p className="mt-3 text-center text-xs text-[#667085]">
                 Os itens do carrinho so entram na DFD coletiva quando voce confirma o envio para a sala.
@@ -2591,14 +2634,15 @@ function ConsolidationSummary({
           : "Coautoria já encerrada. O próximo passo é abrir a prévia de conversão para revisão final."}
       </div>
       <Checklist title="Antes de avançar, verifique:" checklist={checklist} />
-      <button
+      <PulsingCtaButton
         type="button"
         onClick={onContinue}
         disabled={!canEdit || updatingStatus || detail.items.length === 0}
+        pulse
         className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
         {ctaLabel} <ArrowRight size={17} weight="bold" />
-      </button>
+      </PulsingCtaButton>
       <button
         type="button"
         onClick={onSaveAndExit}
