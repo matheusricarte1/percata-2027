@@ -13,6 +13,7 @@ import { getSafeUser, supabase } from "@/lib/supabase";
 import {
   mapUserSettingsRow,
   normalizeUserSettings,
+  parseUserSettingsJson,
   type UserSettings,
 } from "@/lib/user-settings";
 import "@material/web/all.js";
@@ -37,7 +38,7 @@ function applyStoredSettings(settings: Partial<UserSettings> | null) {
 function loadStoredSettings(): Partial<UserSettings> | null {
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
-    return raw ? (JSON.parse(raw) as Partial<UserSettings>) : null;
+    return parseUserSettingsJson(raw);
   } catch {
     return null;
   }

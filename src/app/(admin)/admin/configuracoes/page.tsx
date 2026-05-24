@@ -22,7 +22,11 @@ import { Button } from "@/components/ui/button";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
-import { sanitizePlainText } from "@/lib/settings-sanitize";
+import {
+  sanitizeLongText,
+  sanitizePlainText,
+  sanitizeUiMessage,
+} from "@/lib/settings-sanitize";
 
 const UsuariosModule = dynamic(() => import("@/app/(admin)/admin/usuarios/page"), {
   ssr: false,
@@ -169,7 +173,7 @@ export default function ConfiguracoesAdminPage() {
         Object.fromEntries(labsData.map((item) => [item.id, item.nome])),
       );
     } catch (error: any) {
-      const message = error?.message || "Erro ao carregar estrutura.";
+      const message = sanitizeUiMessage(error?.message, 220) || "Erro ao carregar estrutura.";
       setStructureNotice(message);
       toast.error(message);
     } finally {
@@ -263,7 +267,7 @@ export default function ConfiguracoesAdminPage() {
       await loadStructure(selectedCampusId);
       return payload;
     } catch (error: any) {
-      toast.error(error?.message || "Erro na operação.");
+      toast.error(sanitizeUiMessage(error?.message, 220) || "Erro na operação.");
       return null;
     } finally {
       setSaving(false);
@@ -438,9 +442,12 @@ function SystemAccessLockPanel() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "Falha ao carregar bloqueio.");
       setEnabled(Boolean(payload?.value?.enabled));
-      setMessage(String(payload?.value?.message || "").trim() || message);
+      setMessage(
+        sanitizeLongText(payload?.value?.message, 240) ||
+          "O sistema esta temporariamente bloqueado para manutenção. Aguarde a liberação pelo superadmin.",
+      );
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao carregar bloqueio global.");
+      toast.error(sanitizeUiMessage(error?.message, 220) || "Erro ao carregar bloqueio global.");
     } finally {
       setLoading(false);
     }
@@ -448,7 +455,6 @@ function SystemAccessLockPanel() {
 
   useEffect(() => {
     void loadLock();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function saveLock(nextEnabled: boolean) {
@@ -457,15 +463,21 @@ function SystemAccessLockPanel() {
       const response = await fetch("/api/superadmin/access-lock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: nextEnabled, message }),
+        body: JSON.stringify({
+          enabled: nextEnabled,
+          message: sanitizeLongText(message, 240),
+        }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "Falha ao atualizar bloqueio.");
       setEnabled(Boolean(payload?.value?.enabled));
-      setMessage(String(payload?.value?.message || "").trim() || message);
+      setMessage(
+        sanitizeLongText(payload?.value?.message, 240) ||
+          "O sistema esta temporariamente bloqueado para manutenção. Aguarde a liberação pelo superadmin.",
+      );
       toast.success(nextEnabled ? "Acesso bloqueado para todos, exceto superadmin." : "Acesso liberado.");
     } catch (error: any) {
-      toast.error(error?.message || "Erro ao atualizar bloqueio global.");
+      toast.error(sanitizeUiMessage(error?.message, 220) || "Erro ao atualizar bloqueio global.");
     } finally {
       setSaving(false);
     }
@@ -504,7 +516,7 @@ function SystemAccessLockPanel() {
         </span>
         <textarea
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          onChange={(event) => setMessage(sanitizeLongText(event.target.value, 240))}
           className="mt-2 min-h-[92px] w-full resize-none rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] px-4 py-3 text-sm font-medium text-[#2E3A4A] outline-none focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
           maxLength={240}
           disabled={loading || saving}

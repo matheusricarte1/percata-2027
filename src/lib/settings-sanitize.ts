@@ -12,6 +12,14 @@ export function sanitizePlainText(value: unknown, maxLength = 240) {
     .slice(0, maxLength);
 }
 
+export function sanitizeUiMessage(value: unknown, maxLength = 240) {
+  return sanitizePlainText(value, maxLength).trim();
+}
+
+export function sanitizeUiLabel(value: unknown, maxLength = 64) {
+  return sanitizePlainText(value, maxLength).trim();
+}
+
 export function sanitizeLongText(value: unknown, maxLength = 4000) {
   return String(value ?? "")
     .replace(CONTROL_CHARS, "")

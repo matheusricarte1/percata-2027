@@ -130,3 +130,22 @@ export function toUserSettingsUpsert(userId: string, settings: UserSettings) {
     show_avatar: sanitized.showAvatar,
   };
 }
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function parseUserSettingsSnapshot(value: unknown): UserSettings | null {
+  if (!isPlainRecord(value)) return null;
+  return normalizeUserSettings(value as Partial<UserSettings>);
+}
+
+export function parseUserSettingsJson(raw: string | null | undefined): UserSettings | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parseUserSettingsSnapshot(parsed);
+  } catch {
+    return null;
+  }
+}

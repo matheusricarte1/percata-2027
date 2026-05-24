@@ -18,10 +18,12 @@ import {
   DEFAULT_USER_SETTINGS,
   mapUserSettingsRow,
   normalizeUserSettings,
+  parseUserSettingsJson,
   toUserSettingsUpsert,
   type AccentColor,
   type UserSettings,
 } from "@/lib/user-settings";
+import { sanitizePlainText, sanitizeUiLabel, sanitizeUiMessage } from "@/lib/settings-sanitize";
 
 type EmailStatus = {
   provider: "resend" | "smtp" | "none";
@@ -84,15 +86,14 @@ function isMissingSettingsTableError(error: any): boolean {
 }
 
 function toStorageKey(userId: string) {
-  return `${STORAGE_PREFIX}:${userId}`;
+  const safeUserId = sanitizePlainText(userId, 80);
+  return `${STORAGE_PREFIX}:${safeUserId || "unknown-user"}`;
 }
 
 function loadLocalSettings(userId: string): UserSettings {
   try {
     const raw = window.localStorage.getItem(toStorageKey(userId));
-    if (!raw) return DEFAULT_USER_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return normalizeUserSettings(parsed);
+    return parseUserSettingsJson(raw) || DEFAULT_USER_SETTINGS;
   } catch {
     return DEFAULT_USER_SETTINGS;
   }
@@ -120,6 +121,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
   const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null);
   const [emailStatusLoading, setEmailStatusLoading] = useState(false);
   const [sendingEmailTest, setSendingEmailTest] = useState(false);
+  const safeScope = useMemo(() => sanitizeUiLabel(scope, 48) || "Usuário", [scope]);
 
   const loadEmailStatus = async ({ silent = false }: { silent?: boolean } = {}) => {
     setEmailStatusLoading(true);
@@ -130,7 +132,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload?.error || "Falha ao carregar status de e-mail.");
+        throw new Error(sanitizeUiMessage(payload?.error, 220) || "Falha ao carregar status de e-mail.");
       }
       setEmailStatus(payload as EmailStatus);
     } catch (error: any) {
@@ -139,12 +141,12 @@ export function SettingsPanel({ scope }: { scope: string }) {
         configured: false,
         fromAddress: "não configurado",
         redirectTo: null,
-        reason: error?.message || "Canal de e-mail indisponível.",
+        reason: sanitizeUiMessage(error?.message, 220) || "Canal de e-mail indisponível.",
         queueAvailable: false,
         queue: null,
       });
       if (!silent) {
-        toast.error("Falha ao carregar canal de e-mail: " + (error?.message || "erro desconhecido"));
+        toast.error("Falha ao carregar canal de e-mail: " + (sanitizeUiMessage(error?.message, 180) || "erro desconhecido"));
       }
     } finally {
       setEmailStatusLoading(false);
@@ -199,7 +201,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
         }
       } catch (error: any) {
         if (alive) {
-          toast.error("Falha ao carregar configurações: " + (error?.message || "erro desconhecido"));
+          toast.error("Falha ao carregar configurações: " + (sanitizeUiMessage(error?.message, 180) || "erro desconhecido"));
           const fallbackUser = await getSafeUser();
           if (fallbackUser?.id) {
             setSettings(loadLocalSettings(fallbackUser.id));
@@ -263,12 +265,15 @@ export function SettingsPanel({ scope }: { scope: string }) {
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload?.error || payload?.reason || "Falha ao enviar e-mail de teste.");
+        throw new Error(
+          sanitizeUiMessage(payload?.error || payload?.reason, 220) || "Falha ao enviar e-mail de teste.",
+        );
       }
-      toast.success(`E-mail de teste enviado para ${payload?.to || userEmail || "sua caixa de entrada"}.`);
+      const safeTarget = sanitizePlainText(payload?.to || userEmail || "sua caixa de entrada", 140);
+      toast.success(`E-mail de teste enviado para ${safeTarget}.`);
       await loadEmailStatus();
     } catch (error: any) {
-      toast.error("Erro no teste de e-mail: " + (error?.message || "erro desconhecido"));
+      toast.error("Erro no teste de e-mail: " + (sanitizeUiMessage(error?.message, 180) || "erro desconhecido"));
     } finally {
       setSendingEmailTest(false);
     }
@@ -300,7 +305,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
       setSettings(sanitized);
       toast.success("Configurações salvas com sucesso.");
     } catch (error: any) {
-      toast.error("Erro ao salvar configurações: " + (error?.message || "erro desconhecido"));
+      toast.error("Erro ao salvar configurações: " + (sanitizeUiMessage(error?.message, 180) || "erro desconhecido"));
     } finally {
       setSaving(false);
     }
@@ -328,7 +333,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
               Configurações
             </h1>
             <p className="text-sm font-medium text-[#52627A]">
-              Ajuste sua experiência no sistema ({scope}).
+              Ajuste sua experiência no sistema ({safeScope}).
             </p>
           </div>
           </div>

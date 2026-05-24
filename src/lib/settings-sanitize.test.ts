@@ -6,6 +6,8 @@ import {
   parseLocalDateTimeToIso,
   sanitizeEmail,
   sanitizePlainText,
+  sanitizeUiLabel,
+  sanitizeUiMessage,
   sanitizeUuid,
   validateDateRange,
 } from "./settings-sanitize.ts";
@@ -32,5 +34,10 @@ describe("settings-sanitize", () => {
 
     assert.equal(validateDateRange(start, end).ok, false);
     assert.equal(validateDateRange(start, null).ok, true);
+  });
+
+  it("sanitizes ui labels and messages", () => {
+    assert.equal(sanitizeUiLabel("  Configurações\nAdmin  ", 14), "Configurações");
+    assert.equal(sanitizeUiMessage("Erro\u0000 interno\n\n", 20), "Erro interno");
   });
 });

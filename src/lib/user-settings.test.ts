@@ -4,6 +4,8 @@ import { describe, it } from "node:test";
 import {
   mapUserSettingsRow,
   normalizeUserSettings,
+  parseUserSettingsJson,
+  parseUserSettingsSnapshot,
   toUserSettingsUpsert,
 } from "./user-settings.ts";
 
@@ -30,5 +32,14 @@ describe("user-settings", () => {
 
   it("falls back to the institutional accent for invalid values", () => {
     assert.equal(normalizeUserSettings({ accentColor: "purple" as any }).accentColor, "upe");
+  });
+
+  it("parses settings snapshots safely from objects and JSON", () => {
+    const fromSnapshot = parseUserSettingsSnapshot({ accentColor: "teal" });
+    const fromJson = parseUserSettingsJson('{"accentColor":"gold"}');
+    assert.equal(fromSnapshot?.accentColor, "teal");
+    assert.equal(fromJson?.accentColor, "gold");
+    assert.equal(parseUserSettingsSnapshot(["bad"] as any), null);
+    assert.equal(parseUserSettingsJson("{"), null);
   });
 });
