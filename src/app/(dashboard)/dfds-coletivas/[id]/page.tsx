@@ -466,6 +466,14 @@ export default function DfdColetivaDetailPage() {
   }, [detail, viewerUserId]);
   const canDeleteRequestedContribution =
     detail?.room.actor_role === "admin" || detail?.room.actor_role === "superadmin";
+  const itemsFromOtherPeople = useMemo(() => {
+    if (!detail) return [];
+    return detail.items.filter((item) =>
+      (item.contributors || []).some(
+        (contributor) => String(contributor.user_id || "") !== String(viewerUserId || ""),
+      ),
+    );
+  }, [detail, viewerUserId]);
 
   async function saveMetadata(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1123,6 +1131,8 @@ export default function DfdColetivaDetailPage() {
               canDeleteContribution={canDeleteRequestedContribution}
               onAddMoreContribution={seedContributionInCart}
               onDeleteContribution={deleteRequestedContribution}
+              itemsFromOthers={itemsFromOtherPeople}
+              onRequestFromOtherItem={addAggregatedItemToCart}
               addContribution={addContribution}
               subtotal={selectedSubtotal}
               disabled={!canContributeInOpenRoom || savingCart}
@@ -1737,6 +1747,8 @@ function SelectedItemDrawer({
   canDeleteContribution,
   onAddMoreContribution,
   onDeleteContribution,
+  itemsFromOthers,
+  onRequestFromOtherItem,
   addContribution,
   subtotal,
   disabled,
@@ -1757,6 +1769,8 @@ function SelectedItemDrawer({
   canDeleteContribution: boolean;
   onAddMoreContribution: (contribution: Contribution) => void;
   onDeleteContribution: (contribution: Contribution) => void;
+  itemsFromOthers: AggregatedItem[];
+  onRequestFromOtherItem: (item: AggregatedItem) => void;
   addContribution: (event: FormEvent) => void;
   subtotal: number;
   disabled: boolean;
@@ -1938,14 +1952,14 @@ function SelectedItemDrawer({
               />
 
               <section className="mt-4 rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
-                <SectionTitle icon={<Package size={18} weight="bold" />} title="Itens já adicionados" />
-                {detail.items.length === 0 ? (
+                <SectionTitle icon={<Package size={18} weight="bold" />} title="Itens adicionados por outras pessoas" />
+                {itemsFromOthers.length === 0 ? (
                   <p className="mt-4 rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-4 text-center text-sm text-[#667085]">
-                    Nenhum item consolidado ainda.
+                    Ainda não há itens de outros participantes para complementar.
                   </p>
                 ) : (
                   <div className="mt-4 divide-y divide-[#EEF2F7]">
-                    {detail.items.slice(0, 5).map((item) => {
+                    {itemsFromOthers.slice(0, 6).map((item) => {
                       const key = `${item.codigo_item_efisco || item.codigo_tce}-${item.gnd || item.gnd_derivado}`;
                       return (
                         <div key={key} className="py-3">
@@ -1953,9 +1967,14 @@ function SelectedItemDrawer({
                             <p className="line-clamp-2 text-sm font-semibold leading-5 text-[#0F172A]">
                               {item.descricao}
                             </p>
-                            <strong className="shrink-0 text-sm text-[#0B4AA2]">
-                              {formatCurrency(getItemSubtotal(item))}
-                            </strong>
+                            <button
+                              type="button"
+                              onClick={() => onRequestFromOtherItem(item)}
+                              className="inline-flex h-8 shrink-0 items-center gap-2 rounded-md border border-[#CBD5E1] bg-white px-3 text-xs font-semibold text-[#0B4AA2] hover:bg-[#F1F5F9]"
+                            >
+                              <Plus size={13} weight="bold" />
+                              Adicionar minha quantidade
+                            </button>
                           </div>
                           <p className="mt-1 text-xs text-[#526070]">
                             Qtd. {item.quantidade} · {item.gnd || item.gnd_derivado || "GND não informado"}
@@ -1963,9 +1982,9 @@ function SelectedItemDrawer({
                         </div>
                       );
                     })}
-                    {detail.items.length > 5 && (
+                    {itemsFromOthers.length > 6 && (
                       <p className="pt-3 text-xs font-semibold text-[#0B4AA2]">
-                        + {detail.items.length - 5} item(ns) no resumo completo
+                        + {itemsFromOthers.length - 6} item(ns) de outros participantes
                       </p>
                     )}
                   </div>
