@@ -159,23 +159,23 @@ const GROUPING_OPTIONS: Array<{
   {
     value: "grupo",
     title: "Unir por grupo",
-    description: "Recomendado para gerar DFDs por família ampla do e-Fisco.",
+    description: "Melhor para começar: cria uma DFD por família maior do e-Fisco.",
     recommended: true,
   },
   {
     value: "classe",
     title: "Unir por classe",
-    description: "Mais granular, útil quando um grupo reúne necessidades distintas.",
+    description: "Mais detalhado: separa melhor quando o grupo tem necessidades diferentes.",
   },
   {
     value: "livre",
     title: "Deixar livre",
-    description: "Mantém o carrinho junto, mas separa custeio e capital automaticamente.",
+    description: "Mantém tudo junto e ainda separa custeio e capital automaticamente.",
   },
   {
     value: "coletiva",
     title: "Coletiva por setor",
-    description: "Soma itens comuns da mesma unidade e guarda quantidades por usuário.",
+    description: "Junta itens em comum da unidade e registra quanto cada pessoa pediu.",
   },
 ];
 
@@ -667,7 +667,7 @@ export default function NovaDFDPage() {
       );
       if (selectedUnitIds.size > 1) {
         errors.push(
-          "DFD coletiva: todos os itens devem usar o mesmo setor/laboratorio.",
+          "Na DFD coletiva, todos os itens precisam ficar no mesmo setor/laboratório.",
         );
       }
     }
@@ -679,29 +679,29 @@ export default function NovaDFDPage() {
         errors.push(`${label}: ${expenseViolation}`);
       }
       if (!String(group.formData.objeto || "").trim()) {
-        errors.push(`${label}: título do objeto é obrigatório.`);
+        errors.push(`${label}: informe o título do objeto.`);
       }
       if (!group.formData.unidade_id) {
-        errors.push(`${label}: local de uso é obrigatório.`);
+        errors.push(`${label}: escolha o local de uso.`);
       }
       if (!group.formData.analysis_unidade_id) {
-        errors.push(`${label}: responsável pela análise é obrigatório.`);
+        errors.push(`${label}: escolha quem fará a análise.`);
       }
       if (!group.formData.finalidade) {
-        errors.push(`${label}: finalidade da demanda é obrigatória.`);
+        errors.push(`${label}: escolha a finalidade da demanda.`);
       }
       if (!group.formData.contexto_academico) {
-        errors.push(`${label}: contexto de uso é obrigatório.`);
+        errors.push(`${label}: escolha o contexto de uso.`);
       }
       if (!String(group.formData.justificativa_contratacao || "").trim()) {
-        errors.push(`${label}: justificativa da necessidade é obrigatória.`);
+        errors.push(`${label}: escreva o porquê dessa necessidade.`);
       }
       if (!String(group.formData.justificativa_quantidade || "").trim()) {
-        errors.push(`${label}: base de cálculo é obrigatória.`);
+        errors.push(`${label}: explique como chegou nas quantidades.`);
       }
       if (!String(group.formData.previsao_data || "").trim()) {
         errors.push(
-          `${label}: previsão de recebimento é obrigatória (a partir de ${formatIsoDateToPtBr(NEXT_YEAR_MIN_DATE)}).`,
+          `${label}: informe a previsão de recebimento (a partir de ${formatIsoDateToPtBr(NEXT_YEAR_MIN_DATE)}).`,
         );
       } else if (group.formData.previsao_data < NEXT_YEAR_MIN_DATE) {
         errors.push(
@@ -723,20 +723,20 @@ export default function NovaDFDPage() {
         if (!description) errors.push(`${itemLabel}: descrição não informada.`);
         if (!code) errors.push(`${itemLabel}: código e-Fisco não informado.`);
         if (!Number.isFinite(qtd) || qtd <= 0) {
-          errors.push(`${itemLabel}: quantidade deve ser maior que zero.`);
+          errors.push(`${itemLabel}: informe uma quantidade maior que zero.`);
         }
-        if (!unit) errors.push(`${itemLabel}: unidade é obrigatória.`);
+        if (!unit) errors.push(`${itemLabel}: informe a unidade.`);
         if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-          errors.push(`${itemLabel}: valor unitário deve ser maior que zero.`);
+          errors.push(`${itemLabel}: informe um valor unitário maior que zero.`);
         }
         if (!gnd) errors.push(`${itemLabel}: GND não informado.`);
-        if (!link) errors.push(`${itemLabel}: link de referência é obrigatório.`);
+        if (!link) errors.push(`${itemLabel}: adicione um link de referência.`);
         if (link && !isValidReferenceLink(link)) {
-          errors.push(`${itemLabel}: informe um link válido (http/https).`);
+          errors.push(`${itemLabel}: use um link válido (http/https).`);
         }
         if (just.length < MIN_ITEM_JUSTIFICATIVA_CHARS) {
           errors.push(
-            `${itemLabel}: justificativa técnica com mínimo de ${MIN_ITEM_JUSTIFICATIVA_CHARS} caracteres.`,
+            `${itemLabel}: detalhe melhor a justificativa (${MIN_ITEM_JUSTIFICATIVA_CHARS}+ caracteres).`,
           );
         }
       });
@@ -789,7 +789,7 @@ export default function NovaDFDPage() {
   const handleFinalize = async () => {
     if (blockingErrors.length > 0) {
       toast.error(
-        `Preencha os campos obrigatórios antes de finalizar (${blockingErrors.length} pendência(s)). Ex.: ${blockingErrors[0]}`,
+        `Faltam ${blockingErrors.length} ajuste(s) antes de concluir. Exemplo: ${blockingErrors[0]}`,
       );
       return;
     }
@@ -1056,7 +1056,7 @@ export default function NovaDFDPage() {
           createdCount += 1;
         }
 
-        toast.success(`${createdCount} DFD(s) coletiva(s) criada(s) com sucesso.`);
+        toast.success(`${createdCount} DFD(s) coletiva(s) criada(s). Tudo certo.`);
         clearCarrinho();
         // Apaga rascunho — DFDs já existem no banco; nada a recuperar.
         await draft.clear();
@@ -1170,12 +1170,12 @@ export default function NovaDFDPage() {
         }
       }
 
-      toast.success(`${dfdGroups.length} DFD(s) criada(s) com sucesso.`);
+      toast.success(`${dfdGroups.length} DFD(s) criada(s). Tudo certo.`);
       clearCarrinho();
       await draft.clear();
       router.push("/minhas-dfds");
     } catch (error: any) {
-      toast.error(`Erro ao finalizar DFDs: ${error.message}`);
+      toast.error(`Não foi possível concluir agora: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -1192,7 +1192,7 @@ export default function NovaDFDPage() {
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-[#164073]">Carrinho vazio</h2>
           <p className="text-sm text-[#5B6675]">
-            Selecione itens no catálogo para iniciar a elaboração das DFDs.
+            Escolha itens no catálogo para começar sua solicitação.
           </p>
         </div>
         <Button
@@ -1211,14 +1211,14 @@ export default function NovaDFDPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.08em] text-[#164073]">
-              Solicitação guiada
+              Passo a passo
             </span>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[#0F2E57] md:text-5xl">
               Vamos organizar sua demanda
             </h1>
             <p className="mt-2 max-w-4xl text-sm leading-7 text-[#3E4C5F]">
-              O sistema separa o carrinho em etapas para que você consiga montar os rascunhos de DFD
-              com mais clareza, justificativas melhores e menos sensação de preenchimento solto.
+              Separamos tudo por etapas para você preencher com calma, sem se perder,
+              e montar DFDs mais claras.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -1246,8 +1246,8 @@ export default function NovaDFDPage() {
                 Você não precisa lembrar tudo de uma vez
               </h2>
               <p className="mt-1 max-w-4xl text-sm leading-6 text-[#52627A]">
-                Complete os dados essenciais, finalize os rascunhos e, depois, envie cada DFD para a chefia
-                em Minhas DFDs. O sistema usa este fluxo para ajudar você a construir a solicitação com mais segurança.
+                Primeiro complete os dados principais. Depois conclua os rascunhos e envie para a chefia em
+                <b> Minhas DFDs</b>. Você pode revisar tudo antes de enviar.
               </p>
             </div>
           </div>
@@ -1286,7 +1286,7 @@ export default function NovaDFDPage() {
 
                 <div className="rounded-2xl border border-[#D9E0E8] bg-white p-3">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#164073]">
-                    Checklist antes de finalizar
+                    Confira antes de concluir
                   </p>
                   <div className="mt-3 space-y-2">
                     {processChecklist.slice(0, 5).map((item) => (
@@ -1318,13 +1318,11 @@ export default function NovaDFDPage() {
               Organização do carrinho
             </div>
             <h2 className="mt-2 text-2xl font-semibold text-[#0F2E57]">
-              Como deseja gerar as DFDs?
+              Como você quer organizar as DFDs?
             </h2>
             <p className="mt-1 text-sm leading-6 text-[#5B6675]">
-              Nossa recomendação é unir por grupo e-Fisco. Isso cria uma DFD por família ampla
-              de necessidade e mantém as classes como seções internas de análise. Custeio e
-              capital são sempre separados. Para demandas compartilhadas, use a opção coletiva
-              por setor.
+              Recomendamos começar por <b>grupo e-Fisco</b>. Assim você cria uma DFD por família de itens,
+              sem misturar custeio com capital. Para demandas em equipe, use o modo coletivo.
             </p>
           </div>
 
@@ -1371,7 +1369,7 @@ export default function NovaDFDPage() {
               </span>
             </div>
             <span className="text-xs font-semibold text-[#3E4C5F]">
-              O carrinho tem custeio e capital; as DFDs foram divididas para não misturar.
+              Encontramos custeio e capital no carrinho; separamos para você automaticamente.
             </span>
           </div>
         ) : null}
@@ -1381,8 +1379,8 @@ export default function NovaDFDPage() {
                 Modo coletivo ativo
               </p>
               <p className="mt-1 text-xs leading-5">
-                Ao finalizar, seus itens entram no rascunho coletivo da unidade selecionada e
-                o sistema preserva a distribuicao por usuario para que a colaboracao continue legivel.
+                Ao concluir, seus itens entram no rascunho coletivo da unidade e o sistema
+                mantém quanto cada pessoa pediu.
               </p>
             </div>
           ) : null}
@@ -1410,7 +1408,7 @@ export default function NovaDFDPage() {
             </div>
             {blockingErrors.length > 0 ? (
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {blockingErrors.length} pendência(s) obrigatória(s)
+                {blockingErrors.length} ajuste(s) pendente(s)
               </div>
             ) : (
               <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
@@ -1483,7 +1481,7 @@ export default function NovaDFDPage() {
                 <WarningCircle size={18} className="mt-0.5 text-amber-700" />
                 <div className="text-sm text-amber-900">
                   <p className="font-semibold">
-                    {blockingErrors.length} pendência(s) obrigatória(s)
+                    {blockingErrors.length} ajuste(s) pendente(s)
                   </p>
                   <p>{blockingErrors[0]}</p>
                 </div>
@@ -1526,7 +1524,7 @@ export default function NovaDFDPage() {
                     </p>
                     <h2 className="text-2xl font-semibold text-[#164073]">{group.label}</h2>
                     <p className="mt-1 text-sm text-[#5B6675]">
-                      Configure objeto, local de uso, justificativas e detalhes técnicos dos itens.
+                      Preencha título, local de uso, justificativas e detalhes dos itens.
                     </p>
                   </div>
                   <span className="inline-flex items-center rounded-full border border-[#C7D7EA] bg-[#E8EDF2] px-3 py-1 text-xs font-bold text-[#164073]">
@@ -1550,7 +1548,7 @@ export default function NovaDFDPage() {
                     <div className="xl:col-span-12">
                       <VisualOptionGroup
                         title="Finalidade da demanda"
-                        description="Escolha o eixo institucional antes de definir o encaminhamento."
+                        description="Escolha a finalidade principal para ajudar no encaminhamento."
                         options={PURPOSE_OPTIONS}
                         value={group.formData.finalidade}
                         onChange={(value) =>
@@ -1986,11 +1984,11 @@ export default function NovaDFDPage() {
                   Processando
                 </span>
               ) : (
-                <span className="flex items-center gap-2">
-                  Finalizar rascunhos
-                  <ArrowRight size={14} />
-                </span>
-              )}
+                                <span className="flex items-center gap-2">
+                                  Concluir rascunhos
+                                  <ArrowRight size={14} />
+                                </span>
+                              )}
             </Button>
           </div>
         </div>
@@ -2012,11 +2010,11 @@ export default function NovaDFDPage() {
             >
               <CircleNotch size={28} className="mx-auto animate-spin text-[#164073]" />
               <h3 className="mt-3 text-lg font-semibold text-[#164073]">
-                Criando rascunhos de DFD
+                Criando seus rascunhos
               </h3>
               <p className="mt-2 text-sm leading-6 text-[#5B6675]">
-                Estamos salvando itens, GND, roteamento e distribuição coletiva quando houver.
-                Mantenha esta tela aberta até a conclusão.
+                Estamos salvando itens e informações de análise.
+                Deixe esta tela aberta até terminar.
               </p>
             </motion.div>
           </motion.div>
@@ -2027,10 +2025,10 @@ export default function NovaDFDPage() {
         <DialogContent className="max-w-[560px] rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
           <DialogHeader className="border-b border-[#E8EDF2] p-5">
             <DialogTitle className="text-xl font-semibold text-[#164073]">
-              Confirmar finalização dos rascunhos
+              Confirmar conclusão dos rascunhos
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-[#5B6675]">
-              Ao continuar, o sistema criará {dfdGroups.length} rascunho(s) usando o modo{" "}
+              Ao continuar, vamos criar {dfdGroups.length} rascunho(s) no modo{" "}
               <b>{GROUPING_OPTIONS.find((option) => option.value === groupingMode)?.title}</b>.
             </DialogDescription>
           </DialogHeader>
@@ -2074,10 +2072,10 @@ export default function NovaDFDPage() {
                 );
               })}
             </div>
-            <p className="font-semibold text-[#164073]">Fluxo após a finalização</p>
-            <p>1. As DFDs serão salvas em <b>Minhas DFDs</b> para conferência final.</p>
-            <p>2. Após revisão, elas seguem para a <b>fila da chefia</b> na etapa de triagem/homologação.</p>
-            <p>3. Itens com pendência obrigatória bloqueiam avanço até correção.</p>
+            <p className="font-semibold text-[#164073]">O que acontece depois</p>
+            <p>1. As DFDs ficam em <b>Minhas DFDs</b> para sua revisão final.</p>
+            <p>2. Depois da revisão, você envia para a <b>análise da chefia</b>.</p>
+            <p>3. Se houver campo obrigatório faltando, o envio fica bloqueado até ajuste.</p>
           </div>
 
           <DialogFooter className="border-t border-[#E8EDF2] bg-[#FAFBFC] p-4">
@@ -2087,7 +2085,7 @@ export default function NovaDFDPage() {
               disabled={loading}
               className="h-10 rounded-lg border border-[#D9E0E8] px-4 text-[#3E4C5F] hover:bg-[#F4F7FA]"
             >
-              Revisar dados
+              Voltar e revisar
             </Button>
             <Button
               onClick={async () => {
@@ -2104,7 +2102,7 @@ export default function NovaDFDPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Confirmar e finalizar
+                  Confirmar e concluir
                   <ArrowRight size={14} />
                 </span>
               )}
@@ -2136,8 +2134,7 @@ function GndBudgetPanel({ summary }: { summary: GndDistributionSummary }) {
             Leitura orçamentária por GND
           </p>
           <p className="mt-1 text-xs leading-5 text-[#5B6675]">
-            Use esta leitura para evitar DFDs com naturezas incompatíveis e reforçar a
-            justificativa.
+            Use este resumo para evitar mistura de naturezas e fortalecer a justificativa.
           </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#164073]">
