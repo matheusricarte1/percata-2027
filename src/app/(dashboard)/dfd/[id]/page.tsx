@@ -123,6 +123,25 @@ export default function DfdDetailsPage() {
   const [deletingDfd, setDeletingDfd] = useState(false);
   const [timelineModalOpen, setTimelineModalOpen] = useState(false);
 
+  const handleBackNavigation = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const hasHistory = window.history.length > 1;
+      const hasSameOriginReferrer = (() => {
+        try {
+          return Boolean(document.referrer) && new URL(document.referrer).origin === window.location.origin;
+        } catch {
+          return false;
+        }
+      })();
+
+      if (hasHistory && hasSameOriginReferrer) {
+        router.back();
+        return;
+      }
+    }
+    router.push("/minhas-dfds");
+  }, [router]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -403,7 +422,7 @@ export default function DfdDetailsPage() {
         </p>
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={handleBackNavigation}
           className="mt-4 rounded-lg border border-[#C7D7EA] bg-[#E8EDF2] px-4 py-2 text-sm font-semibold text-[#164073] hover:bg-[#DCEAF0]"
         >
           Voltar
@@ -489,7 +508,7 @@ export default function DfdDetailsPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={handleBackNavigation}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D7E2F0] bg-[#F7FAFF] text-[#36557F] hover:bg-[#EDF3FD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
                 aria-label="Voltar"
               >
