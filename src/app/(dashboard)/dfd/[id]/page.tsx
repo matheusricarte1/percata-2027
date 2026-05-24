@@ -29,6 +29,7 @@ import { useRouter, useParams } from "next/navigation";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { buildDfdPrintExportCsv } from "@/lib/dfd-print-export";
@@ -120,6 +121,7 @@ export default function DfdDetailsPage() {
   const [sendingToChefia, setSendingToChefia] = useState(false);
   const [submissionAnimationOpen, setSubmissionAnimationOpen] = useState(false);
   const [deletingDfd, setDeletingDfd] = useState(false);
+  const [timelineModalOpen, setTimelineModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -455,6 +457,9 @@ export default function DfdDetailsPage() {
     })
     .join("; ");
   const timelineEntries = buildTimelineEntries(logs);
+  const fullTimelineEntries = [...(logs || [])].sort(
+    (a, b) => new Date(String(a?.created_at || 0)).getTime() - new Date(String(b?.created_at || 0)).getTime(),
+  );
 
   return (
     <div className="mx-auto max-w-[1280px] space-y-4 px-4 py-5 pb-24 md:px-6 lg:px-8">
@@ -850,7 +855,7 @@ export default function DfdDetailsPage() {
 
           <button
             type="button"
-            onClick={() => router.push("/historico")}
+            onClick={() => setTimelineModalOpen(true)}
             className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)]"
           >
             <ListBullets size={18} />
@@ -863,6 +868,43 @@ export default function DfdDetailsPage() {
         protocol={dfd.numero_protocolo || `DFD-${dfd.id.slice(0, 8).toUpperCase()}`}
         onClose={() => setSubmissionAnimationOpen(false)}
       />
+      <Dialog open={timelineModalOpen} onOpenChange={setTimelineModalOpen}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Caminho completo da DFD</DialogTitle>
+          </DialogHeader>
+          {fullTimelineEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--semantic-neutral-border)] bg-[var(--semantic-neutral-soft)] px-4 py-8 text-center text-sm text-[var(--semantic-text-muted)]">
+              Ainda não há movimentações registradas.
+            </div>
+          ) : (
+            <div className="mt-2 space-y-4">
+              {fullTimelineEntries.map((entry, index) => {
+                const meta = getTimelineMeta(String(entry?.action || ""));
+                const isLast = index === fullTimelineEntries.length - 1;
+                return (
+                  <div key={entry.id || `${entry.action}-${entry.created_at}-${index}`} className="relative flex gap-3">
+                    {!isLast ? (
+                      <span className="absolute left-[10px] top-8 h-[calc(100%-8px)] w-px bg-[var(--semantic-action-border)]" />
+                    ) : null}
+                    <span className={`z-10 mt-1 h-5 w-5 rounded-full border-4 ${meta.dot}`} />
+                    <div className="flex-1 rounded-xl border border-[var(--semantic-neutral-border)] bg-white px-4 py-3">
+                      <p className="text-sm font-bold text-[var(--semantic-action)]">{meta.label}</p>
+                      <p className="mt-1 text-sm text-[var(--semantic-text-muted)]">
+                        {entry.details || "Movimentação registrada automaticamente pelo sistema."}
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-[var(--semantic-text-muted)]">
+                        {formatTimelineDate(entry.created_at)}
+                        {entry.actor_name ? ` • ${entry.actor_name}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
