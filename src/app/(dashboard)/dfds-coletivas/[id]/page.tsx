@@ -396,6 +396,7 @@ export default function DfdColetivaDetailPage() {
   }, [detail]);
   const canEdit = Boolean(detail?.room.can_edit_metadata);
   const isOpen = detail?.room.status === "aberta";
+  const canContributeInOpenRoom = isOpen && Boolean(detail?.room.can_contribute);
   const activeCartItem = useMemo(
     () =>
       cartItems.find((item) => item.cartId === activeCartId) ||
@@ -904,7 +905,7 @@ export default function DfdColetivaDetailPage() {
           </section>
         )}
 
-        {activeStage === "adicionar" && (
+        {(activeStage === "adicionar" || (activeStage === "consolidar" && canContributeInOpenRoom)) && (
           <>
             <SelectionFloatingBar
               activeCartItem={activeCartItem}
@@ -933,7 +934,7 @@ export default function DfdColetivaDetailPage() {
               removeCartItem={removeCartItem}
               addContribution={addContribution}
               subtotal={selectedSubtotal}
-              disabled={!isOpen || savingCart}
+              disabled={!canContributeInOpenRoom || savingCart}
               savingCart={savingCart}
               detail={detail}
               pendingCartValue={pendingCartValue}
@@ -2364,13 +2365,22 @@ function ParticipantDots({
           key={contributor.user_id}
           title={contributor.user_name || contributor.user_email || "Usuário"}
           className={cn(
-            "-ml-1 first:ml-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold text-white",
-            index === 0 && "bg-[#9B8DD8]",
-            index === 1 && "bg-[#79C8E8]",
-            index === 2 && "bg-[#2F9DD8]",
+            "-ml-1 first:ml-0 relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-white text-[11px] font-semibold",
+            !contributor.user_avatar_url && "text-white",
+            !contributor.user_avatar_url && index === 0 && "bg-[#9B8DD8]",
+            !contributor.user_avatar_url && index === 1 && "bg-[#79C8E8]",
+            !contributor.user_avatar_url && index === 2 && "bg-[#2F9DD8]",
           )}
         >
-          {getInitial(contributor.user_name || contributor.user_email || "U")}
+          {contributor.user_avatar_url ? (
+            <img
+              src={contributor.user_avatar_url}
+              alt={contributor.user_name || contributor.user_email || "Usuário"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            getInitial(contributor.user_name || contributor.user_email || "U")
+          )}
         </span>
       ))}
       {remaining > 0 && (
