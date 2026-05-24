@@ -792,14 +792,14 @@ export default function DfdDetailsPage() {
                             {String(index + 1).padStart(2, "0")}
                           </span>
                           <div className="min-w-0">
-                            <p className="text-sm text-[var(--semantic-text-muted)]">Código</p>
-                            <p className="truncate text-2xl font-bold tracking-tight text-[var(--semantic-action)]">
+                            <p className="text-xs text-[var(--semantic-text-muted)]">Código</p>
+                            <p className="truncate text-xl font-bold tracking-tight text-[var(--semantic-action)]">
                               #{item.codigo_tce || "N/A"}
                             </p>
                           </div>
                         </div>
                         <div className="rounded-xl border border-[var(--semantic-action-border)] bg-gradient-to-r from-white to-[var(--semantic-action-soft)] px-3 py-2.5">
-                          <p className="text-sm font-semibold uppercase tracking-[0.03em] text-[var(--semantic-action)]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.03em] text-[var(--semantic-action)]">
                             Resumo financeiro
                           </p>
                           <div className="mt-2 grid grid-cols-3 divide-x divide-[var(--semantic-action-border)]">
@@ -815,7 +815,7 @@ export default function DfdDetailsPage() {
                           <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--semantic-action-soft)] text-[var(--semantic-action)]">
                             <Package size={22} weight="duotone" />
                           </span>
-                          <h3 className="break-words text-lg font-semibold leading-[1.45] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
+                          <h3 className="break-words text-[15px] font-semibold leading-[1.4] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
                             {formatCatalogDescription(item.descricao)}
                           </h3>
                         </div>
@@ -1070,7 +1070,7 @@ function MetricChip({
         <p className="text-[11px] font-semibold uppercase tracking-[0.03em] text-[var(--semantic-text-muted)]">
           {label}
         </p>
-        <p className="mt-1 break-words text-2xl font-bold leading-tight text-[var(--semantic-action)]">
+        <p className="mt-1 whitespace-nowrap text-base font-bold leading-tight tracking-tight text-[var(--semantic-action)] sm:text-lg">
           {value}
         </p>
       </div>
