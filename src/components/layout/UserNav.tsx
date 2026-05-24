@@ -17,13 +17,15 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CategoryAvatar } from "@/components/user/CategoryAvatar";
+import { roleToUserCategory, type UserCategory } from "@/lib/user-category";
 
 interface UserData {
   id: string;
   name: string;
   email: string;
   avatar: string | null;
-  initials: string;
+  category: UserCategory;
 }
 
 interface ProfileSummary {
@@ -47,15 +49,6 @@ const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
 };
 
 const SETTINGS_PREFIX = "percata:user-settings:v1";
-
-function getInitials(nameOrEmail: string): string {
-  const source = String(nameOrEmail || "").trim();
-  if (!source) return "US";
-  const clean = source.includes("@") ? source.split("@")[0] : source;
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return clean.slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase();
-}
 
 function normalizeProfilePrefs(input: any): ProfilePrefs {
   const profileVisibility =
@@ -115,14 +108,14 @@ export function UserNav() {
           name: baseName,
           email: baseEmail,
           avatar: String(metadata.avatar_url || metadata.picture || "").trim() || null,
-          initials: getInitials(baseName || baseEmail || "US"),
+          category: "usuario",
         });
         setProfilePrefs(readProfilePrefs(user.id));
 
         try {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name,email,campus_id")
+            .select("full_name,email,campus_id,role")
             .eq("id", user.id)
             .maybeSingle();
 
@@ -135,7 +128,7 @@ export function UserNav() {
                   ...prev,
                   name: resolvedName,
                   email: resolvedEmail,
-                  initials: getInitials(resolvedName || resolvedEmail || "US"),
+                  category: roleToUserCategory(profile?.role),
                 }
               : prev,
           );
@@ -258,17 +251,13 @@ export function UserNav() {
         className="flex items-center gap-3 p-2 rounded-full hover:bg-black/5 transition-all group"
       >
         <div className="relative">
-          {showAvatar && userData.avatar ? (
-            <img
-              src={userData.avatar}
-              alt={userData.name}
-              className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm group-hover:border-[var(--upe-blue-medium)] transition-all"
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--upe-blue-upe)] to-[var(--upe-blue-medium)] flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
-              {userData.initials}
-            </div>
-          )}
+          <CategoryAvatar
+            name={userData.name}
+            avatarUrl={showAvatar ? userData.avatar : null}
+            category={userData.category}
+            size="md"
+            animate
+          />
           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
         </div>
 
@@ -295,17 +284,13 @@ export function UserNav() {
           />
           <div className="absolute right-0 mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-black/5 p-2 z-50 animate-in fade-in zoom-in duration-200">
             <div className="p-4 border-b border-black/5 flex items-center gap-4">
-              {showAvatar && userData.avatar ? (
-                <img
-                  src={userData.avatar}
-                  alt={userData.name}
-                className="w-12 h-12 rounded-2xl shadow-lg object-cover"
+              <CategoryAvatar
+                name={userData.name}
+                avatarUrl={showAvatar ? userData.avatar : null}
+                category={userData.category}
+                size="lg"
+                animate
               />
-            ) : (
-                <div className="w-12 h-12 rounded-2xl shadow-lg bg-gradient-to-br from-[var(--upe-blue-upe)] to-[var(--upe-blue-medium)] text-white flex items-center justify-center font-bold">
-                  {userData.initials}
-                </div>
-              )}
               <div className="flex-1 overflow-hidden">
                 <p className="font-display font-semibold text-[#1C1B1F] leading-tight truncate">
                   {userData.name}
@@ -364,17 +349,13 @@ export function UserNav() {
         <DialogContent className="max-h-[calc(100vh-2rem)] w-full overflow-y-auto rounded-2xl border border-[#E8EDF2] bg-white p-5 shadow-xl sm:max-w-2xl md:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  {showAvatar && userData.avatar ? (
-                    <img
-                      src={userData.avatar}
-                      alt={userData.name}
-                      className="h-24 w-24 rounded-[22px] border border-[#D9E0E8] object-cover shadow-sm"
-                    />
-                  ) : (
-                    <div className="h-24 w-24 rounded-[22px] border border-[#D9E0E8] bg-[var(--upe-blue-upe)] text-white text-2xl font-semibold inline-flex items-center justify-center shadow-sm">
-                      {userData.initials}
-                    </div>
-                  )}
+                  <CategoryAvatar
+                    name={userData.name}
+                    avatarUrl={showAvatar ? userData.avatar : null}
+                    category={userData.category}
+                    size="lg"
+                    animate
+                  />
 
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">

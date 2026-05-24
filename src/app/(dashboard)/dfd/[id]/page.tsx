@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Printer,
@@ -22,6 +23,7 @@ import {
   PencilSimpleLine,
   MapPin,
   ListBullets,
+  UsersThree,
 } from "@phosphor-icons/react";
 import { useRouter, useParams } from "next/navigation";
 import { getSafeUser, supabase } from "@/lib/supabase";
@@ -31,6 +33,8 @@ import { normalizeRole, type UserRole } from "@/lib/access";
 import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { buildDfdPrintExportCsv } from "@/lib/dfd-print-export";
 import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
+import { useReducedMotion, motionProps } from "@/lib/use-reduced-motion";
+import { CategoryAvatar } from "@/components/user/CategoryAvatar";
 
 type DfdStatus = "rascunho" | "triagem" | "aprovada" | "devolvida" | "pactuando" | "concluida";
 
@@ -88,14 +92,6 @@ function formatCurrency(value: number) {
   });
 }
 
-function getInitials(fullName: string) {
-  const safe = String(fullName || "").trim();
-  if (!safe) return "US";
-  const parts = safe.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase();
-}
-
 const STATUS_META: Record<DfdStatus, { label: string; className: string }> = {
   rascunho: { label: "Rascunho", className: "bg-[#E8EDF2] text-[#3E4C5F]" },
   triagem: { label: "Em análise", className: "bg-[#DCEAF0] text-[#1C5A6B]" },
@@ -109,6 +105,7 @@ export default function DfdDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const reducedMotion = useReducedMotion();
 
   const [dfd, setDfd] = useState<DfdDetails | null>(null);
   const [items, setItems] = useState<DfdItem[]>([]);
@@ -442,7 +439,14 @@ export default function DfdDetailsPage() {
         <span className="text-[#2A4267]">Detalhes da DFD</span>
       </nav>
 
-      <header className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.06)] md:p-6">
+      <motion.header
+        {...motionProps(reducedMotion, {
+          initial: { opacity: 0, y: 22, scale: 0.985 },
+          animate: { opacity: 1, y: 0, scale: 1 },
+          transition: { duration: 0.45 },
+        })}
+        className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white p-5 shadow-[0_10px_28px_rgba(23,35,60,0.08)] md:p-6"
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
@@ -454,20 +458,20 @@ export default function DfdDetailsPage() {
               >
                 <ArrowLeft size={16} />
               </button>
-              <h1 className="text-3xl font-bold tracking-tight text-[#0D2A62] md:text-4xl">
+              <h1 className="text-3xl font-bold tracking-tight text-[var(--semantic-action)] md:text-4xl">
                 {dfd.numero_protocolo || `DFD #${dfd.id.slice(0, 8).toUpperCase()}`}
               </h1>
               <span className={`rounded-full px-4 py-1 text-sm font-semibold ${status.className}`}>
                 {status.label}
               </span>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-lg text-[#8BA0BC]">
-              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[#244D87]">
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-lg text-[var(--semantic-text-muted)]">
+              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[var(--semantic-action)]">
                 <Buildings size={24} />
                 <span className="text-xl">{campusLabel}</span>
               </p>
               <span>|</span>
-              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[#244D87]">
+              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[var(--semantic-action)]">
                 <CalendarBlank size={24} />
                 <span className="text-xl">Ciclo: {String(dfd.exercicio || 2027)}</span>
               </p>
@@ -478,7 +482,7 @@ export default function DfdDetailsPage() {
               <button
                 type="button"
                 onClick={() => router.push("/minhas-dfds")}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#BFD4F2] bg-white px-4 text-sm font-semibold text-[#1B57E0] hover:bg-[#F3F8FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white px-4 text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--semantic-action)]/30"
               >
                 <PencilSimpleLine size={18} />
                 Editar
@@ -488,7 +492,7 @@ export default function DfdDetailsPage() {
                 type="button"
                 onClick={handleSendToTriagem}
                 disabled={sendingToChefia}
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#1656E8] px-4 text-sm font-semibold text-white hover:bg-[#1147C2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1656E8]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--semantic-action)] px-4 text-sm font-semibold text-white hover:bg-[var(--semantic-action-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--semantic-action)]/40 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {sendingToChefia ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneTilt size={18} />}
                 {sendingToChefia ? "Enviando..." : "Enviar para análise"}
@@ -501,7 +505,7 @@ export default function DfdDetailsPage() {
             <button
               type="button"
               onClick={() => router.push(`/dfd/${id}/impressao`)}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#BFD4F2] bg-white px-4 text-sm font-semibold text-[#1B57E0] hover:bg-[#F3F8FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white px-4 text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--semantic-action)]/30"
             >
               <Printer size={18} weight="fill" />
               Exportar PDF
@@ -509,7 +513,7 @@ export default function DfdDetailsPage() {
             <button
               type="button"
               onClick={handleDownloadData}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#BFD4F2] bg-white text-[#1B57E0] hover:bg-[#F3F8FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--semantic-action-border)] bg-white text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--semantic-action)]/30"
               aria-label="Mais opções"
             >
               <DotsThreeVertical size={18} weight="bold" />
@@ -519,7 +523,7 @@ export default function DfdDetailsPage() {
               type="button"
               onClick={handleMarkAsKit}
               disabled={markingKit}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#BFD4F2] bg-white px-4 text-sm font-semibold text-[#1B57E0] hover:bg-[#F3F8FF] disabled:opacity-60"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white px-4 text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)] disabled:opacity-60"
             >
                 <Package size={16} />
                 {markingKit ? "Marcando..." : "Kit"}
@@ -530,7 +534,7 @@ export default function DfdDetailsPage() {
               type="button"
               onClick={handleDeleteDfdAsSuperadmin}
               disabled={deletingDfd}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-soft)] px-4 text-sm font-semibold text-[var(--semantic-danger)] hover:brightness-95 disabled:opacity-60"
             >
                 {deletingDfd ? <CircleNotch size={16} className="animate-spin" /> : <Trash size={16} weight="bold" />}
                 Excluir
@@ -538,9 +542,16 @@ export default function DfdDetailsPage() {
             ) : null}
           </div>
         </div>
-      </header>
+      </motion.header>
 
-      <section className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
+      <motion.section
+        {...motionProps(reducedMotion, {
+          initial: { opacity: 0, y: 18 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.42, delay: 0.06 },
+        })}
+        className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white p-5 shadow-[0_8px_22px_rgba(23,35,60,0.06)]"
+      >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetaCard
             icon={User}
@@ -548,10 +559,12 @@ export default function DfdDetailsPage() {
             value={requesterValue}
             tone="blue"
             rightContent={
-              <ProfileAvatar
-                name={requesterAvatarName}
-                avatarUrl={dfd.profiles?.avatar_url || null}
-              />
+                <CategoryAvatar
+                  name={requesterAvatarName}
+                  avatarUrl={dfd.profiles?.avatar_url || null}
+                  category={isCollectiveDfd ? "collective" : "solicitante"}
+                  size="md"
+                />
             }
           />
           <MetaCard icon={MapPin} label="Local de uso" value={dfd.unidade_nome || "Não informado"} tone="violet" />
@@ -572,8 +585,8 @@ export default function DfdDetailsPage() {
           <ValueCard label="Total estimado" value={formatCurrency(totalGeral)} className="md:col-span-2" />
         </div>
         {isCollectiveDfd && collectiveParticipantNames.length > 0 ? (
-          <div className="mt-4 rounded-xl border border-[#D6E2F0] bg-[#F7FAFF] p-4">
-            <p className="text-sm font-semibold text-[#214A81]">
+          <div className="mt-4 rounded-xl border border-[var(--semantic-action-border)] bg-[var(--semantic-action-soft)] p-4">
+            <p className="text-sm font-semibold text-[var(--semantic-action)]">
               Participantes da DFD coletiva ({collectiveParticipantNames.length})
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -587,8 +600,9 @@ export default function DfdDetailsPage() {
                 return (
                   <span
                     key={author.contribution_user_id}
-                    className="inline-flex items-center rounded-full border border-[#C5D8F1] bg-white px-3 py-1 text-xs font-medium text-[#34506F]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--semantic-action-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--semantic-text)]"
                   >
+                    <UsersThree size={12} className="text-[var(--semantic-collab)]" />
                     {name} • {Number(author.quantidade_total || 0)} un.
                   </span>
                 );
@@ -596,37 +610,51 @@ export default function DfdDetailsPage() {
             </div>
           </div>
         ) : null}
-      </section>
+      </motion.section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-4">
-          <section className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#0D2A62]">
+          <motion.section
+            {...motionProps(reducedMotion, {
+              initial: { opacity: 0, x: -20 },
+              animate: { opacity: 1, x: 0 },
+              transition: { duration: 0.38, delay: 0.08 },
+            })}
+            className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white p-5 shadow-[0_8px_22px_rgba(23,35,60,0.06)]"
+          >
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[var(--semantic-action)]">
               <FileText size={30} weight="fill" />
               Justificativa da DFD
             </h2>
-            <div className="mt-4 rounded-xl border border-[#C9DAF4] bg-[#F6FAFF] p-5">
-              <p className="whitespace-pre-wrap text-base leading-relaxed text-[#1F3B63]">
+            <div className="mt-4 rounded-xl border border-[var(--semantic-action-border)] bg-[var(--semantic-action-soft)] p-5">
+              <p className="whitespace-pre-wrap text-base leading-relaxed text-[var(--semantic-text)]">
                 {dfd.justificativa_contratacao || "Sem justificativa registrada para esta solicitação."}
               </p>
               {dfd.analysis_routing_reason ? (
-                <p className="mt-4 rounded-lg border border-[#D9E0E8] bg-white px-3 py-2 text-sm font-semibold text-[#3E4C5F]">
+                <p className="mt-4 rounded-lg border border-[var(--semantic-neutral-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--semantic-text)]">
                   Roteamento da chefia: {dfd.analysis_routing_reason}
                 </p>
               ) : null}
             </div>
-          </section>
+          </motion.section>
 
-          <section className="rounded-2xl border border-[#D5E1F0] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center justify-between border-b border-[#E2ECF7] px-5 py-4">
-              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#0D2A62]">
+          <motion.section
+            {...motionProps(reducedMotion, {
+              initial: { opacity: 0, y: 20 },
+              animate: { opacity: 1, y: 0 },
+              transition: { duration: 0.42, delay: 0.12 },
+            })}
+            className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white shadow-[0_8px_22px_rgba(23,35,60,0.06)]"
+          >
+            <div className="flex items-center justify-between border-b border-[var(--semantic-neutral-border)] px-5 py-4">
+              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[var(--semantic-action)]">
                 <Package size={30} weight="fill" />
                 Itens da DFD
-                <span className="rounded-full bg-[#E8F0FF] px-3 py-1 text-sm font-semibold text-[#1B57E0]">
+                <span className="rounded-full bg-[var(--semantic-action-soft)] px-3 py-1 text-sm font-semibold text-[var(--semantic-action)]">
                   {items.length} item{items.length === 1 ? "" : "s"}
                 </span>
               </h2>
-              <p className="text-xl font-bold text-[#1656E8]">{formatCurrency(totalGeral)}</p>
+              <p className="text-xl font-bold text-[var(--semantic-action)]">{formatCurrency(totalGeral)}</p>
             </div>
 
             {items.length === 0 ? (
@@ -647,22 +675,28 @@ export default function DfdDetailsPage() {
                   const justificationText = formatJustificationForDisplay(item.justificativa_item);
                   const distributionText = extractCollectiveDistribution(item.justificativa_item);
                   return (
-                    <article
+                    <motion.article
+                      {...motionProps(reducedMotion, {
+                        initial: { opacity: 0, y: 16, scale: 0.992 },
+                        animate: { opacity: 1, y: 0, scale: 1 },
+                        transition: { duration: 0.34, delay: Math.min(index * 0.04, 0.22) },
+                      })}
+                      whileHover={reducedMotion ? undefined : { y: -4, boxShadow: "0 16px 28px rgba(23,35,60,0.12)" }}
                       key={item.id}
-                      className="rounded-xl border border-[#D7E2F1] bg-[#FCFEFF] p-4 shadow-sm"
+                      className="rounded-xl border border-[var(--semantic-neutral-border)] bg-[#FCFEFF] p-4 shadow-sm"
                     >
                       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#1B57E0] text-xl font-bold text-white">
+                            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--semantic-action)] text-xl font-bold text-white">
                               {String(index + 1).padStart(2, "0")}
                             </span>
                             <div>
-                              <p className="text-sm text-[#60748D]">Código</p>
-                              <p className="text-xl font-bold text-[#0D2A62]">#{item.codigo_tce || "N/A"}</p>
+                              <p className="text-sm text-[var(--semantic-text-muted)]">Código</p>
+                              <p className="text-xl font-bold text-[var(--semantic-action)]">#{item.codigo_tce || "N/A"}</p>
                             </div>
                           </div>
-                          <h3 className="mt-3 break-words text-lg font-semibold leading-[1.5] text-[#112F62] [overflow-wrap:anywhere]">
+                          <h3 className="mt-3 break-words text-lg font-semibold leading-[1.5] text-[var(--semantic-text)] [overflow-wrap:anywhere]">
                             {formatCatalogDescription(item.descricao)}
                           </h3>
                         </div>
@@ -680,11 +714,11 @@ export default function DfdDetailsPage() {
                       </div>
 
                       {justificationText ? (
-                        <div className="mt-3 rounded-lg border border-[#D9E0E8] bg-white p-3">
-                          <p className="text-sm font-semibold tracking-[0.03em] text-[#5A7596]">
+                        <div className="mt-3 rounded-lg border border-[var(--semantic-neutral-border)] bg-white p-3">
+                          <p className="text-sm font-semibold tracking-[0.03em] text-[var(--semantic-action)]">
                             Justificativa do item
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#5B6675]">
+                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[var(--semantic-text-muted)]">
                             {justificationText}
                           </p>
                         </div>
@@ -704,26 +738,33 @@ export default function DfdDetailsPage() {
                           href={item.link_referencia}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#1B57E0] hover:underline"
+                          className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--semantic-action)] hover:underline"
                         >
                           <Paperclip size={14} />
                           Abrir referência técnica
                         </a>
                       ) : null}
-                    </article>
+                    </motion.article>
                   );
                 })}
               </div>
             )}
-          </section>
+          </motion.section>
         </div>
 
-        <section className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] lg:sticky lg:top-4 lg:h-fit">
-          <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#0D2A62]">
+        <motion.section
+          {...motionProps(reducedMotion, {
+            initial: { opacity: 0, x: 20 },
+            animate: { opacity: 1, x: 0 },
+            transition: { duration: 0.42, delay: 0.1 },
+          })}
+          className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white p-5 shadow-[0_8px_22px_rgba(23,35,60,0.06)] lg:sticky lg:top-4 lg:h-fit"
+        >
+          <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[var(--semantic-action)]">
             <Clock size={30} weight="fill" />
             Histórico de tramitação
           </h2>
-          <p className="mt-2 text-base leading-6 text-[#38567F]">
+          <p className="mt-2 text-base leading-6 text-[var(--semantic-text-muted)]">
             Acompanhe as etapas e movimentações desta DFD.
           </p>
 
@@ -744,17 +785,17 @@ export default function DfdDetailsPage() {
                     <span className={`z-10 mt-1 h-5 w-5 rounded-full border-4 ${meta.dot}`} />
                     <div className={`flex-1 rounded-xl border px-4 py-3 ${isLatest ? "border-[#BFD4F2] bg-[#F5F9FF]" : "border-[#E1EAF6] bg-white"}`}>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-bold text-[#123B6B]">{meta.label}</p>
+                        <p className="text-base font-bold text-[var(--semantic-action)]">{meta.label}</p>
                         {isLatest ? (
                           <span className="rounded-full bg-[#E4EEFF] px-2 py-0.5 text-xs font-bold text-[#1B57E0]">
                             ATUAL
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-sm text-[#405B7E]">
+                      <p className="mt-1 text-sm text-[var(--semantic-text-muted)]">
                         {entry.details || "Movimentação registrada automaticamente pelo sistema."}
                       </p>
-                      <p className="mt-2 text-sm font-medium text-[#5E7695]">
+                      <p className="mt-2 text-sm font-medium text-[var(--semantic-text-muted)]">
                         {formatTimelineDate(entry.created_at)}
                         {entry.actor_name ? ` • ${entry.actor_name}` : ""}
                       </p>
@@ -768,12 +809,12 @@ export default function DfdDetailsPage() {
           <button
             type="button"
             onClick={() => router.push("/historico")}
-            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#BFD4F2] bg-white text-base font-semibold text-[#1B57E0] hover:bg-[#F3F8FF]"
+            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white text-base font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)]"
           >
             <ListBullets size={18} />
             Ver todas as movimentações
           </button>
-        </section>
+        </motion.section>
       </div>
       <DfdSubmissionAnimation
         open={submissionAnimationOpen}
@@ -911,25 +952,4 @@ function extractCollectiveDistribution(value?: string | null) {
   if (!raw) return "";
   const match = raw.match(/Distribui[cç][aã]o por usu[aá]rio:\s*([\s\S]+)$/i);
   return match?.[1]?.trim() || "";
-}
-
-function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
-  const [broken, setBroken] = useState(false);
-
-  if (!avatarUrl || broken) {
-      return (
-      <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D2DEF0] bg-white text-sm font-semibold uppercase text-[#164073]">
-        {getInitials(name)}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={avatarUrl}
-      alt={name}
-      className="h-11 w-11 rounded-full border border-[#D2DEF0] object-cover"
-      onError={() => setBroken(true)}
-    />
-  );
 }
