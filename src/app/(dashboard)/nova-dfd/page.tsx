@@ -389,6 +389,9 @@ export default function NovaDFDPage() {
   // no Zustand carrinho persistente). Restaura ao montar; limpa após finalize.
   const draft = useDfdDraft();
   const draftRestoredRef = React.useRef(false);
+  const [pendingFormRestoreMap, setPendingFormRestoreMap] = useState<
+    Record<string, DFDGroup["formData"]> | null
+  >(null);
 
   // Restaura rascunho — quando a primeira passagem do effect abaixo gera os
   // grupos (a partir dos itens do carrinho), aplicamos formData salvos.
@@ -407,13 +410,9 @@ export default function NovaDFDPage() {
     if (typeof payload.showGuide === "boolean") setShowGuide(payload.showGuide);
     // groupForms é aplicado no effect que reconstrói dfdGroups (logo abaixo),
     // através de uma ref consultada lá.
-    pendingFormRestoreRef.current = payload.groupForms || null;
+    setPendingFormRestoreMap(payload.groupForms || null);
     draftRestoredRef.current = true;
   }, [draft.loading, draft.draft]);
-
-  const pendingFormRestoreRef = React.useRef<
-    Record<string, DFDGroup["formData"]> | null
-  >(null);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -436,7 +435,7 @@ export default function NovaDFDPage() {
       });
     });
 
-    const restoreMap = pendingFormRestoreRef.current;
+    const restoreMap = pendingFormRestoreMap;
     setDfdGroups(
       Object.entries(grouped).map(([key, group]) => {
         const fallbackObjeto = buildDefaultObjeto(groupingMode, group.label);
@@ -467,8 +466,8 @@ export default function NovaDFDPage() {
       }),
     );
     // Restauração é one-shot — não reaplica em mudanças subsequentes.
-    if (restoreMap) pendingFormRestoreRef.current = null;
-  }, [items, groupingMode]);
+    if (restoreMap) setPendingFormRestoreMap(null);
+  }, [items, groupingMode, pendingFormRestoreMap]);
 
   // Autosave: a cada mudança de dfdGroups/groupingMode/showGuide, agenda save.
   // O hook tem debounce 1500ms + dedup por hash; chamar sempre é seguro.

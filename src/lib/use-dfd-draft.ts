@@ -5,9 +5,8 @@ import {
   clearDfdDraftAction,
   loadDfdDraftAction,
   saveDfdDraftAction,
-  type DfdDraftPayload,
-  type DfdDraftSnapshot,
 } from "@/app/actions/dfdDraftActions";
+import type { DfdDraftPayload, DfdDraftSnapshot } from "@/lib/dfd-draft-schema";
 
 /**
  * Hook de rascunho do wizard DFD com autosave debounced.

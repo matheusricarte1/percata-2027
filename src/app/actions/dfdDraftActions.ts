@@ -1,6 +1,11 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import {
+  DFD_DRAFT_SCHEMA_VERSION,
+  type DfdDraftPayload,
+  type DfdDraftSnapshot,
+} from "@/lib/dfd-draft-schema";
 
 /**
  * Server Actions para o rascunho do wizard nova-dfd.
@@ -20,18 +25,6 @@ import { createClient } from "@/utils/supabase/server";
  * Schema-version: incrementar SCHEMA_VERSION quando o shape do payload
  * mudar de forma incompatível. Rascunhos antigos são ignorados pelo loader.
  */
-
-export const DFD_DRAFT_SCHEMA_VERSION = 1;
-
-export type DfdDraftPayload = Record<string, unknown>;
-
-export type DfdDraftSnapshot = {
-  payload: DfdDraftPayload;
-  schema_version: number;
-  current_step: string | null;
-  updated_at: string;
-  expires_at: string;
-};
 
 export async function loadDfdDraftAction(): Promise<DfdDraftSnapshot | null> {
   const supabase = await createClient();
