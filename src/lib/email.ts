@@ -16,6 +16,16 @@ type SendEmailInput = {
   statusTone?: EmailTone;
   facts?: EmailFact[];
   details?: string[];
+  /**
+   * Chave única para deduplicação. Quando presente:
+   *   - Resend: enviado como header `Idempotency-Key` (preservado pelo provider
+   *     por 24h; chamadas com mesma key não disparam segundo envio).
+   *   - SMTP/Nodemailer: usado como `Message-Id` determinístico — não evita
+   *     reenvio, mas permite que o destinatário/MTA detecte duplicata.
+   *   - Recomendado: derivar de `email_alert_queue.id`, ou
+   *     `hash(to + subject + dfd_id + status)`.
+   */
+  idempotencyKey?: string;
 };
 
 type SendEmailResult = {
@@ -484,13 +494,23 @@ export async function sendSystemEmail(
   if (resendApiKey) {
     try {
       const resend = new Resend(resendApiKey);
-      await resend.emails.send({
-        from: fromAddress,
-        to: [effectiveTo],
-        subject: input.subject,
-        text: content.text,
-        html: content.html,
-      });
+      // Resend honra `Idempotency-Key` por 24h. Se mesmo key chegar de novo,
+      // o provider retorna o resultado do envio original em vez de duplicar.
+      // Doc: https://resend.com/docs/api-reference/emails/send-email
+      const resendOptions: { idempotencyKey?: string } = {};
+      if (input.idempotencyKey) {
+        resendOptions.idempotencyKey = String(input.idempotencyKey).slice(0, 256);
+      }
+      await resend.emails.send(
+        {
+          from: fromAddress,
+          to: [effectiveTo],
+          subject: input.subject,
+          text: content.text,
+          html: content.html,
+        },
+        resendOptions,
+      );
       return { ok: true, provider: "resend", to: effectiveTo, originalTo, redirected };
     } catch (error: any) {
       return {
@@ -504,12 +524,21 @@ export async function sendSystemEmail(
   const transporter = getSmtpTransport();
   if (transporter) {
     try {
+      // Message-Id determinístico a partir da idempotencyKey, quando presente.
+      // Não impede reenvio (SMTP não tem idempotency nativa), mas permite o
+      // MTA destinatário detectar duplicação e fica visível em headers.
+      const fromDomain = String(fromAddress.split("@")[1] || "percata.local")
+        .replace(/[<>\s]/g, "");
+      const messageId = input.idempotencyKey
+        ? `<${input.idempotencyKey}@${fromDomain}>`
+        : undefined;
       await transporter.sendMail({
         from: fromAddress,
         to: effectiveTo,
         subject: input.subject,
         text: content.text,
         html: content.html,
+        ...(messageId ? { messageId } : {}),
       });
       return { ok: true, provider: "smtp", to: effectiveTo, originalTo, redirected };
     } catch (error: any) {

@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { isSuperadminEmail } from "@/lib/access";
+import { normalizeRole } from "@/lib/access";
 import { DFD_PROCESS_STEPS } from "@/lib/dfd-process-guide";
 import { parseCollectiveDistributionText } from "@/lib/collective-dfd";
 import { buildPcaGoalMetrics } from "@/lib/chefia-summary";
@@ -222,6 +222,18 @@ function getCriticidadeLevel(value: DfdItemRow["criticidade"]): number {
     value as NonNullable<DfdItemRow["criticidade"]>,
   );
   return idx >= 0 ? idx + 1 : 0;
+}
+
+function resolveItemLocationLabel(
+  localUso?: string | null,
+  fallback?: { analysis_unidade_nome?: string | null; unidade_nome?: string | null } | null,
+) {
+  const direct = String(localUso || "").trim();
+  if (direct) return direct;
+  const analysis = String(fallback?.analysis_unidade_nome || "").trim();
+  if (analysis) return analysis;
+  const unit = String(fallback?.unidade_nome || "").trim();
+  return unit || null;
 }
 
 function getPriorizacaoLevel(value: DfdItemRow["moscow_categoria"]): number {
@@ -474,6 +486,7 @@ export default function TriagemPage() {
             if (!owner) return null;
             return {
               ...item,
+              local_uso: resolveItemLocationLabel(item.local_uso, owner),
               dfd_id: String(item.dfd_id || owner.id),
               numero_protocolo: owner.numero_protocolo,
               objeto_contratacao: owner.objeto_contratacao,
@@ -551,7 +564,16 @@ export default function TriagemPage() {
       });
       await syncCurrentUserProfile(user);
 
-      if (isSuperadminEmail(user.email)) {
+      const { data: currentProfile, error: currentProfileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (currentProfileError) throw currentProfileError;
+      const isSuperadmin =
+        normalizeRole(currentProfile?.role, user.email) === "superadmin";
+
+      if (isSuperadmin) {
         let result: any = await supabase
           .from("dfds")
           .select(DFD_TRIAGEM_SELECT)
@@ -749,7 +771,13 @@ export default function TriagemPage() {
         analysis_unidade_nome: analysisUnidadeNome || unidadeNome || null,
       });
 
-      const dfdItems = await fetchItemsByDfdIds([dfd.id]);
+      const dfdItems = (await fetchItemsByDfdIds([dfd.id])).map((item) => ({
+        ...item,
+        local_uso: resolveItemLocationLabel(item.local_uso, {
+          analysis_unidade_nome: analysisUnidadeNome || unidadeNome || null,
+          unidade_nome: unidadeNome || null,
+        }),
+      }));
       setItems(dfdItems);
       setDevolvendo(dfdItems.length === 0);
       if (dfdItems.length === 0) {
@@ -1000,22 +1028,33 @@ export default function TriagemPage() {
       const user = await getSafeUser();
       if (!user) return;
 
+      // Em lote, .select() força o servidor a retornar as linhas que efetivamente
+      // transitaram. DFDs que mudaram de status entre o "abrir lote" e o
+      // "homologar" devolvem vazio — só logamos as que foram realmente aplicadas.
+      const appliedIds = new Set<string>();
+      const skippedIds: string[] = [];
       await Promise.all(
         dfdIds.map(async (dfdId) => {
           const totals = byDfd.get(dfdId)!;
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from("dfds")
             .update({
               status: "aprovada",
               valor_total_estimado: totals.total,
             })
             .eq("id", dfdId)
-            .eq("status", "triagem");
+            .eq("status", "triagem")
+            .select("id");
           if (error) throw error;
+          if (data && data.length > 0) {
+            appliedIds.add(dfdId);
+          } else {
+            skippedIds.push(dfdId);
+          }
         }),
       );
 
-      const logsPayload = dfdIds.map((dfdId) => {
+      const logsPayload = Array.from(appliedIds).map((dfdId) => {
         const totals = byDfd.get(dfdId)!;
         return {
           dfd_id: dfdId,
@@ -1024,11 +1063,19 @@ export default function TriagemPage() {
           details: `Demanda homologada em lote pela chefia. Total homologado: R$ ${totals.total.toLocaleString("pt-BR")}.`,
         };
       });
-      const { error: logError } = await supabase.from("dfd_logs").insert(logsPayload);
-      if (logError) throw logError;
-      toast.success(
-        `${dfdIds.length} DFD(s) homologadas em lote e enviadas para Consolidação.`,
-      );
+      if (logsPayload.length > 0) {
+        const { error: logError } = await supabase.from("dfd_logs").insert(logsPayload);
+        if (logError) throw logError;
+      }
+      if (skippedIds.length > 0) {
+        toast.warning(
+          `${appliedIds.size} DFD(s) homologadas; ${skippedIds.length} foram ignoradas porque mudaram de status durante o lote.`,
+        );
+      } else {
+        toast.success(
+          `${appliedIds.size} DFD(s) homologadas em lote e enviadas para Consolidação.`,
+        );
+      }
       setBatchSheetOpen(false);
       await fetchDfds();
     } catch (error: any) {
@@ -1086,15 +1133,28 @@ export default function TriagemPage() {
         0,
       );
 
-      const { error: dfdError } = await supabase
+      // CAS guard: só transita se ainda estiver em 'triagem'.
+      // Sem isso, uma outra chefia que aprovou/devolveu no mesmo instante
+      // tem seu trabalho sobrescrito silenciosamente.
+      const { data: aprovadaRows, error: dfdError } = await supabase
         .from("dfds")
         .update({
           status: "aprovada",
           valor_total_estimado: novoTotal,
         })
-        .eq("id", selectedDfd.id);
+        .eq("id", selectedDfd.id)
+        .eq("status", "triagem")
+        .select("id");
 
       if (dfdError) throw dfdError;
+      if (!aprovadaRows || aprovadaRows.length === 0) {
+        toast.error(
+          "Esta DFD já foi processada por outra chefia ou mudou de status. Recarregando fila…",
+        );
+        resetDialogState();
+        fetchDfds();
+        return;
+      }
 
       const { error: logError } = await supabase.from("dfd_logs").insert({
         dfd_id: selectedDfd.id,
@@ -1127,12 +1187,23 @@ export default function TriagemPage() {
       const user = await getSafeUser();
       if (!user) return;
 
-      const { error: dfdError } = await supabase
+      // CAS guard: idem handleAprove. Se outra chefia já agiu, abortar.
+      const { data: devolvidaRows, error: dfdError } = await supabase
         .from("dfds")
         .update({ status: "devolvida" })
-        .eq("id", selectedDfd.id);
+        .eq("id", selectedDfd.id)
+        .eq("status", "triagem")
+        .select("id");
 
       if (dfdError) throw dfdError;
+      if (!devolvidaRows || devolvidaRows.length === 0) {
+        toast.error(
+          "Esta DFD já foi processada por outra chefia ou mudou de status. Recarregando fila…",
+        );
+        resetDialogState();
+        fetchDfds();
+        return;
+      }
 
       const { error: logError } = await supabase.from("dfd_logs").insert({
         dfd_id: selectedDfd.id,

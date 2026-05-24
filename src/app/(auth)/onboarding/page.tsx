@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
@@ -440,6 +441,10 @@ export default function OnboardingPage() {
   const currentCampusLabel =
     campi.find((campus) => campus.id === activeCampus)?.nome || "Campus";
   const currentVisual = ONBOARDING_VISUALS[step];
+  // Respeita preferência: ghost cards eram o pior ofensor (loop infinito
+  // ignorando todas as 3 fontes de reduced-motion). Quando reduzido, viram
+  // cards estáticos com opacidade fixa.
+  const reduceMotion = useReducedMotion();
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#EEF3F9]">
@@ -450,14 +455,28 @@ export default function OnboardingPage() {
             <motion.div
               key={card.id}
               className="absolute h-20 rounded-2xl border border-white/40 bg-white/55 shadow-sm"
-              style={{ top: card.top, left: card.left, width: card.width }}
-              animate={{ y: [0, -4, 0], opacity: [0.55, 0.75, 0.55] }}
-              transition={{
-                duration: 3.4,
-                repeat: Infinity,
-                repeatType: "mirror",
-                delay: card.delay,
+              style={{
+                top: card.top,
+                left: card.left,
+                width: card.width,
+                opacity: reduceMotion ? 0.55 : undefined,
               }}
+              animate={
+                reduceMotion
+                  ? undefined
+                  : { y: [0, -4, 0], opacity: [0.55, 0.75, 0.55] }
+              }
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : {
+                      duration: 3.4,
+                      repeat: Infinity,
+                      repeatType: "mirror",
+                      delay: card.delay,
+                    }
+              }
+              aria-hidden="true"
             />
           ))}
         </div>

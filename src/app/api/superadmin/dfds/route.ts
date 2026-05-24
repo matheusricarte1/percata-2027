@@ -1,30 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
-import { isSuperadminEmail, normalizeRole } from "@/lib/access";
+import { NextResponse } from "next/server";
 import {
   isDfdDeleteConfirmationValid,
   SUPERADMIN_DFD_DELETE_STEPS,
 } from "@/lib/superadmin-dfd-delete";
-
-async function requireSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id || !user.email) return null;
-
-  if (isSuperadminEmail(user.email)) return user;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (normalizeRole(profile?.role, user.email) !== "superadmin") return null;
-  return user;
-}
+import { withAuthorizedRole } from "@/lib/api-auth";
 
 function isIgnorableOptionalError(error: any) {
   const message = String(error?.message || "").toLowerCase();
@@ -37,29 +16,21 @@ function isIgnorableOptionalError(error: any) {
   );
 }
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const actor = await requireSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
-    if (!hasSupabaseAdminCredentials()) {
-      return NextResponse.json(
-        { error: "Credenciais administrativas do Supabase não configuradas." },
-        { status: 503 },
-      );
-    }
-
+export const DELETE = withAuthorizedRole(
+  ["superadmin"],
+  async ({ request, supabaseAdmin }) => {
+    const admin = supabaseAdmin!;
     const body = await request.json().catch(() => ({}));
     const id = String(body?.id || "").trim();
     const confirmProtocol = String(body?.confirmProtocol || "").trim();
 
     if (!id) {
-      return NextResponse.json({ error: "Informe o id da DFD." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Informe o id da DFD." },
+        { status: 400 },
+      );
     }
 
-    const admin = createSupabaseAdminClient();
     const { data: dfd, error: dfdError } = await admin
       .from("dfds")
       .select("id,numero_protocolo,objeto_contratacao")
@@ -101,6 +72,8 @@ export async function DELETE(request: NextRequest) {
       executed.push(`${step.action}:${step.table}`);
     }
 
+    // A trilha de exclusão é capturada pela migration 0039 (audit_log)
+    // via trigger AFTER DELETE em dfds/dfd_items/dfd_logs etc.
     return NextResponse.json({
       ok: true,
       deleted: {
@@ -110,10 +83,6 @@ export async function DELETE(request: NextRequest) {
       },
       executed,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao excluir DFD." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

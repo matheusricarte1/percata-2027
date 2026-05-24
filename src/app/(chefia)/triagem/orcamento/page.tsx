@@ -27,7 +27,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { LoadingPanel, EmptyState } from "@/components/feedback/SystemFeedback";
 import { toast } from "sonner";
 import { getSafeUser, supabase } from "@/lib/supabase";
-import { isSuperadminEmail } from "@/lib/access";
+import { normalizeRole } from "@/lib/access";
 import { parseCollectiveDistributionText } from "@/lib/collective-dfd";
 import {
   buildCsv as buildReportCsv,
@@ -158,12 +158,12 @@ const GND_LABELS: Record<string, string> = {
 
 const STATUS_META: Record<string, { label: string; tone: string; dot: string }> = {
   rascunho: { label: "Rascunho", tone: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
-  enviada: { label: "Enviada", tone: "bg-blue-50 text-blue-800 border-blue-200", dot: "bg-blue-500" },
+  enviada: { label: "Enviada", tone: "bg-[var(--semantic-action-soft)] text-[var(--semantic-action)] border-[var(--semantic-action-border)]", dot: "bg-[var(--semantic-action)]" },
   triagem: { label: "Em análise", tone: "bg-amber-50 text-amber-800 border-amber-200", dot: "bg-amber-500" },
   devolvida: { label: "Devolvida", tone: "bg-red-50 text-red-800 border-red-200", dot: "bg-red-500" },
   aprovada: { label: "Homologada", tone: "bg-emerald-50 text-emerald-800 border-emerald-200", dot: "bg-emerald-500" },
-  pactuando: { label: "Recebida pela Admin.", tone: "bg-cyan-50 text-cyan-800 border-cyan-200", dot: "bg-cyan-500" },
-  concluida: { label: "Consolidada", tone: "bg-[#E8EDF2] text-[#164073] border-[#C7D7EA]", dot: "bg-[#164073]" },
+  pactuando: { label: "Recebida pela Admin.", tone: "bg-[var(--semantic-collab-soft)] text-[var(--semantic-collab)] border-[var(--semantic-collab-border)]", dot: "bg-[var(--semantic-collab)]" },
+  concluida: { label: "Consolidada", tone: "bg-[var(--semantic-insight-soft)] text-[var(--semantic-insight)] border-[var(--semantic-insight-border)]", dot: "bg-[var(--semantic-insight)]" },
 };
 
 function isMissingAnalysisColumns(error: any) {
@@ -198,6 +198,11 @@ function formatDateTime(value?: string | null) {
 
 function normalizeStatus(value?: string | null) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeLocationLabel(value?: string | null) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
 }
 
 function getStatusMeta(status?: string | null) {
@@ -375,6 +380,7 @@ async function resolveScopeLabelFromUnits(units: UnitScope[], scopedDfds: DfdDas
 async function resolveScopeOptions(
   units: UnitScope[],
   includeInstitutional = false,
+  options?: { superadminMode?: boolean },
 ): Promise<ScopeOption[]> {
   const unitOptions = await Promise.all(
     units.map(async (unit) => {
@@ -401,7 +407,11 @@ async function resolveScopeOptions(
     return includeInstitutional ? [...unitOptions, institutionalOption] : unitOptions;
   }
 
-  const options = [
+  if (includeInstitutional && options?.superadminMode) {
+    return [institutionalOption, ...unitOptions];
+  }
+
+  const scopedOptions = [
     {
       key: "all",
       label: `Visão consolidada: ${unitOptions.length} unidades`,
@@ -410,7 +420,7 @@ async function resolveScopeOptions(
     ...unitOptions,
   ];
 
-  return includeInstitutional ? [...options, institutionalOption] : options;
+  return includeInstitutional ? [...scopedOptions, institutionalOption] : scopedOptions;
 }
 
 function buildCsv(rows: DfdWithMetrics[]) {
@@ -481,6 +491,13 @@ export default function OrcamentoSetorial() {
         return;
       }
 
+      const { data: currentProfile, error: currentProfileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (currentProfileError) throw currentProfileError;
+
       setResponsibleLabel(user.user_metadata?.full_name || user.email || "Chefia responsável");
       setResponsibleAvatarUrl(
         String(
@@ -493,9 +510,9 @@ export default function OrcamentoSetorial() {
 
       let scopedUnits: UnitScope[] = [];
       let resolvedScopeOptions: ScopeOption[] = [];
-      const superadmin = isSuperadminEmail(user.email);
+      const superadmin = normalizeRole(currentProfile?.role, user.email) === "superadmin";
 
-      {
+      if (!superadmin) {
         let unitsQuery = supabase
           .from("user_units")
           .select("unit_id, unit_type, role_in_unit")
@@ -514,7 +531,7 @@ export default function OrcamentoSetorial() {
           role_in_unit: String(unit.role_in_unit || ""),
         }));
         const chefiaUnits = rawUnits.filter((unit) => unit.role_in_unit === "chefia");
-        const unitsForScope = superadmin && chefiaUnits.length === 0 ? rawUnits : chefiaUnits;
+        const unitsForScope = chefiaUnits.length > 0 ? chefiaUnits : rawUnits;
 
         scopedUnits = unitsForScope
           .map((unit: any) => ({
@@ -522,29 +539,6 @@ export default function OrcamentoSetorial() {
             unit_type: String(unit.unit_type || ""),
           }))
           .filter((unit) => unit.unit_id);
-
-        if (scopedUnits.length === 0) {
-          if (!superadmin) {
-            setDfds([]);
-            setItems([]);
-            setScopeLabel("Nenhum setor vinculado");
-            setScopeOptions([]);
-            return;
-          }
-          resolvedScopeOptions = await resolveScopeOptions([], true);
-          setScopeOptions(resolvedScopeOptions);
-          if (selectedScopeKey !== "institutional") {
-            setSelectedScopeKey("institutional");
-          }
-          setScopeLabel("Visão geral institucional");
-        } else {
-          resolvedScopeOptions = await resolveScopeOptions(scopedUnits, superadmin);
-          setScopeOptions(resolvedScopeOptions);
-          const hasSelected = resolvedScopeOptions.some((option) => option.key === selectedScopeKey);
-          if (!hasSelected) {
-            setSelectedScopeKey(resolvedScopeOptions[0]?.key || "all");
-          }
-        }
       }
 
       let result: any = await supabase
@@ -582,6 +576,44 @@ export default function OrcamentoSetorial() {
         }))
         .filter((row) => row.id);
 
+      if (superadmin) {
+        scopedUnits = Array.from(
+          new Map(
+            rawDfds
+              .map((dfd) => {
+                const unitId = dfd.analysis_unidade_id || dfd.unidade_id || null;
+                const unitType = dfd.analysis_tipo_unidade || dfd.tipo_unidade || null;
+                return unitId && unitType
+                  ? [`${unitType}:${unitId}`, { unit_id: unitId, unit_type: unitType }]
+                  : null;
+              })
+              .filter(Boolean) as Array<[string, UnitScope]>,
+          ).values(),
+        );
+
+        resolvedScopeOptions = await resolveScopeOptions(scopedUnits, true, {
+          superadminMode: true,
+        });
+        setScopeOptions(resolvedScopeOptions);
+        const hasSelected = resolvedScopeOptions.some((option) => option.key === selectedScopeKey);
+        if (!hasSelected) {
+          setSelectedScopeKey("institutional");
+        }
+      } else if (scopedUnits.length === 0) {
+        setDfds([]);
+        setItems([]);
+        setScopeLabel("Nenhum setor vinculado");
+        setScopeOptions([]);
+        return;
+      } else {
+        resolvedScopeOptions = await resolveScopeOptions(scopedUnits, false);
+        setScopeOptions(resolvedScopeOptions);
+        const hasSelected = resolvedScopeOptions.some((option) => option.key === selectedScopeKey);
+        if (!hasSelected) {
+          setSelectedScopeKey(resolvedScopeOptions[0]?.key || "all");
+        }
+      }
+
       const selectedUnit =
         selectedScopeKey === "all" || selectedScopeKey === "institutional"
           ? null
@@ -592,6 +624,33 @@ export default function OrcamentoSetorial() {
       const scopedDfds = superadmin && (selectedScopeKey === "institutional" || scopedUnits.length === 0)
         ? rawDfds
         : rawDfds.filter((dfd) => belongsToChefiaScope(dfd, targetUnits));
+
+      const dfdUnitKeys = Array.from(
+        new Set(
+          scopedDfds
+            .map((dfd) => {
+              const unitId = dfd.analysis_unidade_id || dfd.unidade_id || null;
+              const unitType = dfd.analysis_tipo_unidade || dfd.tipo_unidade || null;
+              return unitId && unitType ? `${unitType}:${unitId}` : null;
+            })
+            .filter(Boolean) as string[],
+        ),
+      );
+      const unitNameEntries = await Promise.all(
+        dfdUnitKeys.map(async (key) => {
+          const [unitType, unitId] = key.split(":");
+          return [key, await resolveUnitName(unitType, unitId)] as const;
+        }),
+      );
+      const unitNameByKey = new Map(unitNameEntries);
+      const unitNameByDfdId = new Map(
+        scopedDfds.map((dfd) => {
+          const unitId = dfd.analysis_unidade_id || dfd.unidade_id || null;
+          const unitType = dfd.analysis_tipo_unidade || dfd.tipo_unidade || null;
+          const key = unitId && unitType ? `${unitType}:${unitId}` : null;
+          return [dfd.id, key ? normalizeLocationLabel(unitNameByKey.get(key) || null) : null] as const;
+        }),
+      );
 
       setDfds(scopedDfds);
       const selectedOption = resolvedScopeOptions.find((option) => option.key === selectedScopeKey);
@@ -626,7 +685,10 @@ export default function OrcamentoSetorial() {
           quantidade: Number(row.quantidade || 0),
           valor_unitario_estimado: Number(row.valor_unitario_estimado || 0),
           gnd: String(row.gnd || "") || null,
-          local_uso: String(row.local_uso || "") || null,
+          local_uso:
+            normalizeLocationLabel(String(row.local_uso || "")) ||
+            unitNameByDfdId.get(String(row.dfd_id || "")) ||
+            null,
           justificativa_item: String(row.justificativa_item || "") || null,
           justificativa_quantidade: String(row.justificativa_quantidade || "") || null,
           criticidade: String(row.criticidade || "") || null,
@@ -976,26 +1038,26 @@ function HeaderPanel({
   onExport: () => void;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[24px] border border-[#C7D7EA] bg-white p-5 shadow-sm md:p-7">
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#164073] via-[#2A7C8C] to-[#EC2029]" />
+    <section className="ux-panel relative overflow-hidden rounded-[24px] p-5 md:p-7">
+      <div className="ux-accent-rule absolute inset-x-0 top-0 h-1" />
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#5B6675]">
+          <div className="ux-kicker flex flex-wrap items-center gap-2">
             <span>PERCATA</span>
             <ArrowRight className="h-3 w-3" />
             <span>Setores</span>
             <ArrowRight className="h-3 w-3" />
-            <span className="text-[#164073]">{scopeLabel}</span>
+            <span className="text-[var(--semantic-collab)]">{scopeLabel}</span>
           </div>
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#E8EDF2] text-[#164073]">
+            <div className="ux-icon-collab flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl">
               <Grid3X3 className="h-7 w-7" />
             </div>
             <div>
-              <h1 className="font-display text-3xl font-semibold tracking-tight text-[#17233C] md:text-4xl">
+              <h1 className="ux-title font-display text-3xl font-semibold md:text-4xl">
                 Panorama do setor para decidir melhor
               </h1>
-              <p className="mt-1 text-sm font-medium text-[#5B6675]">
+              <p className="ux-muted mt-1 text-sm font-medium">
                 {scopeLabel} | Exercício 2026
               </p>
             </div>
@@ -1004,15 +1066,15 @@ function HeaderPanel({
             <ChiefChip name={responsibleLabel} avatarUrl={responsibleAvatarUrl} />
             <InfoChip icon={<Clock3 className="h-3.5 w-3.5" />} label={`Atualização: ${formatDateTime(lastUpdatedAt)}`} />
           </div>
-          <div className="mt-4 max-w-xl rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-3">
-            <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5B6675]">
+          <div className="mt-4 max-w-xl rounded-2xl border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] p-3">
+            <label className="ux-kicker">
               Escopo do resumo
             </label>
             {scopeOptions.length > 1 ? (
               <select
                 value={selectedScopeKey}
                 onChange={(event) => onScopeChange(event.target.value)}
-                className="mt-2 h-11 w-full rounded-xl border border-[#C7D7EA] bg-white px-3 text-sm font-bold text-[#164073] outline-none"
+                className="mt-2 h-11 w-full rounded-xl border border-[var(--semantic-collab-border)] bg-white px-3 text-sm font-bold text-[var(--semantic-collab)] outline-none"
               >
                 {scopeOptions.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -1021,7 +1083,7 @@ function HeaderPanel({
                 ))}
               </select>
             ) : (
-              <div className="mt-2 rounded-xl bg-white px-3 py-3 text-sm font-bold text-[#164073]">
+              <div className="mt-2 rounded-xl bg-white px-3 py-3 text-sm font-bold text-[var(--semantic-collab)]">
                 {scopeLabel}
               </div>
             )}
@@ -1032,16 +1094,16 @@ function HeaderPanel({
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <QuickGuideCard
-              title="Leia antes de comparar"
-              description="Este painel existe para mostrar pressão orçamentária, gargalos e sobreposição antes da decisão."
+              title="Compare"
+              description="Pressão orçamentária, gargalos e sobreposição."
             />
             <QuickGuideCard
-              title="Veja o que trava o setor"
-              description="DFDs em análise, devolvidas e possíveis duplicidades costumam ser o primeiro foco de chefia."
+              title="Aja"
+              description="Análise parada, devolução e duplicidade primeiro."
             />
             <QuickGuideCard
-              title="Priorize com contraste"
-              description="A visão geral ajuda a separar impacto financeiro, urgência e oportunidade de consolidação."
+              title="Decida"
+              description="Impacto financeiro, urgência e consolidação."
             />
           </div>
         </div>
@@ -1051,21 +1113,21 @@ function HeaderPanel({
           </Link>
           <Link
             href="/triagem"
-            className={cn(buttonVariants({ variant: "outline" }), "rounded-xl border-[#C7D7EA] text-[#164073]")}
+            className={cn(buttonVariants({ variant: "outline" }), "rounded-xl border-[var(--semantic-action-border)] text-[var(--semantic-action)]")}
           >
             Analisar DFDs
           </Link>
           <Link
             href="#coletivas"
-            className={cn(buttonVariants({ variant: "outline" }), "rounded-xl border-[#C7D7EA] text-[#164073]")}
+            className={cn(buttonVariants({ variant: "outline" }), "rounded-xl border-[var(--semantic-collab-border)] text-[var(--semantic-collab)]")}
           >
             Demandas Coletivas
           </Link>
-          <Button variant="outline" onClick={onExport} className="rounded-xl border-[#C7D7EA] text-[#164073]">
+          <Button variant="outline" onClick={onExport} className="rounded-xl border-[var(--semantic-action-border)] text-[var(--semantic-action)]">
             <Download className="mr-2 h-4 w-4" />
             Exportar
           </Button>
-          <Button variant="outline" onClick={onRefresh} disabled={loading} className="rounded-xl border-[#C7D7EA] text-[#164073]">
+          <Button variant="outline" onClick={onRefresh} disabled={loading} className="rounded-xl border-[var(--semantic-action-border)] text-[var(--semantic-action)]">
             <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
             Atualizar
           </Button>
@@ -1084,8 +1146,8 @@ function ChiefChip({ name, avatarUrl }: { name: string; avatarUrl: string | null
     .join("") || "CH";
 
   return (
-    <span className="inline-flex items-center gap-3 rounded-full border border-[#D9E0E8] bg-[#F7FBFF] py-1.5 pl-1.5 pr-4 text-[12px] font-semibold text-[#164073]">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#164073] text-sm font-bold text-white shadow-sm">
+    <span className="inline-flex items-center gap-3 rounded-full border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] py-1.5 pl-1.5 pr-4 text-[12px] font-semibold text-[var(--semantic-collab)]">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[var(--semantic-collab)] text-sm font-bold text-white shadow-sm">
         {avatarUrl ? (
           <img
             src={avatarUrl}
@@ -1108,7 +1170,7 @@ function ChiefChip({ name, avatarUrl }: { name: string; avatarUrl: string | null
 
 function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[#D9E0E8] bg-[#F7FBFF] px-3 py-1.5 text-[11px] font-semibold text-[#164073]">
+    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--semantic-action-border)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--semantic-action)]">
       {icon}
       {label}
     </span>
@@ -1633,10 +1695,10 @@ function QuickGuideCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4">
-      <div className="mb-3 h-2 w-10 rounded-full bg-[#DCEAF0]" />
-      <p className="text-sm font-semibold text-[#164073]">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-[#52627A]">{description}</p>
+    <div className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white/80 p-3">
+      <div className="mb-2 h-1.5 w-9 rounded-full bg-[var(--semantic-collab-border)]" />
+      <p className="text-sm font-semibold text-[var(--semantic-text)]">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-[#52627A]">{description}</p>
     </div>
   );
 }

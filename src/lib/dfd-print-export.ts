@@ -19,6 +19,9 @@ export type DfdPrintExportData = {
   objeto: string;
   justificativa: string;
   gnd: string;
+  origem?: string;
+  sala_coletiva?: string;
+  coautores?: string;
   itens: DfdPrintExportItem[];
 };
 
@@ -60,6 +63,9 @@ export function buildDfdPrintExportCsv(data: DfdPrintExportData) {
     metadataRow("objeto", data.objeto),
     metadataRow("justificativa", data.justificativa),
     metadataRow("gnd", data.gnd),
+    ...(data.origem ? [metadataRow("origem", data.origem)] : []),
+    ...(data.sala_coletiva ? [metadataRow("sala_coletiva", data.sala_coletiva)] : []),
+    ...(data.coautores ? [metadataRow("coautores", data.coautores)] : []),
     ...data.itens.map((item, index) => ({
       secao: "ITEM",
       campo: `item_${index + 1}`,

@@ -1,5 +1,11 @@
 export type CollectiveUnitType = "departamento" | "laboratorio";
-export type CollectiveRoomStatus = "aberta" | "em_revisao" | "convertida" | "arquivada";
+export type CollectiveRoomStatus =
+  | "proposta"
+  | "aberta"
+  | "em_consolidacao_chefia"
+  | "pronta_para_conversao"
+  | "convertida"
+  | "arquivada";
 export type CollectiveRoomRole = "membro" | "chefia" | "admin" | "superadmin";
 export type CollectiveExpenseClass = "custeio" | "investimento" | "outro" | "sem-gnd";
 
@@ -175,10 +181,50 @@ export function aggregateCollectiveContributions(
 export function canEditCollectiveRoom(
   status: CollectiveRoomStatus,
   actorRole: CollectiveRoomRole,
+  options?: { isProposalOwner?: boolean },
 ) {
+  if (status === "convertida") return false;
   if (actorRole === "admin" || actorRole === "superadmin") return true;
-  if (actorRole !== "chefia") return false;
-  return status === "aberta" || status === "em_revisao" || status === "arquivada";
+  if (actorRole === "chefia") return true;
+  return status === "proposta" && Boolean(options?.isProposalOwner);
+}
+
+export function canPublishCollectiveRoom(
+  status: CollectiveRoomStatus,
+  actorRole: CollectiveRoomRole,
+) {
+  if (actorRole !== "chefia" && actorRole !== "admin" && actorRole !== "superadmin") {
+    return false;
+  }
+  return status === "proposta";
+}
+
+export function canReopenCollectiveRoom(
+  status: CollectiveRoomStatus,
+  actorRole: CollectiveRoomRole,
+) {
+  if (actorRole !== "chefia" && actorRole !== "admin" && actorRole !== "superadmin") {
+    return false;
+  }
+  return status === "em_consolidacao_chefia" || status === "pronta_para_conversao";
+}
+
+export function canContributeCollectiveRoom(
+  status: CollectiveRoomStatus,
+  actorRole: CollectiveRoomRole,
+) {
+  if (actorRole === "admin" || actorRole === "superadmin") return status === "aberta";
+  return status === "aberta";
+}
+
+export function canConvertCollectiveRoom(
+  status: CollectiveRoomStatus,
+  actorRole: CollectiveRoomRole,
+) {
+  if (actorRole !== "chefia" && actorRole !== "admin" && actorRole !== "superadmin") {
+    return false;
+  }
+  return status === "pronta_para_conversao";
 }
 
 export function canEditCollectiveContribution({
@@ -192,7 +238,13 @@ export function canEditCollectiveContribution({
   actorId?: string | null;
   ownerId?: string | null;
 }) {
-  if (roomStatus === "convertida" || roomStatus === "arquivada") return false;
+  if (
+    roomStatus === "proposta" ||
+    roomStatus === "convertida" ||
+    roomStatus === "arquivada"
+  ) {
+    return false;
+  }
   if (actorRole === "admin" || actorRole === "superadmin" || actorRole === "chefia") {
     return true;
   }

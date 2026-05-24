@@ -3,10 +3,14 @@ import { normalizeRole, type UserRole } from "@/lib/access";
 import {
   aggregateCollectiveContributions,
   buildCollectiveContributionKey,
+  canConvertCollectiveRoom,
+  canEditCollectiveContribution,
+  canEditCollectiveRoom,
   formatContributorDistribution,
   splitCollectiveItemsByExpenseClass,
   stripCollectiveContributionProfileFields,
   summarizeCollectiveRoom,
+  type CollectiveRoomRole,
   type CollectiveContribution,
   type CollectiveRoomStatus,
   type CollectiveUnitType,
@@ -46,7 +50,21 @@ export type CollectiveRoomRow = {
   cycle_year: number;
   created_at: string;
   updated_at: string;
+  published_at: string | null;
+  published_by: string | null;
   converted_at: string | null;
+};
+
+type CollectiveAuthorInsertRow = {
+  dfd_id: string;
+  room_id: string;
+  contribution_user_id: string;
+  author_name_snapshot: string | null;
+  author_email_snapshot: string | null;
+  item_count: number;
+  quantidade_total: number;
+  valor_total_estimado: number;
+  contribution_ids: string[];
 };
 
 export function apiError(message: string, status = 400) {
@@ -70,6 +88,11 @@ export function sanitizeUuid(value: unknown) {
     : "";
 }
 
+function sanitizeOptionalEmail(value: unknown) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
 function buildProtocol(seed = 0) {
   const now = new Date();
   const year = now.getFullYear();
@@ -89,8 +112,10 @@ function normalizeUnitType(value: unknown): CollectiveUnitType | null {
 
 function normalizeRoomStatus(value: unknown): CollectiveRoomStatus | null {
   if (
+    value === "proposta" ||
     value === "aberta" ||
-    value === "em_revisao" ||
+    value === "em_consolidacao_chefia" ||
+    value === "pronta_para_conversao" ||
     value === "convertida" ||
     value === "arquivada"
   ) {
@@ -193,6 +218,15 @@ export function actorIsChefiaForUnit(actor: CollectiveRoomActor, unitId: string)
   );
 }
 
+export function resolveCollectiveRoomRole(
+  actor: CollectiveRoomActor,
+  room: Pick<CollectiveRoomRow, "unit_id">,
+): CollectiveRoomRole {
+  if (actor.role === "admin" || actor.role === "superadmin") return actor.role;
+  if (actorIsChefiaForUnit(actor, room.unit_id)) return "chefia";
+  return "membro";
+}
+
 export async function loadRoomOrNull(admin: SupabaseAdmin, roomId: string) {
   const { data, error } = await admin
     .from("dfd_collective_rooms")
@@ -204,6 +238,13 @@ export async function loadRoomOrNull(admin: SupabaseAdmin, roomId: string) {
 }
 
 export function assertCanSeeRoom(actor: CollectiveRoomActor, room: CollectiveRoomRow) {
+  if (room.status === "proposta") {
+    return (
+      isAdminActor(actor) ||
+      actorIsChefiaForUnit(actor, room.unit_id) ||
+      room.created_by === actor.id
+    );
+  }
   return actorHasUnit(actor, room.unit_id, room.unit_type);
 }
 
@@ -225,6 +266,62 @@ export async function insertRoomEvent(
     metadata: params.metadata || null,
   });
   if (error) throw error;
+}
+
+export async function loadUnitRecipientUserIds(
+  admin: SupabaseAdmin,
+  params: {
+    unitId: string;
+    unitType: CollectiveUnitType;
+    roleInUnit?: string | null;
+  },
+) {
+  let query = admin
+    .from("user_units")
+    .select("user_id")
+    .eq("unit_id", params.unitId)
+    .eq("unit_type", params.unitType);
+  if (params.roleInUnit) query = query.eq("role_in_unit", params.roleInUnit);
+  const { data, error } = await query;
+  if (error) throw error;
+  return Array.from(
+    new Set(
+      (data || [])
+        .map((row: any) => String(row.user_id || "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export async function loadRoomParticipantUserIds(admin: SupabaseAdmin, roomId: string) {
+  const { data, error } = await admin
+    .from("dfd_collective_contributions")
+    .select("user_id")
+    .eq("room_id", roomId);
+  if (error) throw error;
+  return Array.from(
+    new Set(
+      (data || [])
+        .map((row: any) => String(row.user_id || "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export async function createNotifications(
+  admin: SupabaseAdmin,
+  notifications: Array<{
+    user_id: string;
+    title: string;
+    message: string;
+    type: "info" | "success" | "warning" | "error";
+  }>,
+) {
+  const rows = notifications.filter((row) => row.user_id && row.title && row.message);
+  if (rows.length === 0) return 0;
+  const { error } = await admin.from("notifications").insert(rows);
+  if (error) throw error;
+  return rows.length;
 }
 
 export async function buildRoomDetail(
@@ -285,6 +382,8 @@ export async function buildRoomDetail(
   const unitNames = await loadUnitNames(admin, [
     { unit_id: room.unit_id, unit_type: room.unit_type },
   ]);
+  const actorRoomRole = resolveCollectiveRoomRole(actor, room);
+  const isProposalOwner = room.created_by === actor.id;
 
   return {
     room: {
@@ -292,10 +391,24 @@ export async function buildRoomDetail(
       unit_name:
         unitNames.get(`${room.unit_type}:${room.unit_id}`) ||
         "Unidade vinculada",
-      can_edit_metadata: actorIsChefiaForUnit(actor, room.unit_id),
-      can_convert:
-        actorIsChefiaForUnit(actor, room.unit_id) &&
-        (room.status === "aberta" || room.status === "em_revisao"),
+      can_edit_metadata: canEditCollectiveRoom(room.status, actorRoomRole, {
+        isProposalOwner,
+      }),
+      can_publish:
+        (actorRoomRole === "chefia" ||
+          actorRoomRole === "admin" ||
+          actorRoomRole === "superadmin") &&
+        room.status === "proposta",
+      can_reopen:
+        (actorRoomRole === "chefia" ||
+          actorRoomRole === "admin" ||
+          actorRoomRole === "superadmin") &&
+        (room.status === "em_consolidacao_chefia" ||
+          room.status === "pronta_para_conversao"),
+      can_contribute: room.status === "aberta",
+      can_convert: canConvertCollectiveRoom(room.status, actorRoomRole),
+      actor_role: actorRoomRole,
+      is_proposal_owner: isProposalOwner,
     },
     summary,
     participants: summary.participants,
@@ -306,11 +419,12 @@ export async function buildRoomDetail(
         user_name: profile?.full_name || null,
         user_email: profile?.email || null,
         user_avatar_url: profile?.avatar_url || row.user_avatar_url || null,
-        can_edit:
-          (row.status === "aberta" &&
-            room.status === "aberta" &&
-            row.user_id === actor.id) ||
-          actorIsChefiaForUnit(actor, room.unit_id),
+        can_edit: canEditCollectiveContribution({
+          roomStatus: room.status,
+          actorRole: actorRoomRole,
+          actorId: actor.id,
+          ownerId: row.user_id,
+        }),
       };
     }),
     items: aggregatedItems,
@@ -438,17 +552,73 @@ async function getCampusLegacy(admin: SupabaseAdmin, campusId: string | null) {
   return String(data?.sigla || data?.nome || campusId).trim() || "SEM_CAMPUS";
 }
 
+function buildCollectiveAuthorRows(params: {
+  dfdId: string;
+  roomId: string;
+  contributions: any[];
+}) {
+  const { dfdId, roomId, contributions } = params;
+  const authorMap = new Map<
+    string,
+    Omit<CollectiveAuthorInsertRow, "item_count"> & { item_keys: Set<string> }
+  >();
+
+  for (const contribution of contributions) {
+    const userId = String(contribution.user_id || "").trim();
+    if (!userId) continue;
+
+    const current =
+      authorMap.get(userId) ||
+      ({
+        dfd_id: dfdId,
+        room_id: roomId,
+        contribution_user_id: userId,
+        author_name_snapshot: sanitizeText(contribution.user_name, 200) || null,
+        author_email_snapshot: sanitizeOptionalEmail(contribution.user_email),
+        item_keys: new Set<string>(),
+        quantidade_total: 0,
+        valor_total_estimado: 0,
+        contribution_ids: [],
+      } satisfies Omit<CollectiveAuthorInsertRow, "item_count"> & { item_keys: Set<string> });
+
+    current.author_name_snapshot =
+      current.author_name_snapshot || sanitizeText(contribution.user_name, 200) || null;
+    current.author_email_snapshot =
+      current.author_email_snapshot || sanitizeOptionalEmail(contribution.user_email);
+    current.item_keys.add(String(contribution.collective_key || contribution.id || ""));
+    current.quantidade_total += Number(contribution.quantidade || 0);
+    current.valor_total_estimado +=
+      Number(contribution.quantidade || 0) * Number(contribution.valor_unitario_estimado || 0);
+    if (contribution.id) current.contribution_ids.push(String(contribution.id));
+    authorMap.set(userId, current);
+  }
+
+  return Array.from(authorMap.values()).map(
+    ({ item_keys, valor_total_estimado, contribution_ids, ...entry }) =>
+      ({
+        ...entry,
+        item_count: item_keys.size,
+        valor_total_estimado: Number(valor_total_estimado.toFixed(2)),
+        contribution_ids: Array.from(new Set(contribution_ids)),
+      }) satisfies CollectiveAuthorInsertRow,
+  );
+}
+
 export async function convertRoomToOfficialDfds(params: {
   admin: SupabaseAdmin;
   actor: CollectiveRoomActor;
   room: CollectiveRoomRow;
 }) {
   const { admin, actor, room } = params;
-  if (!actorIsChefiaForUnit(actor, room.unit_id)) {
+  const actorRoomRole = resolveCollectiveRoomRole(actor, room);
+  if (actorRoomRole !== "chefia" && actorRoomRole !== "admin" && actorRoomRole !== "superadmin") {
     throw new Error("Somente a chefia da unidade pode converter a sala em DFD.");
   }
   if (room.status === "convertida" || room.status === "arquivada") {
     throw new Error("Esta sala nao pode mais ser convertida.");
+  }
+  if (room.status !== "pronta_para_conversao") {
+    throw new Error("Leve a sala ate a previa de conversao antes de gerar a DFD oficial.");
   }
 
   const detail = await buildRoomDetail(admin, actor, room);
@@ -484,6 +654,10 @@ export async function convertRoomToOfficialDfds(params: {
         campus_id: room.campus_id || actor.campus_id || null,
         unidade_id: room.unit_id,
         tipo_unidade: room.unit_type,
+        origin_type: "collective",
+        collective_origin_room_id: room.id,
+        collective_origin_room_title: room.title,
+        collective_origin_expense_class: group.expenseClass,
         previsao_recebimento: null,
         valor_total_estimado: valorTotalEstimado,
         status: "rascunho",
@@ -534,10 +708,23 @@ export async function convertRoomToOfficialDfds(params: {
     if (linkError) throw linkError;
 
     const groupKeys = new Set(group.items.map((item) => buildCollectiveContributionKey(item)));
-    const contributionIds = detail.contributions
-      .filter((contribution: any) => groupKeys.has(String(contribution.collective_key || "")))
+    const groupContributions = detail.contributions.filter((contribution: any) =>
+      groupKeys.has(String(contribution.collective_key || "")),
+    );
+    const contributionIds = groupContributions
       .map((contribution: any) => contribution.id)
       .filter(Boolean);
+    const authorRows = buildCollectiveAuthorRows({
+      dfdId: dfd.id,
+      roomId: room.id,
+      contributions: groupContributions,
+    });
+    if (authorRows.length > 0) {
+      const { error: authorsError } = await admin
+        .from("dfd_collective_dfd_authors")
+        .insert(authorRows);
+      if (authorsError) throw authorsError;
+    }
     if (contributionIds.length > 0) {
       const { error: closeError } = await admin
         .from("dfd_collective_contributions")

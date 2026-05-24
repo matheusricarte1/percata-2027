@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { createClient } from "@/utils/supabase/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 type DfdForTriagem = {
   id: string;
@@ -25,6 +26,15 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Usuário não autenticado." }, { status: 401 });
     }
+
+    // 30 envios para triagem por minuto por solicitante: suficiente para
+    // refile after correções, bloqueia loop acidental.
+    const limited = await enforceRateLimit(
+      request,
+      { bucket: "dfd-send-to-triagem", limit: 30, windowSec: 60 },
+      user.id,
+    );
+    if (limited) return limited;
 
     const body = await request.json().catch(() => ({}));
     const id = String(body?.id || "").trim();

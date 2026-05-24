@@ -4,8 +4,12 @@ import { describe, it } from "node:test";
 import {
   aggregateCollectiveContributions,
   buildCollectiveContributionKey,
+  canContributeCollectiveRoom,
+  canConvertCollectiveRoom,
   canEditCollectiveContribution,
   canEditCollectiveRoom,
+  canPublishCollectiveRoom,
+  canReopenCollectiveRoom,
   parseCollectiveDistributionText,
   splitCollectiveItemsByExpenseClass,
   stripCollectiveContributionProfileFields,
@@ -115,11 +119,33 @@ describe("collective-dfd", () => {
     ]);
   });
 
-  it("allows only chefia to edit room metadata after creation", () => {
+  it("lets proposal owners edit only their own proposal metadata", () => {
+    assert.equal(canEditCollectiveRoom("proposta", "membro", { isProposalOwner: true }), true);
+    assert.equal(canEditCollectiveRoom("proposta", "membro", { isProposalOwner: false }), false);
+    assert.equal(canEditCollectiveRoom("proposta", "chefia"), true);
+  });
+
+  it("allows only chefia-like roles to control room lifecycle after publication", () => {
     assert.equal(canEditCollectiveRoom("aberta", "membro"), false);
     assert.equal(canEditCollectiveRoom("aberta", "chefia"), true);
     assert.equal(canEditCollectiveRoom("convertida", "chefia"), false);
     assert.equal(canEditCollectiveRoom("arquivada", "admin"), true);
+  });
+
+  it("enforces publish, reopen and convert authority on the lifecycle", () => {
+    assert.equal(canPublishCollectiveRoom("proposta", "chefia"), true);
+    assert.equal(canPublishCollectiveRoom("proposta", "membro"), false);
+    assert.equal(canReopenCollectiveRoom("em_consolidacao_chefia", "chefia"), true);
+    assert.equal(canReopenCollectiveRoom("pronta_para_conversao", "chefia"), true);
+    assert.equal(canReopenCollectiveRoom("aberta", "chefia"), false);
+    assert.equal(canConvertCollectiveRoom("pronta_para_conversao", "chefia"), true);
+    assert.equal(canConvertCollectiveRoom("em_consolidacao_chefia", "chefia"), false);
+  });
+
+  it("allows contributions only while the room is open", () => {
+    assert.equal(canContributeCollectiveRoom("aberta", "membro"), true);
+    assert.equal(canContributeCollectiveRoom("proposta", "membro"), false);
+    assert.equal(canContributeCollectiveRoom("em_consolidacao_chefia", "membro"), false);
   });
 
   it("allows members to edit only their own open contributions", () => {
@@ -143,7 +169,16 @@ describe("collective-dfd", () => {
     );
     assert.equal(
       canEditCollectiveContribution({
-        roomStatus: "em_revisao",
+        roomStatus: "em_consolidacao_chefia",
+        actorRole: "chefia",
+        actorId: "chefia-1",
+        ownerId: "user-2",
+      }),
+      true,
+    );
+    assert.equal(
+      canEditCollectiveContribution({
+        roomStatus: "pronta_para_conversao",
         actorRole: "chefia",
         actorId: "chefia-1",
         ownerId: "user-2",

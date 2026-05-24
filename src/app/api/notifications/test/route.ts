@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { normalizeRole } from "@/lib/access";
 import { sanitizeEmail } from "@/lib/settings-sanitize";
 import { toPublicSiteUrl } from "@/lib/site-url";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,14 @@ export async function POST(request: NextRequest) {
     if (!user?.email) {
       return NextResponse.json({ error: "Usuário não autenticado." }, { status: 401 });
     }
+
+    // 5 testes de e-mail por minuto por usuário. Mais do que isso é abuso ou bug.
+    const limited = await enforceRateLimit(
+      request,
+      { bucket: "notif-test", limit: 5, windowSec: 60 },
+      user.id,
+    );
+    if (limited) return limited;
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -50,10 +59,16 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
     const timestamp = now.toLocaleString("pt-BR", { timeZone: "America/Bahia" });
+    // Idempotência: clicks duplos no botão "Enviar teste" não devem gerar
+    // 2 emails. Janela de 60s é suficiente — testes intencionais subsequentes
+    // produzem timestamps diferentes e portanto keys diferentes.
+    const minuteBucket = Math.floor(now.getTime() / 60_000);
+    const idempotencyKey = `notif-test:${user.id}:${targetEmail}:${minuteBucket}`;
     const result = await sendSystemEmail({
       to: targetEmail,
       subject: "PERCATA • Teste de e-mail",
       templateKey: "test",
+      idempotencyKey,
       text:
         `Olá.\n\n` +
         `Este é um teste do canal de e-mail do PERCATA.\n` +

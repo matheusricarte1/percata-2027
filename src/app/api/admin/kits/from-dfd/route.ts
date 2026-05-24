@@ -1,13 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
-import { normalizeRole, type UserRole } from "@/lib/access";
-
-type ActorContext = {
-  id: string;
-  email: string;
-  role: UserRole;
-};
+import { NextResponse } from "next/server";
+import { withAuthorizedRole } from "@/lib/api-auth";
 
 type DfdRecord = {
   id: string;
@@ -32,59 +24,24 @@ function isSchemaCacheError(error: any, columns: string[]) {
   );
 }
 
-async function requireAdminOrSuperadmin(): Promise<ActorContext | null> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id || !user.email) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = normalizeRole(profile?.role, user.email);
-  if (role !== "admin" && role !== "superadmin") return null;
-
-  return {
-    id: user.id,
-    email: String(user.email).toLowerCase(),
-    role,
-  };
-}
-
 function getItemCode(item: DfdItemRecord) {
   return String(item.codigo_item_efisco || item.codigo_tce || "").trim();
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const actor = await requireAdminOrSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
-    if (!hasSupabaseAdminCredentials()) {
-      return NextResponse.json(
-        {
-          error:
-            "Credenciais administrativas do Supabase não configuradas. Configure SUPABASE_SERVICE_ROLE_KEY.",
-        },
-        { status: 503 },
-      );
-    }
-
+export const POST = withAuthorizedRole(
+  ["admin", "superadmin"],
+  async ({ request, supabaseAdmin, user }) => {
+    const admin = supabaseAdmin!;
     const body = await request.json().catch(() => ({}));
     const dfdId = String(body?.dfdId || "").trim();
     const category = String(body?.category || "DFD").trim() || "DFD";
 
     if (!dfdId) {
-      return NextResponse.json({ error: "Parâmetro dfdId é obrigatório." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Parâmetro dfdId é obrigatório." },
+        { status: 400 },
+      );
     }
-
-    const admin = createSupabaseAdminClient();
 
     const { data: dfd, error: dfdError } = await admin
       .from("dfds")
@@ -102,10 +59,15 @@ export async function POST(request: NextRequest) {
       .eq("dfd_id", dfdId);
     if (dfdItemsError) throw dfdItemsError;
 
-    const items = ((dfdItems || []) as DfdItemRecord[]).filter((item) => getItemCode(item));
+    const items = ((dfdItems || []) as DfdItemRecord[]).filter((item) =>
+      getItemCode(item),
+    );
     if (items.length === 0) {
       return NextResponse.json(
-        { error: "Esta DFD não possui itens com código e-Fisco para virar kit." },
+        {
+          error:
+            "Esta DFD não possui itens com código e-Fisco para virar kit.",
+        },
         { status: 422 },
       );
     }
@@ -118,7 +80,10 @@ export async function POST(request: NextRequest) {
     if (catalogError) throw catalogError;
 
     const catalogByCode = new Map(
-      (catalogItems || []).map((item: any) => [String(item.codigo_efisco || "").trim(), item]),
+      (catalogItems || []).map((item: any) => [
+        String(item.codigo_efisco || "").trim(),
+        item,
+      ]),
     );
     const kitRows = items
       .map((item) => {
@@ -150,7 +115,7 @@ export async function POST(request: NextRequest) {
         `Modelo ${dfdRecord.numero_protocolo || dfdRecord.id.slice(0, 8)}`,
       descricao: String(dfdRecord.justificativa_contratacao || "").trim() || null,
       categoria: category,
-      created_by: actor.id,
+      created_by: user.id,
       source_dfd_id: dfdRecord.id,
       source_protocol: dfdRecord.numero_protocolo,
       is_active: true,
@@ -163,14 +128,25 @@ export async function POST(request: NextRequest) {
       .select("*")
       .single();
 
-    if (upsertResult.error && isSchemaCacheError(upsertResult.error, ["source_dfd_id", "source_protocol", "is_active"])) {
+    if (
+      upsertResult.error &&
+      isSchemaCacheError(upsertResult.error, [
+        "source_dfd_id",
+        "source_protocol",
+        "is_active",
+      ])
+    ) {
       const fallbackPayload = {
         nome: kitPayload.nome,
         descricao: kitPayload.descricao,
         categoria: kitPayload.categoria,
         created_by: kitPayload.created_by,
       };
-      const fallbackResult = await admin.from("kits").insert(fallbackPayload).select("*").single();
+      const fallbackResult = await admin
+        .from("kits")
+        .insert(fallbackPayload)
+        .select("*")
+        .single();
       if (fallbackResult.error) throw fallbackResult.error;
       kit = fallbackResult.data;
     } else if (upsertResult.error) {
@@ -179,7 +155,10 @@ export async function POST(request: NextRequest) {
       kit = upsertResult.data;
     }
 
-    const { error: deleteItemsError } = await admin.from("kit_items").delete().eq("kit_id", kit.id);
+    const { error: deleteItemsError } = await admin
+      .from("kit_items")
+      .delete()
+      .eq("kit_id", kit.id);
     if (deleteItemsError) throw deleteItemsError;
 
     const { error: insertItemsError } = await admin.from("kit_items").insert(
@@ -197,10 +176,6 @@ export async function POST(request: NextRequest) {
       insertedItems: kitRows.length,
       unmatched,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao marcar DFD como kit." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

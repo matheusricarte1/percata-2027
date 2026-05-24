@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
+import { NextResponse } from "next/server";
 import { getEmailProviderStatus, sendSystemEmail } from "@/lib/email";
-import { createClient } from "@/utils/supabase/server";
-import { normalizeRole } from "@/lib/access";
 import { toPublicSiteUrl } from "@/lib/site-url";
+import { withAuthorizedRole } from "@/lib/api-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DEFAULT_BATCH_SIZE = 20;
 
@@ -18,26 +17,17 @@ function isMissingEmailQueueError(error: any): boolean {
   );
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Usuário não autenticado." }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    const role = normalizeRole(profile?.role, user.email);
-    if (role !== "admin" && role !== "superadmin") {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
+export const POST = withAuthorizedRole(
+  ["admin", "superadmin"],
+  async ({ request, supabaseAdmin, user }) => {
+    // Rate limit defensivo: o dispatch pode ser disparado por cron, mas se
+    // for chamado manualmente em loop, evita esgotar quota do Resend.
+    const limited = await enforceRateLimit(
+      request,
+      { bucket: "notif-dispatch", limit: 30, windowSec: 60 },
+      user.id,
+    );
+    if (limited) return limited;
 
     const providerStatus = getEmailProviderStatus();
     if (!providerStatus.configured) {
@@ -55,28 +45,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!hasSupabaseAdminCredentials()) {
-      return NextResponse.json(
-        {
-          processed: 0,
-          sent: 0,
-          failed: 0,
-          provider: providerStatus.provider,
-          configured: providerStatus.configured,
-          redirectTo: providerStatus.redirectTo || null,
-          reason: "Credenciais administrativas do Supabase não configuradas neste ambiente.",
-        },
-        { status: 503 },
-      );
-    }
-
-    const batchParam = Number(request.nextUrl.searchParams.get("batch") || DEFAULT_BATCH_SIZE);
+    const batchParam = Number(
+      request.nextUrl.searchParams.get("batch") || DEFAULT_BATCH_SIZE,
+    );
     const batchSize = Number.isFinite(batchParam)
       ? Math.max(1, Math.min(batchParam, 100))
       : DEFAULT_BATCH_SIZE;
 
-    const supabaseAdmin = createSupabaseAdminClient();
-    const { data: queued, error: queueError } = await supabaseAdmin.rpc(
+    // supabaseAdmin é garantido !== null pelo requireAdminClient: true.
+    const admin = supabaseAdmin!;
+    const { data: queued, error: queueError } = await admin.rpc(
       "claim_email_alert_queue",
       { batch_size: batchSize },
     );
@@ -109,18 +87,27 @@ export async function POST(request: NextRequest) {
     let failed = 0;
 
     for (const item of queued) {
+      // Idempotência: chave derivada do id da fila. Se o dispatch crashar
+      // após o envio mas antes do UPDATE status=sent, a próxima execução
+      // do worker reenvia com mesma key — Resend deduplica server-side.
+      const idempotencyKey = `email-queue:${item.id}`;
+
       const result = await sendSystemEmail({
         to: item.email_to,
         subject: item.subject,
         text: item.body,
         contextLabel: "Notificação institucional",
         actionLabel: "Abrir PERCATA",
-        actionUrl: toPublicSiteUrl("/dashboard", request.nextUrl.origin).toString(),
+        actionUrl: toPublicSiteUrl(
+          "/dashboard",
+          request.nextUrl.origin,
+        ).toString(),
+        idempotencyKey,
       });
 
       if (result.ok) {
         sent += 1;
-        await supabaseAdmin
+        await admin
           .from("email_alert_queue")
           .update({
             status: "sent",
@@ -130,7 +117,7 @@ export async function POST(request: NextRequest) {
           .eq("id", item.id);
       } else {
         failed += 1;
-        await supabaseAdmin
+        await admin
           .from("email_alert_queue")
           .update({
             status: "failed",
@@ -148,10 +135,6 @@ export async function POST(request: NextRequest) {
       configured: true,
       redirectTo: providerStatus.redirectTo || null,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Erro ao processar fila de e-mails." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

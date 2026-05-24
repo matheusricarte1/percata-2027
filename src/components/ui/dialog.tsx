@@ -2,11 +2,14 @@
 
 import * as React from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
+// Central hook respeita prefers-reduced-motion + data-reduced-motion +
+// data-show-animations, com precedência única (ver lib/use-reduced-motion.ts).
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;

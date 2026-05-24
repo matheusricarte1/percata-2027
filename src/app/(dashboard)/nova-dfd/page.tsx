@@ -57,6 +57,7 @@ import {
   DFD_PROCESS_STEPS,
   getDfdProcessChecklist,
 } from "@/lib/dfd-process-guide";
+import { useDfdDraft } from "@/lib/use-dfd-draft";
 
 type UnitType = "departamento" | "laboratorio";
 type GroupingMode = "grupo" | "classe" | "livre" | "coletiva";
@@ -383,6 +384,37 @@ export default function NovaDFDPage() {
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("grupo");
   const [showGuide, setShowGuide] = useState(true);
 
+  // Autosave do wizard (migration 0042 + dfdDraftActions).
+  // Salva groupingMode + formData de cada grupo (não os itens, que já vivem
+  // no Zustand carrinho persistente). Restaura ao montar; limpa após finalize.
+  const draft = useDfdDraft();
+  const draftRestoredRef = React.useRef(false);
+
+  // Restaura rascunho — quando a primeira passagem do effect abaixo gera os
+  // grupos (a partir dos itens do carrinho), aplicamos formData salvos.
+  useEffect(() => {
+    if (draft.loading || draftRestoredRef.current) return;
+    if (!draft.draft?.payload) {
+      draftRestoredRef.current = true;
+      return;
+    }
+    const payload = draft.draft.payload as {
+      groupingMode?: GroupingMode;
+      groupForms?: Record<string, DFDGroup["formData"]>;
+      showGuide?: boolean;
+    };
+    if (payload.groupingMode) setGroupingMode(payload.groupingMode);
+    if (typeof payload.showGuide === "boolean") setShowGuide(payload.showGuide);
+    // groupForms é aplicado no effect que reconstrói dfdGroups (logo abaixo),
+    // através de uma ref consultada lá.
+    pendingFormRestoreRef.current = payload.groupForms || null;
+    draftRestoredRef.current = true;
+  }, [draft.loading, draft.draft]);
+
+  const pendingFormRestoreRef = React.useRef<
+    Record<string, DFDGroup["formData"]> | null
+  >(null);
+
   useEffect(() => {
     if (items.length === 0) {
       setDfdGroups([]);
@@ -404,32 +436,78 @@ export default function NovaDFDPage() {
       });
     });
 
+    const restoreMap = pendingFormRestoreRef.current;
     setDfdGroups(
       Object.entries(grouped).map(([key, group]) => {
         const fallbackObjeto = buildDefaultObjeto(groupingMode, group.label);
         const kitPrefill = buildKitPrefill(group.items, fallbackObjeto);
+        const defaultFormData: DFDGroup["formData"] = {
+          objeto: kitPrefill.objeto,
+          justificativa_contratacao: kitPrefill.justificativaContratacao,
+          justificativa_quantidade: kitPrefill.justificativaQuantidade,
+          previsao_data: "",
+          unidade_id: "",
+          tipo_unidade: "departamento",
+          analysis_unidade_id: "",
+          analysis_tipo_unidade: "departamento",
+          analysis_routing_reason: "",
+          finalidade: "",
+          contexto_academico: "",
+        };
+        const restored = restoreMap?.[key];
         return {
           key,
           label: group.label,
           mode: groupingMode,
           items: group.items,
-          formData: {
-            objeto: kitPrefill.objeto,
-            justificativa_contratacao: kitPrefill.justificativaContratacao,
-            justificativa_quantidade: kitPrefill.justificativaQuantidade,
-            previsao_data: "",
-            unidade_id: "",
-            tipo_unidade: "departamento",
-            analysis_unidade_id: "",
-            analysis_tipo_unidade: "departamento",
-            analysis_routing_reason: "",
-            finalidade: "",
-            contexto_academico: "",
-          },
+          formData: restored
+            ? { ...defaultFormData, ...restored }
+            : defaultFormData,
         };
       }),
     );
+    // Restauração é one-shot — não reaplica em mudanças subsequentes.
+    if (restoreMap) pendingFormRestoreRef.current = null;
   }, [items, groupingMode]);
+
+  // Autosave: a cada mudança de dfdGroups/groupingMode/showGuide, agenda save.
+  // O hook tem debounce 1500ms + dedup por hash; chamar sempre é seguro.
+  useEffect(() => {
+    if (draft.loading || !draftRestoredRef.current) return;
+    if (dfdGroups.length === 0 && items.length === 0) return;
+    const groupForms: Record<string, DFDGroup["formData"]> = {};
+    dfdGroups.forEach((g) => {
+      groupForms[g.key] = g.formData;
+    });
+    draft.save(
+      {
+        groupingMode,
+        groupForms,
+        showGuide,
+        savedAt: new Date().toISOString(),
+      },
+      groupingMode,
+    );
+  }, [dfdGroups, groupingMode, showGuide, items.length, draft]);
+
+  // Surface de erro de autosave: avisa o usuário se o BD recusar.
+  // Não toasta sucesso a cada save para não poluir; só mostra erros novos.
+  const lastShownErrorRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      draft.status === "error" &&
+      draft.lastError &&
+      draft.lastError !== lastShownErrorRef.current
+    ) {
+      lastShownErrorRef.current = draft.lastError;
+      toast.error(
+        `Autosave do rascunho falhou: ${draft.lastError}. Suas alterações ainda estão na memória — finalize ou tente novamente.`,
+      );
+    }
+    if (draft.status === "saved") {
+      lastShownErrorRef.current = null;
+    }
+  }, [draft.status, draft.lastError]);
 
   useEffect(() => {
     async function loadUnits() {
@@ -981,6 +1059,8 @@ export default function NovaDFDPage() {
 
         toast.success(`${createdCount} DFD(s) coletiva(s) criada(s) com sucesso.`);
         clearCarrinho();
+        // Apaga rascunho — DFDs já existem no banco; nada a recuperar.
+        await draft.clear();
         router.push("/minhas-dfds");
         return;
       }
@@ -1093,6 +1173,7 @@ export default function NovaDFDPage() {
 
       toast.success(`${dfdGroups.length} DFD(s) criada(s) com sucesso.`);
       clearCarrinho();
+      await draft.clear();
       router.push("/minhas-dfds");
     } catch (error: any) {
       toast.error(`Erro ao finalizar DFDs: ${error.message}`);

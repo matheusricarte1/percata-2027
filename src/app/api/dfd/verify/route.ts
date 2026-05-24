@@ -7,9 +7,20 @@ import {
   computeDfdSignature,
   isValidDfdSignature,
 } from "@/lib/dfd-signature";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
+    // Rota pública (verificação por QR). Rate limit alto mas presente —
+    // sem isso, atacante pode brute-force assinaturas HMAC.
+    // 60/min por IP é generoso para uso humano.
+    const limited = await enforceRateLimit(request, {
+      bucket: "dfd-verify",
+      limit: 60,
+      windowSec: 60,
+    });
+    if (limited) return limited;
+
     const id = request.nextUrl.searchParams.get("id");
     const sig = request.nextUrl.searchParams.get("sig");
 

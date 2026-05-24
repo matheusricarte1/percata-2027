@@ -414,17 +414,18 @@ export default function MinhasDFDsPage() {
     setPage(1);
   }, [filter, search, sortBy]);
   return (
-    <div className="space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
-      <section className="rounded-[20px] border border-[#C7D7EA] bg-[#F7FBFF] p-6 shadow-sm">
+    <div className="space-y-5 bg-[var(--semantic-neutral-soft)] px-4 py-6 md:px-6">
+      <section className="ux-panel-soft relative overflow-hidden rounded-[20px] p-6">
+        <div className="ux-accent-rule absolute inset-x-0 top-0 h-1" />
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#47739F]">
+            <p className="ux-kicker">
               Acompanhamento do solicitante
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#17233C]">
+            <h1 className="ux-title mt-1 text-3xl font-semibold">
               Suas DFDs em um fluxo mais claro
             </h1>
-            <p className="mt-1 text-sm text-[#52627A]">
+            <p className="ux-muted mt-1 max-w-3xl text-sm">
               Veja o que ainda está sob sua responsabilidade, o que já seguiu para análise e o que voltou para ajuste.
             </p>
           </div>
@@ -432,14 +433,14 @@ export default function MinhasDFDsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/catalogo"
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073] hover:bg-[#EAF2FF]"
+              className="ux-btn-secondary inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.12em]"
             >
               <Files size={16} weight="bold" />
               Catálogo
             </Link>
             <Link
               href="/catalogo"
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#164073] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#0F2E57]"
+              className="ux-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-xs font-semibold uppercase tracking-[0.12em]"
             >
               <Plus size={16} weight="bold" />
               Nova Demanda
@@ -449,19 +450,20 @@ export default function MinhasDFDsPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <KpiCard label="Total de DFDs" value={String(activeKpis.total)} icon={Files} />
-        <KpiCard label="Rascunhos" value={String(activeKpis.drafts)} icon={ClipboardText} />
-        <KpiCard label="Em análise" value={String(activeKpis.inReview)} icon={FunnelSimple} />
-        <KpiCard label="Concluídas" value={String(activeKpis.done)} icon={CheckCircle} />
+        <KpiCard label="Total de DFDs" value={String(activeKpis.total)} icon={Files} tone="action" />
+        <KpiCard label="Rascunhos" value={String(activeKpis.drafts)} icon={ClipboardText} tone="neutral" />
+        <KpiCard label="Em análise" value={String(activeKpis.inReview)} icon={FunnelSimple} tone="warning" />
+        <KpiCard label="Concluídas" value={String(activeKpis.done)} icon={CheckCircle} tone="success" />
         <KpiCard
           label="Valor estimado"
           value={formatCurrency(activeKpis.totalValue)}
           icon={ChartLineUp}
+          tone="collab"
         />
-        <KpiCard label="Legadas" value={String(activeKpis.legacy)} icon={Archive} />
+        <KpiCard label="Legadas" value={String(activeKpis.legacy)} icon={Archive} tone="insight" />
       </section>
 
-      <section className="rounded-[20px] border border-[#D9E0E8] bg-white p-4 shadow-sm">
+      <section className="ux-panel rounded-[20px] p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1">
             <MagnifyingGlass
@@ -477,7 +479,7 @@ export default function MinhasDFDsPage() {
                   ? "Buscar por ano, código legado ou objeto"
                   : "Buscar por protocolo, objeto ou campus"
               }
-              className="h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] pl-10 pr-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#4D79A8] focus:bg-white"
+              className="h-11 w-full rounded-xl border border-[var(--semantic-neutral-border)] bg-[#FAFBFC] pl-10 pr-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[var(--semantic-collab)] focus:bg-white"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -486,7 +488,7 @@ export default function MinhasDFDsPage() {
               <select
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as SortOption)}
-                className="h-11 min-w-[220px] appearance-none rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-4 pr-10 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#4D79A8] focus:bg-white"
+                className="h-11 min-w-[220px] appearance-none rounded-xl border border-[var(--semantic-neutral-border)] bg-[#FAFBFC] px-4 pr-10 text-sm font-semibold text-[var(--semantic-action)] outline-none transition focus:border-[var(--semantic-collab)] focus:bg-white"
               >
                 <option value="recentes">Mais recentes</option>
                 <option value="antigas">Mais antigas</option>
@@ -517,8 +519,8 @@ export default function MinhasDFDsPage() {
                 onClick={() => setFilter(option)}
                 className={`h-11 rounded-xl px-4 text-sm font-semibold transition ${
                   filter === option
-                    ? "bg-[#164073] text-white"
-                    : "border border-[#D9E0E8] bg-[#F4F7FA] text-[#3E4C5F] hover:bg-[#E8EDF2]"
+                    ? "bg-[var(--semantic-action)] text-white"
+                    : "border border-[var(--semantic-neutral-border)] bg-[var(--semantic-neutral-soft)] text-[#3E4C5F] hover:bg-[#E8EDF2]"
                 }`}
               >
                 {option} ({count})
@@ -530,7 +532,7 @@ export default function MinhasDFDsPage() {
 
       {!isLegacyMode && (
         <section className="space-y-4">
-          <h2 className="text-[34px] font-semibold tracking-tight text-[#172C5A]">Demandas recentes</h2>
+          <h2 className="ux-title text-[30px] font-semibold">Demandas recentes</h2>
           {loading && (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -549,7 +551,7 @@ export default function MinhasDFDsPage() {
               const localUso =
                 dfd.unidade_id && dfd.tipo_unidade
                   ? unitNameMap[`${dfd.tipo_unidade}:${dfd.unidade_id}`] || "Unidade não encontrada"
-                  : "Não informado";
+                  : "Setor não vinculado";
               const stage = getDfdProcessStage(dfd.status);
 
               return (
@@ -558,7 +560,7 @@ export default function MinhasDFDsPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.16 }}
-                  className="relative overflow-hidden rounded-[26px] border border-[#E2E8F0] bg-white shadow-sm"
+                  className="ux-panel relative overflow-hidden rounded-[24px]"
                 >
                   <div className={`absolute left-0 top-0 h-full w-1.5 ${visual.borderClassName}`} />
                   <div className="p-6">
@@ -566,16 +568,16 @@ export default function MinhasDFDsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className={`rounded-full px-4 py-1.5 text-sm font-semibold ${visual.badgeClassName}`}>{visual.label}</span>
-                          <span className="rounded-full bg-[#F4F7FA] px-4 py-1.5 text-sm font-semibold text-[#5B6675]">
+                          <span className="ux-chip bg-[var(--semantic-neutral-soft)] px-4 py-1.5 text-sm text-[#5B6675]">
                             Etapa {stage.stepIndex}/4
                           </span>
                           {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
-                            <span className="rounded-full bg-[#FFF3E6] px-4 py-1.5 text-sm font-semibold text-[#D26C2D]">
+                            <span className="ux-chip ux-chip-warning px-4 py-1.5 text-sm">
                               Requer sua ação
                             </span>
                           )}
                         </div>
-                        <h3 className="mt-4 line-clamp-2 text-[28px] font-semibold tracking-tight text-[#172C5A]">
+                        <h3 className="ux-title mt-4 line-clamp-2 text-[26px] font-semibold">
                           {dfd.objeto_contratacao || "Demanda sem objeto informado"}
                         </h3>
                         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#5B6675]">
@@ -597,7 +599,7 @@ export default function MinhasDFDsPage() {
                         >
                           <DotsThree size={20} weight="bold" />
                         </button>
-                        <p className="text-[28px] font-semibold tracking-tight text-[#172C5A]">
+                        <p className="ux-title text-[26px] font-semibold">
                           {formatCurrency(Number(dfd.valor_total_estimado || 0))}
                         </p>
                       </div>
@@ -610,7 +612,7 @@ export default function MinhasDFDsPage() {
                             type="button"
                             onClick={() => handleSendToChefia(dfd.id)}
                             disabled={sendingDfdId === dfd.id}
-                            className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#164073] px-5 text-base font-semibold text-white hover:bg-[#0F2E57] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="ux-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {sendingDfdId === dfd.id ? (
                               <CircleNotch size={14} className="animate-spin" />
@@ -625,7 +627,7 @@ export default function MinhasDFDsPage() {
                             type="button"
                             onClick={() => handleMarkAsKit(dfd.id)}
                             disabled={markingKitId === dfd.id}
-                            className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-white px-5 text-base font-semibold text-[#164073] hover:bg-[#F7FBFF] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="ux-btn-secondary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <Package size={14} weight="bold" />
                             {markingKitId === dfd.id ? "Gerando..." : "Transformar em kit"}
@@ -635,7 +637,7 @@ export default function MinhasDFDsPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/dfd/${dfd.id}`)}
-                        className="inline-flex h-11 items-center gap-2 rounded-xl px-2 text-base font-semibold text-[#164073] hover:text-[#0F2E57]"
+                        className="inline-flex h-11 items-center gap-2 rounded-xl px-2 text-base font-semibold text-[var(--semantic-action)] hover:text-[var(--semantic-action-strong)]"
                       >
                         Ver detalhes
                         <CaretRight size={16} weight="bold" />
@@ -778,22 +780,51 @@ function KpiCard({
   label,
   value,
   icon: Icon,
+  tone = "action",
 }: {
   label: string;
   value: string;
   icon: React.ComponentType<any>;
+  tone?: "action" | "collab" | "success" | "warning" | "insight" | "neutral";
 }) {
+  const toneClasses = {
+    action: {
+      icon: "ux-icon-action",
+      value: "text-[var(--semantic-action)]",
+    },
+    collab: {
+      icon: "ux-icon-collab",
+      value: "text-[var(--semantic-collab)]",
+    },
+    success: {
+      icon: "ux-icon-success",
+      value: "text-[var(--semantic-success)]",
+    },
+    warning: {
+      icon: "ux-icon-warning",
+      value: "text-[#8A5A00]",
+    },
+    insight: {
+      icon: "ux-icon-insight",
+      value: "text-[var(--semantic-insight)]",
+    },
+    neutral: {
+      icon: "bg-[var(--semantic-neutral-soft)] text-[#5B6675]",
+      value: "text-[#3E4C5F]",
+    },
+  }[tone];
+
   return (
-    <article className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+    <article className="ux-panel-soft rounded-2xl p-4">
       <div className="flex items-center justify-between">
         <p className="text-[10px] uppercase tracking-[0.14em] text-black/45 font-semibold">
           {label}
         </p>
-        <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#E8EDF2] text-[#164073]">
+        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${toneClasses.icon}`}>
           <Icon size={17} weight="duotone" />
         </div>
       </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-[#164073]">{value}</p>
+      <p className={`mt-2 text-2xl font-semibold tracking-tight ${toneClasses.value}`}>{value}</p>
     </article>
   );
 }

@@ -2,19 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { normalizeRole } from "@/lib/access";
 
-function buildProtocol(seed = 0) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const chunk =
-    `${now.getMonth() + 1}`.padStart(2, "0") +
-    `${now.getDate()}`.padStart(2, "0") +
-    `${now.getHours()}`.padStart(2, "0") +
-    `${now.getMinutes()}`.padStart(2, "0") +
-    `${now.getSeconds()}`.padStart(2, "0");
-  const random = Math.floor(Math.random() * 9000 + 1000) + seed;
-  return `DFD-${year}-${chunk}-${String(random).padStart(4, "0")}`;
-}
+// Conjunto de papéis autorizados a criar DFD. Mantém solicitante (caminho normal)
+// e papéis superiores (chefia/admin/superadmin podem criar em nome de unidade).
+const ROLES_PODEM_CRIAR_DFD = new Set([
+  "solicitante",
+  "chefia",
+  "admin",
+  "superadmin",
+] as const);
 
 type NewDfdPayload = {
   objeto: string;
@@ -109,85 +106,66 @@ export async function createDFDAction(
       throw new Error("Usuário não autenticado.");
     }
 
+    // CHECAGEM DE PAPEL — antes deste patch, qualquer usuário autenticado
+    // criava DFD para qualquer unidade. RLS é a segunda barreira, não a única.
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("campus_id")
+      .select("role,campus_id")
       .eq("id", user.id)
       .maybeSingle();
     if (profileError) throw profileError;
-
-    let campusLegacy = "SEM_CAMPUS";
-    if (profile?.campus_id) {
-      const { data: campusRow } = await supabase
-        .from("campi")
-        .select("sigla,nome")
-        .eq("id", profile.campus_id)
-        .maybeSingle();
-      campusLegacy =
-        String(campusRow?.sigla || campusRow?.nome || profile.campus_id).trim() ||
-        "SEM_CAMPUS";
+    const role = normalizeRole(profile?.role, user.email);
+    if (!ROLES_PODEM_CRIAR_DFD.has(role as any)) {
+      throw new Error("Seu perfil não pode criar DFDs.");
     }
 
-    const total = items.reduce((acc, item) => {
-      const qty = Number(item.quantidade || 0);
-      const unit = Number(item.valor_unitario_estimado || 0);
-      return acc + qty * unit;
-    }, 0);
-
-    const { data: dfd, error: dfdError } = await supabase
-      .from("dfds")
-      .insert({
-        numero_protocolo: buildProtocol(),
-        objeto_contratacao: dfdData.objeto.trim(),
-        justificativa_contratacao: dfdData.justificativaGeral?.trim() || "",
-        solicitante_id: user.id,
-        campus: campusLegacy,
-        campus_id: profile?.campus_id || null,
-        unidade_id: dfdData.unidade_id || null,
-        tipo_unidade: dfdData.tipo_unidade || null,
-        previsao_recebimento: dfdData.previsao || null,
-        valor_total_estimado: total,
-        status: "rascunho",
-      })
-      .select("id,numero_protocolo")
-      .single();
-
-    if (dfdError) throw dfdError;
-
-    const itemsToInsert = items.map((item) => ({
-      dfd_id: dfd.id,
-      codigo_tce: String(item.item_efisco.codigo_tce || "").trim(),
-      codigo_item_efisco: String(item.item_efisco.codigo_tce || "").trim(),
-      descricao: String(item.item_efisco.descricao || "").trim(),
+    const itemsPayload = items.map((item) => ({
+      codigo_tce: String(item.item_efisco?.codigo_tce || "").trim(),
+      codigo_item_efisco: String(item.item_efisco?.codigo_tce || "").trim(),
+      descricao: String(item.item_efisco?.descricao || "").trim(),
       quantidade: Number(item.quantidade || 0),
       valor_unitario_estimado: Number(item.valor_unitario_estimado || 0),
       justificativa_quantidade: item.justificativa_quantidade || null,
       justificativa_item: item.justificativa_item || null,
-      gnd: item.item_efisco.gnd || "3.3.90.30",
-      gnd_derivado: item.item_efisco.gnd_derivado || item.item_efisco.gnd || null,
-      tipo_objeto: item.item_efisco.tipo_objeto || null,
-      codigo_grupo: item.item_efisco.codigo_grupo || null,
-      nome_grupo: item.item_efisco.nome_grupo || null,
-      codigo_classe: item.item_efisco.codigo_classe || null,
-      nome_classe: item.item_efisco.nome_classe || null,
-      codigo_material_servico: item.item_efisco.codigo_material_servico || null,
-      nome_material_servico: item.item_efisco.nome_material_servico || null,
-      codigo_natureza_despesa: item.item_efisco.codigo_natureza_despesa || null,
+      gnd: item.item_efisco?.gnd || "3.3.90.30",
+      gnd_derivado:
+        item.item_efisco?.gnd_derivado || item.item_efisco?.gnd || null,
+      tipo_objeto: item.item_efisco?.tipo_objeto || null,
+      codigo_grupo: item.item_efisco?.codigo_grupo || null,
+      nome_grupo: item.item_efisco?.nome_grupo || null,
+      codigo_classe: item.item_efisco?.codigo_classe || null,
+      nome_classe: item.item_efisco?.nome_classe || null,
+      codigo_material_servico: item.item_efisco?.codigo_material_servico || null,
+      nome_material_servico: item.item_efisco?.nome_material_servico || null,
+      codigo_natureza_despesa: item.item_efisco?.codigo_natureza_despesa || null,
       grupo_justificativa_id: item.grupo_justificativa_id || null,
       local_uso: item.local_de_uso || null,
       link_referencia: item.link_referencia || null,
     }));
 
-    const { error: itemsError } = await supabase
-      .from("dfd_items")
-      .insert(itemsToInsert);
-    if (itemsError) {
-      await supabase.from("dfds").delete().eq("id", dfd.id);
-      throw itemsError;
-    }
+    // Chamada à RPC transacional (migration 0040). Faz INSERT em dfds +
+    // dfd_items + audit_log dentro da mesma transação Postgres. Protocolo
+    // é gerado server-side via SEQUENCE; sem race entre dois clients.
+    const { data: rpcResult, error: rpcError } = await supabase.rpc(
+      "create_dfd_with_items",
+      {
+        p_dfd: {
+          objeto_contratacao: dfdData.objeto.trim(),
+          justificativa_contratacao: dfdData.justificativaGeral?.trim() || "",
+          unidade_id: dfdData.unidade_id || null,
+          tipo_unidade: dfdData.tipo_unidade || null,
+          previsao_recebimento: dfdData.previsao || null,
+        },
+        p_items: itemsPayload,
+      },
+    );
+
+    if (rpcError) throw rpcError;
+    const protocol =
+      (rpcResult as any)?.numero_protocolo || (rpcResult as any)?.protocol || null;
 
     revalidatePath("/minhas-dfds");
-    return { success: true, protocol: dfd.numero_protocolo };
+    return { success: true, protocol };
   } catch (error: any) {
     return { success: false, error: error.message || "Erro interno." };
   }

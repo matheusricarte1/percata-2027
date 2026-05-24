@@ -28,8 +28,20 @@ function canMutateContribution(params: {
   roomStatus: string;
   contribution: any;
 }) {
-  if (params.roomStatus === "convertida" || params.roomStatus === "arquivada") return false;
-  if (params.isChefia) return true;
+  if (
+    params.roomStatus === "proposta" ||
+    params.roomStatus === "convertida" ||
+    params.roomStatus === "arquivada"
+  ) {
+    return false;
+  }
+  if (params.isChefia) {
+    return (
+      params.roomStatus === "aberta" ||
+      params.roomStatus === "em_consolidacao_chefia" ||
+      params.roomStatus === "pronta_para_conversao"
+    );
+  }
   return params.roomStatus === "aberta" && params.contribution.user_id === params.actorId;
 }
 
@@ -76,6 +88,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if ("link_referencia" in body) {
       patch.link_referencia = sanitizeText(body.link_referencia, 1000);
     }
+    if (isChefia) {
+      patch.adjusted_by_chefia = true;
+      patch.adjusted_by = actor.id;
+      patch.adjusted_at = new Date().toISOString();
+    }
     patch.updated_at = new Date().toISOString();
 
     const { data: updated, error } = await admin
@@ -89,9 +106,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     await insertRoomEvent(admin, {
       roomId: room.id,
       actorId: actor.id,
-      eventType: "contribution_updated",
-      message: `Contribuicao atualizada: ${contribution.descricao}.`,
-      metadata: { contribution_id: contribution.id },
+      eventType: isChefia ? "contribution_adjusted_by_chefia" : "contribution_updated",
+      message: isChefia
+        ? `A chefia ajustou a contribuicao: ${contribution.descricao}.`
+        : `Contribuicao atualizada: ${contribution.descricao}.`,
+      metadata: {
+        contribution_id: contribution.id,
+        adjusted_by_chefia: isChefia,
+      },
     });
 
     return NextResponse.json({ contribution: updated });
@@ -134,9 +156,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     await insertRoomEvent(admin, {
       roomId: room.id,
       actorId: actor.id,
-      eventType: "contribution_removed",
-      message: `Contribuicao removida: ${contribution.descricao}.`,
-      metadata: { contribution_id: contribution.id },
+      eventType: isChefia ? "contribution_discarded_by_chefia" : "contribution_removed",
+      message: isChefia
+        ? `A chefia descartou a contribuicao: ${contribution.descricao}.`
+        : `Contribuicao removida: ${contribution.descricao}.`,
+      metadata: {
+        contribution_id: contribution.id,
+        discarded_by_chefia: isChefia,
+      },
     });
 
     return NextResponse.json({ ok: true });

@@ -14,6 +14,11 @@ export type DfdReportRow = {
   numero_protocolo?: string | null;
   objeto_contratacao?: string | null;
   status?: string | null;
+  origin_type?: string | null;
+  collective_origin_room_id?: string | null;
+  collective_origin_room_title?: string | null;
+  collective_origin_expense_class?: string | null;
+  coautoria_coletiva_relatorio?: string | null;
   campus?: string | null;
   campus_nome?: string | null;
   campus_nome_relatorio?: string | null;
@@ -47,6 +52,10 @@ export const FULL_EXPORT_PREFERRED_HEADERS = [
   "dfd_numero_protocolo",
   "dfd_objeto_contratacao",
   "dfd_status",
+  "dfd_origin_type",
+  "dfd_collective_origin_room_title",
+  "dfd_collective_origin_expense_class",
+  "dfd_coautoria_coletiva_relatorio",
   "dfd_campus_relatorio",
   "dfd_unidade_relatorio",
   "dfd_solicitante_nome_relatorio",

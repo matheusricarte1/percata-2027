@@ -7,6 +7,7 @@ import { rerankCatalogSearchResults } from "@/lib/catalog-search-ranking";
 import { searchCatalogWithTypesense } from "@/lib/catalog-typesense";
 import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
 import { createClient } from "@/utils/supabase/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 50;
@@ -69,6 +70,16 @@ export async function GET(request: NextRequest) {
   if (userError || !user) {
     return NextResponse.json({ error: "Usuario nao autenticado." }, { status: 401 });
   }
+
+  // Rate limit: 120 buscas/min por usuário. Suficiente para digitação
+  // com debounce; bloqueia scraping ou loop acidental que esgotaria a
+  // quota Typesense free tier ou o orçamento de RPC do Supabase.
+  const limited = await enforceRateLimit(
+    request,
+    { bucket: "catalog-search", limit: 120, windowSec: 60 },
+    user.id,
+  );
+  if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
   const query = sanitizeSearchInput(searchParams.get("q"));

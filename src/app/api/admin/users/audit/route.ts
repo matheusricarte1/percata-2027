@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { normalizeRole } from "@/lib/access";
+import { NextResponse } from "next/server";
+import { withAuthorizedRole } from "@/lib/api-auth";
 
 function isMissingAuditTableError(error: any): boolean {
   const text = String(error?.message || error || "").toLowerCase();
@@ -14,36 +12,15 @@ function isMissingAuditTableError(error: any): boolean {
   );
 }
 
-async function requireAdminOrSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  const role = normalizeRole(profile?.role, user.email);
-  if (role !== "admin" && role !== "superadmin") return null;
-  return { user, role };
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const actor = await requireAdminOrSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
+export const GET = withAuthorizedRole(
+  ["admin", "superadmin"],
+  async ({ request, supabaseAdmin }) => {
     const limitParam = Number(request.nextUrl.searchParams.get("limit") || 20);
     const limit = Number.isFinite(limitParam)
       ? Math.max(1, Math.min(limitParam, 100))
       : 20;
 
-    const admin = createSupabaseAdminClient();
+    const admin = supabaseAdmin!;
     const { data, error } = await admin
       .from("admin_user_audit_logs")
       .select(
@@ -63,10 +40,6 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: data || [] });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao carregar trilha de auditoria." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

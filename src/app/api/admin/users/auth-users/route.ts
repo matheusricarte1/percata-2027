@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
-import { normalizeRole } from "@/lib/access";
+import { NextResponse } from "next/server";
+import { hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
+import { withAuthorizedRole } from "@/lib/api-auth";
 
 type AuthUserSnapshot = {
   id: string;
@@ -12,25 +11,6 @@ type AuthUserSnapshot = {
   created_at: string | null;
   last_sign_in_at: string | null;
 };
-
-async function requireAdminOrSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  const role = normalizeRole(profile?.role, user.email);
-
-  if (role !== "admin" && role !== "superadmin") return null;
-  return { user, role };
-}
 
 function readFullName(metadata: Record<string, any> | undefined): string | null {
   const fullName = String(metadata?.full_name || metadata?.name || "").trim();
@@ -46,27 +26,24 @@ function readAvatar(metadata: Record<string, any> | undefined): string | null {
   return avatar || null;
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const actor = await requireAdminOrSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
+export const GET = withAuthorizedRole(
+  ["admin", "superadmin"],
+  async ({ request, supabaseAdmin }) => {
     const limitParam = Number(request.nextUrl.searchParams.get("limit") || 1000);
     const limit = Number.isFinite(limitParam)
       ? Math.max(1, Math.min(limitParam, 5000))
       : 1000;
 
-    if (!hasSupabaseAdminCredentials()) {
+    if (!hasSupabaseAdminCredentials() || !supabaseAdmin) {
       return NextResponse.json({
         data: [],
         unavailable: true,
-        reason: "Credenciais administrativas do Supabase não configuradas neste ambiente.",
+        reason:
+          "Credenciais administrativas do Supabase não configuradas neste ambiente.",
       });
     }
 
-    const admin = createSupabaseAdminClient();
+    const admin = supabaseAdmin;
     const perPage = 200;
     const maxPages = Math.ceil(limit / perPage);
     let page = 1;
@@ -108,10 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: snapshots });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao listar contas autenticadas." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  // requireAdminClient: false porque já tratamos ausência de credenciais
+  // com 200+payload neutro (mantém UX da admin/usuarios).
+);

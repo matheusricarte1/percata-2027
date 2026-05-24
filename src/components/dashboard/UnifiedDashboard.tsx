@@ -491,20 +491,21 @@ export default function UnifiedDashboard() {
 
   return (
     <div className="py-6 space-y-5">
-      <section className="relative overflow-hidden rounded-[20px] border border-[#C7D7EA] bg-[#F7FBFF] text-[#1E2430] px-7 py-7 shadow-sm md:h-[244px]">
+      <section className="ux-panel-soft relative overflow-hidden rounded-[20px] px-7 py-7 text-[#1E2430] md:h-[244px]">
+        <div className="ux-accent-rule absolute inset-x-0 top-0 h-1" />
         <div className="relative z-10 grid min-h-[156px] grid-cols-1 items-center gap-6 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_minmax(360px,50%)]">
           <div className="max-w-[520px]">
-            <h1 className="text-[30px] leading-tight font-semibold tracking-tight text-[#1E2430] md:text-[34px]">
+            <h1 className="ux-title text-[30px] leading-tight font-semibold md:text-[34px]">
               {heroTitle}
             </h1>
-            <p className="mt-3 max-w-[430px] text-sm leading-6 text-[#5B6675]">
+            <p className="ux-muted mt-3 max-w-[430px] text-sm leading-6">
               {heroText}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
               {isExecutive ? (
                 <Link
                   href="/admin/consolidacao"
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm hover:bg-[#0F2E57]"
+                  className="ux-btn-primary inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.12em] shadow-sm"
                 >
                   Abrir consolidação
                   <ArrowRight size={14} weight="bold" />
@@ -512,7 +513,7 @@ export default function UnifiedDashboard() {
               ) : (
                 <Link
                   href={isManager ? "/triagem" : "/nova-dfd"}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-[0.12em] text-white shadow-sm hover:bg-[#0F2E57]"
+                  className="ux-btn-primary inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.12em] shadow-sm"
                 >
                   {isManager ? "Abrir triagem" : "Criar solicitação"}
                   <ArrowRight size={14} weight="bold" />
@@ -520,7 +521,7 @@ export default function UnifiedDashboard() {
               )}
               <Link
                 href="/catalogo"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-white/80 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073] hover:bg-white"
+                className="ux-btn-secondary inline-flex h-10 items-center gap-2 rounded-xl bg-white/80 px-4 text-xs font-semibold uppercase tracking-[0.12em]"
               >
                 Catálogo
               </Link>
@@ -621,7 +622,7 @@ export default function UnifiedDashboard() {
             {loading ? (
               <Skeleton className="h-full rounded-xl" />
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={240} minHeight={220}>
                 <AreaChart data={trendData} margin={{ left: 0, right: 8, top: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
@@ -684,7 +685,7 @@ export default function UnifiedDashboard() {
                 <Skeleton className="h-full rounded-xl" />
               ) : (
                 <>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={180} minHeight={180}>
                     <PieChart>
                       <Pie
                         data={statusData}
@@ -745,7 +746,7 @@ export default function UnifiedDashboard() {
             {loading ? (
               <Skeleton className="h-full rounded-xl" />
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={240} minHeight={220}>
                 <BarChart data={barData} layout="vertical" margin={{ top: 4, right: 12, bottom: 4, left: 24 }}>
                   <CartesianGrid stroke="#E8EDF2" strokeDasharray="4 4" />
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "#5B6675" }} />
@@ -1085,7 +1086,7 @@ function ActionTile({
         </span>
         <ArrowRight size={16} weight="bold" className={palette.arrow} />
       </div>
-      <p className="mt-3 text-sm font-semibold text-[#164073]">{label}</p>
+      <p className="mt-3 text-sm font-semibold text-[var(--semantic-text)]">{label}</p>
       <p className="mt-1 text-xs leading-4 text-[#5B6675]">{detail}</p>
     </Link>
   );
@@ -1110,14 +1111,14 @@ function GuidanceTile({
       className="group rounded-2xl border border-[#E8EDF2] bg-[#FBFCFE] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#C7D7EA] hover:bg-white"
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#164073] transition-colors group-hover:bg-[#164073] group-hover:text-white">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--semantic-collab-soft)] text-[var(--semantic-collab)] transition-colors group-hover:bg-[var(--semantic-collab)] group-hover:text-white">
           <Icon size={20} weight="duotone" />
         </span>
         <ArrowRight size={16} weight="bold" className="text-[#7D98B8]" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold tracking-tight text-[#164073]">{title}</h3>
+      <h3 className="mt-4 text-lg font-semibold tracking-tight text-[var(--semantic-text)]">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-[#5B6675]">{description}</p>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073]">
+      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--semantic-collab)]">
         {cta}
       </p>
     </Link>

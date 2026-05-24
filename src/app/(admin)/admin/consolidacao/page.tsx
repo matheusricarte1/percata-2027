@@ -135,9 +135,9 @@ function criticidadeBadgeClass(level: number): string {
 }
 
 function priorizacaoBadgeClass(level: number): string {
-  if (level >= 4) return "bg-upe-blue-upe/15 text-upe-blue-upe border-upe-blue-upe/30";
-  if (level === 3) return "bg-upe-blue-medium/15 text-upe-blue-medium border-upe-blue-medium/35";
-  if (level === 2) return "bg-upe-blue-closed-sky/20 text-upe-blue-closed-sky border-upe-blue-closed-sky/35";
+  if (level >= 4) return "bg-[var(--semantic-collab-soft)] text-[var(--semantic-collab)] border-[var(--semantic-collab-border)]";
+  if (level === 3) return "bg-[var(--semantic-insight-soft)] text-[var(--semantic-insight)] border-[var(--semantic-insight-border)]";
+  if (level === 2) return "bg-[var(--semantic-success-soft)] text-[var(--semantic-success)] border-[var(--semantic-success-border)]";
   if (level === 1) return "bg-upe-support-blue-bluish-mist text-upe-support-blue-deep-teal border-upe-support-blue-neutral-aqua/40";
   return "bg-upe-neutral-cool-ice text-upe-neutral-cool-steel-gray border-upe-neutral-cool-light-gray";
 }
@@ -1257,7 +1257,7 @@ export default function ConsolidationPage() {
 
   return (
     <div className="min-h-screen space-y-5 bg-[#F3F2F1] px-4 py-6 md:px-6">
-      <section className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0D2C59_0%,#123A73_55%,#1A4D91_100%)] text-white shadow-[0_24px_56px_rgba(13,44,89,0.28)]">
+      <section className="overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#102B4A_0%,#164073_48%,#1F6F78_100%)] text-white shadow-[0_24px_56px_rgba(13,44,89,0.24)]">
         <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-5 md:px-8 md:py-6">
           <div className="flex items-start gap-4">
             <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-sm">
@@ -1298,7 +1298,7 @@ export default function ConsolidationPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-[#D9E6F3] bg-white px-5 py-4 shadow-[0_12px_30px_rgba(22,64,115,0.08)]">
+      <section className="ux-panel rounded-[28px] px-5 py-4">
         <div className="grid gap-3 xl:grid-cols-[1.35fr_1.15fr_1fr_1fr_1fr_1.25fr]">
           <TopMetric
             icon={<span className="text-[#2D7BFF]">$</span>}
@@ -1309,15 +1309,16 @@ export default function ConsolidationPage() {
             })}
             subtitle="Total estimado"
             highlight
+            tone="action"
           />
-          <TopMetric title="Itens consolidados" value={String(displayItems.length)} subtitle="Itens no recorte" />
-          <TopMetric title="DFDs aprovadas" value={String(dfds.length)} subtitle="DFDs de origem" />
-          <TopMetric title="Pareto (20%)" value={String(paretoCount)} subtitle="Itens prioritários" />
-          <TopMetric title="Filtros ativos" value={String(activeFilterCount)} subtitle={activeFilterCount > 0 ? "Recorte aplicado" : "Nenhum filtro aplicado"} />
-          <div className="rounded-2xl border border-[#E5EDF7] bg-[#F8FBFF] p-4">
-            <p className="text-sm font-semibold text-[#2456B6]">Insight do recorte</p>
+          <TopMetric title="Itens consolidados" value={String(displayItems.length)} subtitle="Itens no recorte" tone="collab" />
+          <TopMetric title="DFDs aprovadas" value={String(dfds.length)} subtitle="DFDs de origem" tone="success" />
+          <TopMetric title="Itens estrela" value={String(paretoCount)} subtitle="Recorte prioritário" tone="warning" />
+          <TopMetric title="Filtros ativos" value={String(activeFilterCount)} subtitle={activeFilterCount > 0 ? "Recorte aplicado" : "Sem filtro"} tone="insight" />
+          <div className="rounded-2xl border border-[var(--semantic-insight-border)] bg-[var(--semantic-insight-soft)] p-4">
+            <p className="text-sm font-semibold text-[var(--semantic-insight)]">Insight do recorte</p>
             <p className="mt-2 text-sm leading-6 text-[#3D4E67]">
-              {paretoCount} itens concentram o recorte prioritário.
+              {paretoCount} itens merecem leitura antes dos demais.
             </p>
           </div>
         </div>
@@ -1333,11 +1334,11 @@ export default function ConsolidationPage() {
           <div className="border-b border-[#C7D7EA] bg-[#F7FBFF] p-4 md:p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <h2 className="font-display text-[22px] font-semibold tracking-tight text-upe-blue-upe">
+                <h2 className="font-display text-[22px] font-semibold tracking-tight text-[var(--semantic-text)]">
                   Itens consolidados do recorte
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-black/55">
-                  Lista ordenada por prioridade, do maior para o menor, combinando criticidade e impacto.
+                  A ordem mostra primeiro o que mais pesa na decisão: score, risco, valor e origem.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1398,7 +1399,7 @@ export default function ConsolidationPage() {
                 }}
               />
               <QuickFilterChip
-                label="Pareto"
+                label="Estrela"
                 count={paretoCount}
                 active={smartFilter === "pareto" || highlightOnly}
                 onClick={() => {
@@ -1641,7 +1642,7 @@ export default function ConsolidationPage() {
           >
             <span>Item</span>
             <span className="text-right">Score e decisão</span>
-            <span className="text-right">Pareto</span>
+            <span className="text-right">Estrela</span>
           </div>
 
           <div className="flex-1 min-h-0">
@@ -1804,17 +1805,17 @@ export default function ConsolidationPage() {
                         </div>
 
                         <div className="grid gap-2 self-start">
-                          <div className="rounded-[18px] border border-[#D8EFE0] bg-[#F4FCF7] p-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#4F8D64]">
+                          <div className="rounded-[18px] border border-[var(--semantic-success-border)] bg-[var(--semantic-success-soft)] p-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--semantic-success)]">
                               Score
                             </p>
-                            <p className="mt-1 text-[28px] font-semibold leading-none tracking-tight text-[#164073]">
+                            <p className="mt-1 text-[28px] font-semibold leading-none tracking-tight text-[var(--semantic-text)]">
                               {Math.round(item.rank_score)}
                             </p>
                             {showScoreBars ? (
                               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#DCE8F7]">
                                 <div
-                                  className="h-full rounded-full bg-gradient-to-r from-upe-support-blue-neutral-aqua via-upe-blue-medium to-upe-blue-upe"
+                                  className="h-full rounded-full bg-gradient-to-r from-[var(--semantic-warning)] via-[var(--semantic-collab)] to-[var(--semantic-action)]"
                                   style={{ width: `${scoreWidth}%` }}
                                 />
                               </div>
@@ -2209,13 +2210,30 @@ function TopMetric({
   subtitle,
   icon,
   highlight = false,
+  tone = "action",
 }: {
   title: string;
   value: string;
   subtitle: string;
   icon?: ReactNode;
   highlight?: boolean;
+  tone?: "action" | "collab" | "success" | "warning" | "insight";
 }) {
+  const toneClass = {
+    action: "ux-icon-action",
+    collab: "ux-icon-collab",
+    success: "ux-icon-success",
+    warning: "ux-icon-warning",
+    insight: "ux-icon-insight",
+  }[tone];
+  const valueClass = {
+    action: "text-[var(--semantic-action)]",
+    collab: "text-[var(--semantic-collab)]",
+    success: "text-[var(--semantic-success)]",
+    warning: "text-[#8A5A00]",
+    insight: "text-[var(--semantic-insight)]",
+  }[tone];
+
   return (
     <div
       className={cn(
@@ -2226,13 +2244,13 @@ function TopMetric({
       )}
     >
       {icon ? (
-        <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-xl font-semibold text-[#2456B6]">
+        <div className={cn("inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl font-semibold", toneClass)}>
           {icon}
         </div>
       ) : null}
       <div className="min-w-0">
         <p className="text-sm font-medium text-[#526070]">{title}</p>
-        <p className="mt-1 text-[18px] font-semibold tracking-tight text-[#164073] md:text-[20px]">
+        <p className={cn("mt-1 text-[18px] font-semibold tracking-tight md:text-[20px]", valueClass)}>
           {value}
         </p>
         <p className="mt-1 text-sm text-black/45">{subtitle}</p>

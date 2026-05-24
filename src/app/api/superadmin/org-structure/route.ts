@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
-import { isSuperadminEmail, normalizeRole } from "@/lib/access";
 import {
   buildChefiaAssignmentMap,
   normalizeUnitType,
@@ -12,6 +11,7 @@ import {
   sanitizePlainText,
   sanitizeUuid,
 } from "@/lib/settings-sanitize";
+import { withAuthorizedRole } from "@/lib/api-auth";
 
 type ActionPayload =
   | {
@@ -52,29 +52,6 @@ function getServiceClient() {
 
 function hasServiceCredentials() {
   return hasSupabaseAdminCredentials();
-}
-
-async function requireSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return null;
-  }
-
-  if (isSuperadminEmail(user.email)) return user;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (normalizeRole(profile?.role, user.email) !== "superadmin") {
-    return null;
-  }
-
-  return user;
 }
 
 const PETROLINA_DEPARTAMENTOS = [
@@ -237,13 +214,8 @@ async function fetchChefiaOptions(
   return data || [];
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withAuthorizedRole(["superadmin"], async ({ request }) => {
   try {
-    const user = await requireSuperadmin();
-    if (!user) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
     const campusId = sanitizeUuid(request.nextUrl.searchParams.get("campusId"));
     const service = hasServiceCredentials() ? getServiceClient() : await createServerClient();
 
@@ -306,15 +278,10 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuthorizedRole(["superadmin"], async ({ request }) => {
   try {
-    const user = await requireSuperadmin();
-    if (!user) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
     const payload = (await request.json()) as ActionPayload;
     if (!hasServiceCredentials()) {
       return NextResponse.json(
@@ -600,4 +567,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

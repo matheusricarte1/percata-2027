@@ -33,7 +33,6 @@ import {
   MagnifyingGlass,
   Package,
   PaperPlaneTilt,
-  PencilSimple,
   Plus,
   ShoppingCart,
   UsersThree,
@@ -42,6 +41,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { classifyGnd } from "@/lib/dfd-gnd";
+import { splitCollectiveItemsByExpenseClass } from "@/lib/collective-dfd";
 import {
   COLLECTIVE_CATALOG_SEARCH_LIMIT,
   buildCollectiveCatalogFallbackFilter,
@@ -50,8 +50,14 @@ import {
 } from "@/lib/collective-catalog-search";
 import { rerankCatalogSearchResults } from "@/lib/catalog-search-ranking";
 
-type RoomStatus = "aberta" | "em_revisao" | "convertida" | "arquivada";
-type FlowStage = "adicionar" | "consolidar" | "revisao" | "finalizar";
+type RoomStatus =
+  | "proposta"
+  | "aberta"
+  | "em_consolidacao_chefia"
+  | "pronta_para_conversao"
+  | "convertida"
+  | "arquivada";
+type FlowStage = "proposta" | "adicionar" | "consolidar" | "revisao" | "finalizar";
 type ReviewTab = "itens" | "informacoes" | "anexos";
 type CatalogExpenseFilter = "todos" | "corrente" | "capital" | "consumo" | "permanente";
 
@@ -83,6 +89,8 @@ type Contribution = {
   justificativa_item?: string | null;
   link_referencia?: string | null;
   can_edit?: boolean;
+  adjusted_by_chefia?: boolean;
+  adjusted_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -117,7 +125,13 @@ type RoomDetail = {
     status: RoomStatus;
     unit_name: string;
     can_edit_metadata: boolean;
+    can_publish?: boolean;
+    can_reopen?: boolean;
+    can_contribute?: boolean;
     can_convert: boolean;
+    actor_role?: "membro" | "chefia" | "admin" | "superadmin";
+    is_proposal_owner?: boolean;
+    published_at?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
   };
@@ -161,8 +175,10 @@ type FlyingCartItem = {
 };
 
 const STATUS_LABELS: Record<RoomStatus, string> = {
+  proposta: "Proposta",
   aberta: "Aberta",
-  em_revisao: "Em revisão",
+  em_consolidacao_chefia: "Consolidação da chefia",
+  pronta_para_conversao: "Pronta para conversão",
   convertida: "Convertida",
   arquivada: "Arquivada",
 };
@@ -173,24 +189,29 @@ const FLOW_STEPS: Array<{
   description: string;
 }> = [
   {
+    id: "proposta",
+    title: "Proposta",
+    description: "Rascunho aguardando publicação da chefia",
+  },
+  {
     id: "adicionar",
-    title: "Adicionar itens",
-    description: "Pesquise e adicione itens ao catálogo",
+    title: "Sala aberta",
+    description: "Pares contribuem com itens e justificativas",
   },
   {
     id: "consolidar",
-    title: "Consolidar itens",
-    description: "Revise, edite e consolide os itens",
+    title: "Consolidação da chefia",
+    description: "A chefia consolida, reescreve e decide o recorte",
   },
   {
     id: "revisao",
-    title: "Revisão",
-    description: "Revise as informações da DFD coletiva",
+    title: "Prévia de conversão",
+    description: "Verifique a saída prevista antes de gerar as DFDs oficiais",
   },
   {
     id: "finalizar",
-    title: "Finalizar e enviar",
-    description: "Finalize e envie para aprovação",
+    title: "Histórico",
+    description: "Acompanhe o que a sala gerou",
   },
 ];
 
@@ -241,12 +262,24 @@ export default function DfdColetivaDetailPage() {
 
   useEffect(() => {
     if (!roomStatus) return;
-    if (roomStatus === "convertida" || roomStatus === "arquivada") {
-      setActiveStage("finalizar");
+    if (roomStatus === "proposta") {
+      setActiveStage("proposta");
       return;
     }
-    if (roomStatus === "em_revisao") {
+    if (roomStatus === "aberta") {
+      setActiveStage("adicionar");
+      return;
+    }
+    if (roomStatus === "em_consolidacao_chefia") {
+      setActiveStage("consolidar");
+      return;
+    }
+    if (roomStatus === "pronta_para_conversao") {
       setActiveStage("revisao");
+      return;
+    }
+    if (roomStatus === "convertida" || roomStatus === "arquivada") {
+      setActiveStage("finalizar");
       return;
     }
   }, [roomStatus]);
@@ -329,6 +362,10 @@ export default function DfdColetivaDetailPage() {
   );
 
   const breakdown = useMemo(() => summarizeItemsByExpense(detail?.items || []), [detail?.items]);
+  const previewExpenseGroups = useMemo(
+    () => splitCollectiveItemsByExpenseClass((detail?.items || []) as any),
+    [detail?.items],
+  );
 
   const filteredCatalogItems = useMemo(
     () =>
@@ -661,7 +698,7 @@ export default function DfdColetivaDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] px-5 py-6 text-[#0F172A]">
+    <main className="min-h-screen bg-[var(--semantic-neutral-soft)] px-5 py-6 text-[#0F172A]">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
         <Link
           href="/dfds-coletivas"
@@ -670,11 +707,12 @@ export default function DfdColetivaDetailPage() {
           <ArrowLeft size={17} weight="bold" /> Voltar para DFDs coletivas
         </Link>
 
-        <section className="rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+        <section className="ux-panel relative overflow-hidden rounded-[22px] p-5">
+          <div className="ux-accent-rule absolute inset-x-0 top-0 h-1" />
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#0F1F3D]">DFD Coletiva</p>
-              <h1 className="mt-1 truncate text-2xl font-semibold text-[#0F172A]">
+              <p className="ux-kicker">DFD coletiva</p>
+              <h1 className="ux-title mt-1 truncate text-2xl font-semibold">
                 {detail.room.title}
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-medium text-[#526070]">
@@ -682,6 +720,12 @@ export default function DfdColetivaDetailPage() {
                 <span>{detail.room.unit_name}</span>
                 <span className="text-[#9AA4B2]">•</span>
                 <span>Criada em {formatDateTime(detail.room.created_at)}</span>
+                {detail.room.published_at && (
+                  <>
+                    <span className="text-[#9AA4B2]">•</span>
+                    <span>Publicada em {formatDateTime(detail.room.published_at)}</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-end">
@@ -698,7 +742,7 @@ export default function DfdColetivaDetailPage() {
                 <button
                   type="button"
                   onClick={exportCollectiveCsv}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#CBD5E1] bg-white px-5 text-sm font-semibold text-[#0B4AA2]"
+                  className="ux-btn-secondary inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold"
                 >
                   <DownloadSimple size={17} weight="bold" /> Exportar
                 </button>
@@ -707,10 +751,32 @@ export default function DfdColetivaDetailPage() {
                     type="button"
                     onClick={convertRoom}
                     disabled={converting || detail.items.length === 0}
-                    className="inline-flex h-11 min-w-[168px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-[#063F8F] px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    className="ux-btn-primary inline-flex h-11 min-w-[168px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <LockSimple size={17} weight="bold" />
                     {converting ? "Gerando..." : "Gerar DFD oficial"}
+                  </button>
+                )}
+                {detail.room.can_publish && (
+                  <button
+                    type="button"
+                    onClick={() => updateRoomStatus("aberta", "Sala publicada para o setor.")}
+                    disabled={updatingStatus}
+                    className="ux-btn-collab inline-flex h-11 min-w-[168px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <UsersThree size={17} weight="bold" />
+                    {updatingStatus ? "Publicando..." : "Publicar sala"}
+                  </button>
+                )}
+                {detail.room.can_reopen && (
+                  <button
+                    type="button"
+                    onClick={() => updateRoomStatus("aberta", "Sala reaberta para novas contribuições.")}
+                    disabled={updatingStatus}
+                    className="ux-btn-secondary inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <ArrowRight size={17} weight="bold" />
+                    {updatingStatus ? "Reabrindo..." : "Reabrir sala"}
                   </button>
                 )}
               </div>
@@ -724,6 +790,15 @@ export default function DfdColetivaDetailPage() {
           status={detail.room.status}
           onStageChange={setActiveStage}
         />
+
+        {activeStage === "proposta" && (
+          <ProposalPanel
+            detail={detail}
+            canPublish={Boolean(detail.room.can_publish)}
+            updatingStatus={updatingStatus}
+            onPublish={() => updateRoomStatus("aberta", "Sala publicada para o setor.")}
+          />
+        )}
 
         {activeStage === "adicionar" && (
           <CatalogPanel
@@ -748,10 +823,7 @@ export default function DfdColetivaDetailPage() {
 
         {activeStage === "consolidar" && (
           <section className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
-            <ConsolidationPanel
-              detail={detail}
-              setActiveStage={setActiveStage}
-            />
+            <ConsolidationPanel detail={detail} />
             <ConsolidationSummary
               detail={detail}
               totalValue={totalValue}
@@ -759,7 +831,12 @@ export default function DfdColetivaDetailPage() {
               checklist={checklist}
               canEdit={canEdit}
               updatingStatus={updatingStatus}
-              onContinue={() => updateRoomStatus("em_revisao", "DFD coletiva enviada para revisão.")}
+              onContinue={() =>
+                updateRoomStatus(
+                  "em_consolidacao_chefia",
+                  "Coautoria encerrada. A chefia assumiu a consolidação.",
+                )
+              }
               onSaveAndExit={() => router.push("/dfds-coletivas")}
             />
           </section>
@@ -773,14 +850,23 @@ export default function DfdColetivaDetailPage() {
               setReviewTab={setReviewTab}
               saveMetadata={saveMetadata}
               savingMeta={savingMeta}
-              setActiveStage={setActiveStage}
+              canEditMetadata={Boolean(detail.room.can_edit_metadata)}
             />
             <ApprovalSummary
               detail={detail}
               totalValue={totalValue}
               breakdown={breakdown}
               checklist={checklist}
+              previewExpenseGroups={previewExpenseGroups}
               canConvert={detail.room.can_convert}
+              canAdvance={!detail.room.can_convert && detail.room.status === "em_consolidacao_chefia"}
+              updatingStatus={updatingStatus}
+              onAdvanceToReady={() =>
+                updateRoomStatus(
+                  "pronta_para_conversao",
+                  "Sala marcada como pronta para conversão.",
+                )
+              }
               converting={converting}
               onConvert={convertRoom}
               onSaveAndExit={() => router.push("/dfds-coletivas")}
@@ -876,86 +962,89 @@ function FlowStepper({
 }) {
   const activeIndex = FLOW_STEPS.findIndex((step) => step.id === activeStage);
   const allowedStagesByStatus: Record<RoomStatus, FlowStage[]> = {
-    aberta: ["adicionar", "consolidar"],
-    em_revisao: ["consolidar", "revisao"],
+    proposta: ["proposta"],
+    aberta: ["adicionar"],
+    em_consolidacao_chefia: ["consolidar"],
+    pronta_para_conversao: ["revisao"],
     convertida: ["finalizar"],
     arquivada: ["finalizar"],
   };
+  const suggestedNextStageByStatus: Partial<Record<RoomStatus, FlowStage>> = {
+    proposta: "adicionar",
+    aberta: "consolidar",
+    em_consolidacao_chefia: "revisao",
+  };
   const allowedStages = allowedStagesByStatus[status] || [activeStage];
-  const nextStage =
-    FLOW_STEPS.find((step, index) => index > activeIndex && allowedStages.includes(step.id)) || null;
+  const nextStage = FLOW_STEPS.find((step) => step.id === suggestedNextStageByStatus[status]) || null;
   const statusTone =
-    status === "aberta"
-      ? "border-[#CFE8D8] bg-[#F3FCF6] text-[#168A5A]"
-      : status === "em_revisao"
-        ? "border-[#F6DDAB] bg-[#FFF7E8] text-[#D97706]"
-        : "border-[#D8E3F4] bg-[#F5F8FE] text-[#526070]";
+    status === "proposta"
+      ? "border-[var(--semantic-insight-border)] bg-[var(--semantic-insight-soft)] text-[var(--semantic-insight)]"
+      : status === "aberta"
+      ? "border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] text-[var(--semantic-collab)]"
+      : status === "em_consolidacao_chefia" || status === "pronta_para_conversao"
+        ? "border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] text-[#8A5A00]"
+      : "border-[#D8E3F4] bg-[#F5F8FE] text-[#526070]";
   const progressWidth =
-    activeIndex <= 0 ? "0%" : activeIndex === 1 ? "33.333%" : activeIndex === 2 ? "66.666%" : "100%";
+    activeIndex <= 0 ? "0%" : `${(activeIndex / Math.max(FLOW_STEPS.length - 1, 1)) * 100}%`;
 
   return (
-    <section className="overflow-hidden rounded-[22px] border border-[#DDE5EF] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-col gap-4 px-5 py-5 lg:px-6">
+    <section className="ux-panel overflow-hidden rounded-[22px]">
+      <div className="flex flex-col gap-4 px-4 py-4 lg:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#EEF4FF] text-[#0B4AA2]">
+            <div className="ux-icon-collab flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]">
               <UsersThree size={20} weight="duotone" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base font-semibold tracking-tight text-[#0F1F3D] md:text-lg">
+              <h2 className="ux-title text-base font-semibold md:text-lg">
                 Fluxo da DFD coletiva
               </h2>
-              <p className="mt-0.5 text-xs leading-5 text-[#667085] md:text-sm">
-                Estado atual e próximo avanço da sala.
+              <p className="ux-muted mt-0.5 text-xs leading-5 md:text-sm">
+                Sala de coautoria entre pares, homologada pela chefia.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn("inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold", statusTone)}>
               <LockSimple size={15} weight="bold" />
-              {status === "aberta"
+              {status === "proposta"
+                ? "Proposta reservada"
+                : status === "aberta"
                 ? "Sala aberta"
-                : status === "em_revisao"
-                  ? "Sala em revisão"
+                : status === "em_consolidacao_chefia"
+                  ? "Consolidação da chefia"
+                  : status === "pronta_para_conversao"
+                    ? "Prévia pronta"
                   : status === "convertida"
                     ? "DFD oficial gerada"
                     : "Sala arquivada"}
             </span>
             {nextStage ? (
-              <motion.button
-                type="button"
-                onClick={() => onStageChange(nextStage.id)}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#0B63CE] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#0954AF]"
-              >
-                Ir para {nextStage.title}
-                <motion.span
-                  animate={{ x: [0, 3, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                >
-                  <ArrowRight size={15} weight="bold" />
-                </motion.span>
-              </motion.button>
+              <span className="ux-chip ux-chip-collab h-10 px-4 text-sm">
+                Próxima etapa: {nextStage.title}
+              </span>
             ) : null}
           </div>
         </div>
 
-        <div className="relative pt-2">
-          <div className="absolute left-[20px] right-[20px] top-6 hidden h-[2px] rounded-full bg-[#E5EAF2] md:block" />
+        <div className="relative rounded-[18px] border border-[var(--semantic-neutral-border)] bg-[var(--semantic-neutral-soft)] px-3 py-3">
+          <div className="absolute left-[30px] right-[30px] top-[31px] hidden h-[2px] rounded-full bg-[#E5EAF2] lg:block" />
           <motion.div
-            className="absolute left-[20px] top-6 hidden h-[2px] rounded-full bg-[#0B63CE] md:block"
+            className="absolute left-[30px] top-[31px] hidden h-[2px] rounded-full bg-[var(--semantic-collab)] lg:block"
             initial={false}
-            animate={{ width: `calc(${progressWidth} - 20px)` }}
+            animate={{ width: `calc(${progressWidth} - 30px)` }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           />
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {FLOW_STEPS.map((step, index) => {
               const completed =
                 index < activeIndex ||
-                (step.id === "adicionar" && itemsCount > 0) ||
-                (step.id === "consolidar" && status === "em_revisao") ||
+                (step.id === "proposta" && status !== "proposta") ||
+                (step.id === "adicionar" && itemsCount > 0 && status !== "proposta") ||
+                (step.id === "consolidar" &&
+                  (status === "em_consolidacao_chefia" || status === "pronta_para_conversao" || status === "convertida")) ||
+                (step.id === "revisao" && (status === "pronta_para_conversao" || status === "convertida")) ||
                 (step.id === "finalizar" && status === "convertida");
               const active = step.id === activeStage;
               const allowed = allowedStages.includes(step.id);
@@ -976,17 +1065,21 @@ function FlowStepper({
                   whileHover={clickable ? { y: -2 } : undefined}
                   whileTap={clickable ? { scale: 0.985 } : undefined}
                   className={cn(
-                    "group relative flex flex-col items-center text-center transition",
-                    clickable && "cursor-pointer",
+                    "group relative rounded-2xl border px-2 py-3 text-center transition",
+                    active && "border-[var(--semantic-action-border)] bg-white shadow-sm",
+                    upcoming && !active && "border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)]",
+                    completed && !active && !upcoming && "border-[var(--semantic-success-border)] bg-white",
+                    !active && !completed && !upcoming && "border-transparent bg-transparent",
+                    clickable && "cursor-pointer hover:-translate-y-0.5 hover:bg-white hover:shadow-sm",
                     !clickable && !active && "cursor-default",
                   )}
                 >
                   <motion.span
                   className={cn(
                     "relative z-[1] flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition md:h-12 md:w-12 md:text-base",
-                    active && "border-[#0B63CE] bg-[#0B63CE] text-white shadow-[0_8px_20px_rgba(11,99,206,0.18)]",
-                    upcoming && "border-[#21C5C7] bg-[#E9FCFC] text-[#12AEB0] shadow-[0_8px_20px_rgba(33,197,199,0.12)]",
-                    completed && !active && !upcoming && "border-[#BFD6FB] bg-white text-[#0B63CE]",
+                    active && "border-[var(--semantic-action)] bg-[var(--semantic-action)] text-white shadow-[0_8px_20px_rgba(22,64,115,0.16)]",
+                    upcoming && "border-[var(--semantic-collab)] bg-white text-[var(--semantic-collab)] shadow-[0_8px_20px_rgba(31,111,120,0.12)]",
+                    completed && !active && !upcoming && "border-[var(--semantic-success-border)] bg-white text-[var(--semantic-success)]",
                     !active && !completed && !upcoming && "border-[#D8DEE8] bg-[#F7F9FC] text-[#7A8699]",
                     clickable && "group-hover:border-[#8DBBFF]",
                   )}
@@ -1001,14 +1094,14 @@ function FlowStepper({
                     index + 1
                   )}
                 </motion.span>
-                  <span className="mt-3 text-sm font-semibold text-[#0F1F3D] md:text-[15px]">
+                  <span className="mt-2 block text-sm font-semibold text-[#0F1F3D] md:text-[15px]">
                     {step.title}
                   </span>
                   <span
                     className={cn(
                       "mt-2 inline-flex rounded-full px-3 py-1 text-[11px] font-semibold",
-                      active && "bg-[#EAF2FF] text-[#0B63CE]",
-                      upcoming && "bg-[#E8FBFB] text-[#12AEB0]",
+                      active && "bg-[var(--semantic-action-soft)] text-[var(--semantic-action)]",
+                      upcoming && "bg-[var(--semantic-collab-soft)] text-[var(--semantic-collab)]",
                       !active && !upcoming && allowed && "bg-[#F2F4F7] text-[#667085]",
                       !allowed && "bg-[#F2F4F7] text-[#667085]",
                     )}
@@ -1018,12 +1111,15 @@ function FlowStepper({
                       : upcoming
                         ? "Próxima"
                         : allowed
-                          ? "Disponível"
+                          ? "Ativa"
                           : step.id === "revisao"
                             ? "Aguardando"
                             : "Bloqueada"}
                   </span>
-                  <span className="mt-2 max-w-[180px] text-xs leading-5 text-[#667085] md:max-w-[220px]">
+                  <span className={cn(
+                    "mx-auto mt-2 max-w-[180px] text-xs leading-5 text-[#667085] md:max-w-[220px]",
+                    !active && !upcoming && "hidden lg:block lg:line-clamp-1",
+                  )}>
                     {step.description}
                   </span>
                 </motion.button>
@@ -1033,6 +1129,64 @@ function FlowStepper({
         </div>
       </div>
     </section>
+  );
+}
+
+function ProposalPanel({
+  detail,
+  canPublish,
+  updatingStatus,
+  onPublish,
+}: {
+  detail: RoomDetail;
+  canPublish: boolean;
+  updatingStatus: boolean;
+  onPublish: () => void;
+}) {
+  return (
+    <Panel>
+      <SectionTitle icon={<ClipboardText size={18} weight="bold" />} title="Proposta reservada" />
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-4">
+          <div className="rounded-md border border-[#DDE5EF] bg-[#FBFCFF] p-4 text-sm leading-6 text-[#526070]">
+            Esta proposta ainda não está aberta para o setor. Enquanto estiver neste estado, apenas o proponente e a
+            chefia conseguem vê-la.
+          </div>
+          <div className="grid gap-3 rounded-md border border-[#E2E8F0] bg-white p-4 text-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#667085]">Descrição</p>
+              <p className="mt-2 text-[#344054]">{detail.room.description || "Sem descrição registrada."}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#667085]">Escopo</p>
+              <p className="mt-2 text-[#344054]">{detail.room.scope || "Sem escopo registrado."}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-md border border-[#DDE5EF] bg-[#F7FBFF] p-4">
+          <h3 className="text-sm font-semibold text-[#0B3473]">Publicação da chefia</h3>
+          <p className="mt-2 text-sm leading-6 text-[#526070]">
+            Depois da publicação, a sala passa a receber contribuições dos pares. Antes disso, ela funciona apenas
+            como rascunho de proposta.
+          </p>
+          {canPublish ? (
+            <button
+              type="button"
+              onClick={onPublish}
+              disabled={updatingStatus}
+              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <UsersThree size={17} weight="bold" />
+              {updatingStatus ? "Publicando..." : "Publicar para o setor"}
+            </button>
+          ) : (
+            <p className="mt-4 rounded-md border border-dashed border-[#CBD5E1] bg-white p-3 text-sm text-[#667085]">
+              Aguarde a chefia publicar esta sala para iniciar a coautoria.
+            </p>
+          )}
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -1755,27 +1909,18 @@ function SelectedItemPanel({
 
 function ConsolidationPanel({
   detail,
-  setActiveStage,
 }: {
   detail: RoomDetail;
-  setActiveStage: (stage: FlowStage) => void;
 }) {
   return (
     <Panel>
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div>
         <div>
           <SectionTitle icon={<ClipboardText size={18} weight="bold" />} title="Itens consolidados" />
           <p className="mt-2 text-xs text-[#667085]">
-            Revise os itens adicionados à sala. Você pode editar quantidades, valores e justificativas.
+            A coautoria já foi encerrada. Agora a chefia consolida, ajusta e decide o que segue para a prévia de conversão.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setActiveStage("adicionar")}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#CBD5E1] px-4 text-sm font-semibold text-[#0B4AA2]"
-        >
-          <Plus size={16} weight="bold" /> Adicionar mais itens
-        </button>
       </div>
       <ConsolidatedItemsTable items={detail.items} />
     </Panel>
@@ -1866,7 +2011,7 @@ function ConsolidationSummary({
       <h2 className="text-base font-semibold text-[#0B3473]">Resumo da consolidação</h2>
       <SummaryRows detail={detail} breakdown={breakdown} totalValue={totalValue} />
       <div className="mt-5 rounded-md border border-[#DDE5EF] bg-[#F7FBFF] p-4 text-xs leading-5 text-[#667085]">
-        O valor total é uma estimativa baseada nos valores unitários informados pelos participantes.
+        Ao avançar, a sala deixa a coautoria aberta e passa a ser conduzida exclusivamente pela chefia.
       </div>
       <Checklist title="Antes de avançar, verifique:" checklist={checklist} />
       <button
@@ -1875,7 +2020,7 @@ function ConsolidationSummary({
         disabled={!canEdit || updatingStatus || detail.items.length === 0}
         className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {updatingStatus ? "Enviando..." : "Continuar para revisão"} <ArrowRight size={17} weight="bold" />
+        {updatingStatus ? "Encerrando..." : "Encerrar coautoria e consolidar"} <ArrowRight size={17} weight="bold" />
       </button>
       <button
         type="button"
@@ -1894,14 +2039,14 @@ function ReviewPanel({
   setReviewTab,
   saveMetadata,
   savingMeta,
-  setActiveStage,
+  canEditMetadata,
 }: {
   detail: RoomDetail;
   reviewTab: ReviewTab;
   setReviewTab: (tab: ReviewTab) => void;
   saveMetadata: (event: FormEvent<HTMLFormElement>) => void;
   savingMeta: boolean;
-  setActiveStage: (stage: FlowStage) => void;
+  canEditMetadata: boolean;
 }) {
   const tabs: Array<{ id: ReviewTab; label: string }> = [
     { id: "itens", label: "Itens consolidados" },
@@ -1913,19 +2058,12 @@ function ReviewPanel({
     <Panel>
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <SectionTitle icon={<UsersThree size={18} weight="bold" />} title="Revisão da DFD coletiva" />
+          <SectionTitle icon={<UsersThree size={18} weight="bold" />} title="Prévia da conversão" />
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#667085]">
-            Leia esta sala como se outra pessoa fosse aprovar sem ter acompanhado a montagem. Itens, justificativas e
-            contexto geral precisam fazer sentido juntos.
+            Neste ponto, a chefia já conduz a sala. Revise o texto final, a separação por natureza da despesa e a
+            coerência dos itens antes de gerar as DFDs oficiais.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setActiveStage("consolidar")}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#CBD5E1] px-4 text-sm font-semibold text-[#0B4AA2]"
-        >
-          <PencilSimple size={16} weight="bold" /> Editar itens
-        </button>
       </div>
       <div className="mt-5 flex gap-5 border-b border-[#DDE5EF]">
         {tabs.map((tab) => (
@@ -1952,19 +2090,23 @@ function ReviewPanel({
           <input type="hidden" name="status" value={detail.room.status} />
           <label className="text-sm font-semibold text-[#344054]">
             Título
-            <input name="title" defaultValue={detail.room.title} className="mt-2 h-11 w-full rounded-md border border-[#CBD5E1] px-4 text-sm outline-none focus:border-[#0B63CE]" />
+            <input disabled={!canEditMetadata} name="title" defaultValue={detail.room.title} className="mt-2 h-11 w-full rounded-md border border-[#CBD5E1] px-4 text-sm outline-none focus:border-[#0B63CE] disabled:bg-[#F8FAFC] disabled:text-[#667085]" />
           </label>
           <label className="text-sm font-semibold text-[#344054]">
             Justificativa geral da DFD coletiva
-            <textarea name="description" defaultValue={detail.room.description || ""} rows={4} className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm outline-none focus:border-[#0B63CE]" />
+            <textarea disabled={!canEditMetadata} name="description" defaultValue={detail.room.description || ""} rows={4} className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm outline-none focus:border-[#0B63CE] disabled:bg-[#F8FAFC] disabled:text-[#667085]" />
           </label>
           <label className="text-sm font-semibold text-[#344054]">
             Escopo
-            <textarea name="scope" defaultValue={detail.room.scope || ""} rows={4} className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm outline-none focus:border-[#0B63CE]" />
+            <textarea disabled={!canEditMetadata} name="scope" defaultValue={detail.room.scope || ""} rows={4} className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm outline-none focus:border-[#0B63CE] disabled:bg-[#F8FAFC] disabled:text-[#667085]" />
           </label>
-          <button type="submit" disabled={savingMeta} className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-md bg-[#063F8F] px-4 text-sm font-semibold text-white disabled:opacity-60">
-            <FloppyDisk size={16} weight="bold" /> {savingMeta ? "Salvando..." : "Salvar informações"}
-          </button>
+          {canEditMetadata ? (
+            <button type="submit" disabled={savingMeta} className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-md bg-[#063F8F] px-4 text-sm font-semibold text-white disabled:opacity-60">
+              <FloppyDisk size={16} weight="bold" /> {savingMeta ? "Salvando..." : "Salvar informações"}
+            </button>
+          ) : (
+            <p className="text-sm text-[#667085]">Somente a chefia pode editar o texto final nesta fase.</p>
+          )}
         </form>
       )}
       {reviewTab === "anexos" && (
@@ -1982,7 +2124,11 @@ function ApprovalSummary({
   totalValue,
   breakdown,
   checklist,
+  previewExpenseGroups,
   canConvert,
+  canAdvance,
+  updatingStatus,
+  onAdvanceToReady,
   converting,
   onConvert,
   onSaveAndExit,
@@ -1991,27 +2137,56 @@ function ApprovalSummary({
   totalValue: number;
   breakdown: ExpenseBreakdown;
   checklist: Record<string, boolean>;
+  previewExpenseGroups: ReturnType<typeof splitCollectiveItemsByExpenseClass>;
   canConvert: boolean;
+  canAdvance: boolean;
+  updatingStatus: boolean;
+  onAdvanceToReady: () => void;
   converting: boolean;
   onConvert: () => void;
   onSaveAndExit: () => void;
 }) {
   return (
     <Panel>
-      <h2 className="text-base font-semibold text-[#0B3473]">Resumo para aprovação</h2>
+      <h2 className="text-base font-semibold text-[#0B3473]">Saída prevista</h2>
       <SummaryRows detail={detail} breakdown={breakdown} totalValue={totalValue} />
+      <div className="mt-5 rounded-md border border-[#DDE5EF] bg-[#FBFCFF] p-4">
+        <h3 className="text-sm font-semibold text-[#0F172A]">Prévia das DFDs oficiais</h3>
+        <div className="mt-3 grid gap-3">
+          {previewExpenseGroups.map((group) => (
+            <div key={group.expenseClass} className="rounded-md border border-[#E2E8F0] bg-white px-3 py-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <strong className="text-[#0F172A]">{group.label}</strong>
+                <span className="text-[#526070]">
+                  {group.items.length} item(ns) · {formatCurrency(group.totalValue)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="mt-5 rounded-md border border-[#BBD6FF] bg-[#F7FBFF] p-4 text-xs leading-5 text-[#0B4AA2]">
-        Ao finalizar, esta sala deixa de ser rascunho e gera as DFDs oficiais resultantes da consolidação coletiva.
+        A conversão cria uma DFD oficial por grupo de natureza de despesa e envia a sala para histórico.
       </div>
       <Checklist title="Checklist de revisão" checklist={checklist} />
       <div className="mt-5 border-t border-[#E2E8F0] pt-5">
         <h3 className="text-sm font-semibold text-[#0B3473]">Fluxo de aprovação</h3>
         <ol className="mt-4 grid gap-4 text-sm">
-          <ApprovalStep index={1} title="Envio para aprovação" description="Esta DFD será enviada aos responsáveis." />
-          <ApprovalStep index={2} title="Análise" description="Os responsáveis analisarão as informações." />
-          <ApprovalStep index={3} title="Aprovação" description="Após aprovação, a DFD seguirá para as próximas etapas." />
+          <ApprovalStep index={1} title="Prévia por natureza" description="O sistema separa corrente, capital e outras naturezas antes da geração." />
+          <ApprovalStep index={2} title="Geração oficial" description="A chefia converte a sala e o sistema cria uma ou mais DFDs." />
+          <ApprovalStep index={3} title="Histórico" description="A sala sai da área operacional e permanece apenas para rastreabilidade." />
         </ol>
       </div>
+      {canAdvance && (
+        <button
+          type="button"
+          onClick={onAdvanceToReady}
+          disabled={updatingStatus || detail.items.length === 0}
+          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0B63CE] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {updatingStatus ? "Preparando..." : "Marcar como pronta para conversão"} <ArrowRight size={17} weight="bold" />
+        </button>
+      )}
       <button
         type="button"
         onClick={onConvert}
@@ -2105,7 +2280,19 @@ function EventsPanel({ events }: { events: RoomDetail["events"] }) {
         <div className="divide-y divide-[#E2E8F0]">
           {events.slice(0, 4).map((event) => (
             <div key={event.id} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_160px]">
-              <span className="text-[#344054]">{event.message}</span>
+              <span className="flex items-center gap-2 text-[#344054]">
+                {event.event_type === "contribution_adjusted_by_chefia" && (
+                  <span className="rounded-full bg-[#FFF7ED] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#C2410C]">
+                    Ajustado pela chefia
+                  </span>
+                )}
+                {event.event_type === "contribution_discarded_by_chefia" && (
+                  <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#B91C1C]">
+                    Descartado pela chefia
+                  </span>
+                )}
+                {event.message}
+              </span>
               <span className="text-right text-[#667085]">{formatDateTime(event.created_at)}</span>
             </div>
           ))}
@@ -2117,8 +2304,8 @@ function EventsPanel({ events }: { events: RoomDetail["events"] }) {
 
 function HeaderMetric({ icon, label, value }: { icon: ReactNode; label: string; value: number | string }) {
   return (
-    <div className="flex min-w-[130px] items-center gap-3 rounded-lg border border-[#DDE5EF] bg-[#FBFCFF] px-4 py-3">
-      <div className="text-[#0B4AA2]">{icon}</div>
+    <div className="flex min-w-[130px] items-center gap-3 rounded-xl border border-[var(--semantic-neutral-border)] bg-white px-4 py-3 shadow-sm">
+      <div className="text-[var(--semantic-collab)]">{icon}</div>
       <div>
         <p className="text-xs text-[#526070]">{label}</p>
         <p className="text-base font-semibold text-[#0F172A]">{value}</p>
@@ -2129,16 +2316,16 @@ function HeaderMetric({ icon, label, value }: { icon: ReactNode; label: string; 
 
 function SectionTitle({ icon, title }: { icon: ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 text-[#0B4AA2]">
+    <div className="flex items-center gap-2 text-[var(--semantic-collab)]">
       {icon}
-      <h2 className="text-base font-semibold text-[#0B3473]">{title}</h2>
+      <h2 className="text-base font-semibold text-[var(--semantic-text)]">{title}</h2>
     </div>
   );
 }
 
 function Panel({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]", className)}>
+    <section className={cn("ux-panel rounded-[20px] p-5", className)}>
       {children}
     </section>
   );
@@ -2150,9 +2337,11 @@ function StatusBadge({ status, compact }: { status: RoomStatus; compact?: boolea
       className={cn(
         "inline-flex w-fit items-center rounded-full px-3 py-1 font-semibold",
         compact ? "text-[11px]" : "text-xs",
-        status === "aberta" && "bg-[#D8F8E7] text-[#087443]",
-        status === "em_revisao" && "bg-[#FFF2CC] text-[#8A5A00]",
-        status === "convertida" && "bg-[#EAF2FF] text-[#0B4AA2]",
+        status === "proposta" && "ux-chip-insight",
+        status === "aberta" && "ux-chip-collab",
+        status === "em_consolidacao_chefia" && "ux-chip-warning",
+        status === "pronta_para_conversao" && "ux-chip-warning",
+        status === "convertida" && "ux-chip-success",
         status === "arquivada" && "bg-[#EEF2F7] text-[#526070]",
       )}
     >

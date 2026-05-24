@@ -33,6 +33,9 @@ interface PrintData {
   objeto: string;
   justificativa: string;
   gnd: string;
+  origem?: string;
+  salaColetiva?: string;
+  coautores?: string;
   itens: PrintItem[];
 }
 
@@ -59,7 +62,7 @@ export default function DFDPrintPage() {
 
         if (dfdError) throw dfdError;
 
-        const [profileResult, campusResult, itemsResult, signatureResult, deptResult, labResult, logsResult] =
+        const [profileResult, campusResult, itemsResult, signatureResult, deptResult, labResult, logsResult, authorsResult] =
           await Promise.all([
             dfdData?.solicitante_id
               ? supabase
@@ -103,6 +106,13 @@ export default function DFDPrintPage() {
               .eq("dfd_id", id)
               .not("user_id", "is", null)
               .order("created_at", { ascending: false }),
+            dfdData?.origin_type === "collective"
+              ? supabase
+                  .from("dfd_collective_dfd_authors")
+                  .select("author_name_snapshot,author_email_snapshot,quantidade_total,valor_total_estimado")
+                  .eq("dfd_id", id)
+                  .order("valor_total_estimado", { ascending: false })
+              : Promise.resolve({ data: [], error: null } as const),
           ]);
 
         if (profileResult.error) throw profileResult.error;
@@ -111,6 +121,7 @@ export default function DFDPrintPage() {
         if (deptResult.error) throw deptResult.error;
         if (labResult.error) throw labResult.error;
         if (logsResult.error) throw logsResult.error;
+        if (authorsResult.error) throw authorsResult.error;
 
         const items = (itemsResult.data || []).map((item: any) => ({
           cod: item.codigo_tce ? `E-FISCO ${item.codigo_tce}` : "Sem código",
@@ -186,6 +197,19 @@ export default function DFDPrintPage() {
             dfdData?.justificativa_contratacao ||
             "Sem justificativa cadastrada para esta demanda.",
           gnd: gndPrincipal,
+          origem:
+            dfdData?.origin_type === "collective"
+              ? "DFD coletiva convertida"
+              : "DFD individual",
+          salaColetiva: dfdData?.collective_origin_room_title || "",
+          coautores: (authorsResult.data || [])
+            .map((author: any) => {
+              const name = String(
+                author.author_name_snapshot || author.author_email_snapshot || "Autor não identificado",
+              ).trim();
+              return `${name} (qtd ${Number(author.quantidade_total || 0)})`;
+            })
+            .join("; "),
           itens: items,
         };
         setData(normalizedData);

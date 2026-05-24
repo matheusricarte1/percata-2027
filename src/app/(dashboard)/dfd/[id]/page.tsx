@@ -38,6 +38,10 @@ type DfdDetails = {
   status: DfdStatus;
   created_at: string;
   numero_protocolo?: string | null;
+  origin_type?: "individual" | "collective" | null;
+  collective_origin_room_id?: string | null;
+  collective_origin_room_title?: string | null;
+  collective_origin_expense_class?: string | null;
   campus?: string | null;
   campus_id?: string | null;
   unidade_nome?: string | null;
@@ -52,6 +56,15 @@ type DfdDetails = {
   analysis_routing_reason?: string | null;
   profiles?: { full_name?: string | null; email?: string | null; avatar_url?: string | null } | null;
   campi?: { nome?: string | null; sigla?: string | null } | null;
+};
+
+type CollectiveAuthorSummary = {
+  contribution_user_id: string;
+  author_name_snapshot?: string | null;
+  author_email_snapshot?: string | null;
+  item_count?: number | null;
+  quantidade_total?: number | null;
+  valor_total_estimado?: number | null;
 };
 
 type DfdItem = {
@@ -168,6 +181,7 @@ export default function DfdDetailsPage() {
 
   const [dfd, setDfd] = useState<DfdDetails | null>(null);
   const [items, setItems] = useState<DfdItem[]>([]);
+  const [collectiveAuthors, setCollectiveAuthors] = useState<CollectiveAuthorSummary[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentRole, setCurrentRole] = useState<UserRole>("solicitante");
@@ -241,6 +255,20 @@ export default function DfdDetailsPage() {
         analysis_unidade_nome:
           String(analysisUnitResult.data?.nome || "").trim() || unidadeNome,
       });
+
+      if (dfdData?.origin_type === "collective") {
+        const { data: authorRows, error: authorError } = await supabase
+          .from("dfd_collective_dfd_authors")
+          .select(
+            "contribution_user_id,author_name_snapshot,author_email_snapshot,item_count,quantidade_total,valor_total_estimado",
+          )
+          .eq("dfd_id", id)
+          .order("valor_total_estimado", { ascending: false });
+        if (authorError) throw authorError;
+        setCollectiveAuthors((authorRows || []) as CollectiveAuthorSummary[]);
+      } else {
+        setCollectiveAuthors([]);
+      }
 
       const { data: itemsData, error: itemsError } = await supabase
         .from("dfd_items")
@@ -357,6 +385,12 @@ export default function DfdDetailsPage() {
       objeto: dfd.objeto_contratacao || "",
       justificativa: dfd.justificativa_contratacao || "",
       gnd: Array.from(new Set(items.map((item) => String(item.gnd || "").trim()).filter(Boolean))).join(", "),
+      origem:
+        dfd.origin_type === "collective"
+          ? "DFD coletiva convertida"
+          : "DFD individual",
+      sala_coletiva: dfd.collective_origin_room_title || "",
+      coautores: collectiveAuthorsSummary,
       itens: items.map((item) => ({
         cod: String(item.codigo_tce || ""),
         desc: String(item.descricao || ""),
@@ -439,6 +473,17 @@ export default function DfdDetailsPage() {
     items.every((item) => Boolean(String(item.justificativa_item || "").trim())),
   ].filter(Boolean).length;
   const readinessPercent = Math.round((infoReadiness / 4) * 100);
+  const collectiveAuthorsSummary = collectiveAuthors
+    .map((author) => {
+      const name = String(
+        author.author_name_snapshot ||
+          author.author_email_snapshot ||
+          author.contribution_user_id ||
+          "Autor não identificado",
+      ).trim();
+      return `${name} (qtd ${Number(author.quantidade_total || 0)})`;
+    })
+    .join("; ");
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-5 pb-28 md:px-6">
@@ -612,6 +657,58 @@ export default function DfdDetailsPage() {
               />
             </div>
 
+            {dfd.origin_type === "collective" ? (
+              <div className="mt-3 rounded-xl border border-[#D9E0E8] bg-[#F7FBFF] p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#47739F]">
+                  Procedência coletiva
+                </p>
+                <div className="mt-2 grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs font-semibold text-[#164073]">Sala de origem</p>
+                    <p className="mt-1 text-sm text-[#3E4C5F]">
+                      {dfd.collective_origin_room_title || "Sala coletiva não identificada"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[#164073]">Natureza da saída</p>
+                    <p className="mt-1 text-sm text-[#3E4C5F]">
+                      {String(dfd.collective_origin_expense_class || "")
+                        .replace("custeio", "Despesa corrente")
+                        .replace("investimento", "Despesa de capital")
+                        .replace("outro", "Outra natureza")
+                        .replace("sem-gnd", "Sem GND")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[#164073]">Coautoria preservada</p>
+                    <p className="mt-1 text-sm text-[#3E4C5F]">
+                      {collectiveAuthors.length} participante(s) com registro estruturado
+                    </p>
+                  </div>
+                </div>
+                {collectiveAuthors.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {collectiveAuthors.map((author) => {
+                      const name = String(
+                        author.author_name_snapshot ||
+                          author.author_email_snapshot ||
+                          author.contribution_user_id ||
+                          "Autor",
+                      ).trim();
+                      return (
+                        <span
+                          key={author.contribution_user_id}
+                          className="inline-flex items-center rounded-full border border-[#C7D7EA] bg-white px-3 py-1 text-xs font-medium text-[#34506F]"
+                        >
+                          {name} • {Number(author.quantidade_total || 0)} un.
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="mt-3 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#7D98B8]">
                 Justificativa da DFD
@@ -663,12 +760,14 @@ export default function DfdDetailsPage() {
                   const qtd = Number(item.quantidade || 0);
                   const unit = Number(item.valor_unitario_estimado || 0);
                   const subtotal = qtd * unit;
+                  const justificationText = formatJustificationForDisplay(item.justificativa_item);
+                  const distributionText = extractCollectiveDistribution(item.justificativa_item);
                   return (
                     <article
                       key={item.id}
                       className="rounded-xl border border-[#E8EDF2] bg-[#FAFBFC] p-3"
                     >
-                      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full bg-[#E8EDF2] px-2 py-0.5 text-[10px] font-semibold text-[#164073]">
@@ -686,7 +785,7 @@ export default function DfdDetailsPage() {
                           </h3>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 text-right">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:ml-4 xl:min-w-[300px] xl:max-w-[340px] xl:shrink-0">
                           <MetricChip label="Qtd." value={String(qtd)} />
                           <MetricChip label="Unitário" value={formatCurrency(unit)} />
                           <MetricChip label="Subtotal" value={formatCurrency(subtotal)} />
@@ -698,12 +797,21 @@ export default function DfdDetailsPage() {
                         <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
                       </div>
 
-                      {item.justificativa_item ? (
+                      {justificationText ? (
                         <div className="mt-2 rounded-lg border border-[#D9E0E8] bg-white p-2.5">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
                             Justificativa do item
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-xs text-[#5B6675]">{item.justificativa_item}</p>
+                          <p className="mt-1 whitespace-pre-wrap break-words text-xs text-[#5B6675]">{justificationText}</p>
+                        </div>
+                      ) : null}
+
+                      {dfd.origin_type === "collective" && distributionText ? (
+                        <div className="mt-2 rounded-lg border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] p-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--semantic-collab)]">
+                            Distribuição da sala coletiva
+                          </p>
+                          <p className="mt-1 break-words text-xs font-semibold text-[#3E4C5F]">{distributionText}</p>
                         </div>
                       ) : null}
 
@@ -791,11 +899,29 @@ function SmallInfo({ label, value }: { label: string; value: string }) {
 
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[#D9E0E8] bg-white px-2 py-1.5">
+    <div className="min-w-0 rounded-lg border border-[#D9E0E8] bg-white px-2.5 py-2 text-center">
       <p className="text-[9px] font-semibold uppercase tracking-[0.11em] text-[#7D98B8]">{label}</p>
-      <p className="mt-0.5 text-xs font-semibold text-[#164073]">{value}</p>
+      <p className="mt-1 break-words text-sm font-semibold leading-tight text-[#164073]">{value}</p>
     </div>
   );
+}
+
+function formatJustificationForDisplay(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withoutDistribution = raw.split(/Distribui[cç][aã]o por usu[aá]rio:/i)[0] || "";
+  const withoutPercataLinks = withoutDistribution
+    .replace(/https?:\/\/percata\.vercel\.app\/\S+/gi, "")
+    .replace(/https?:\/\/localhost:\d+\/\S+/gi, "")
+    .trim();
+  return withoutPercataLinks;
+}
+
+function extractCollectiveDistribution(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/Distribui[cç][aã]o por usu[aá]rio:\s*([\s\S]+)$/i);
+  return match?.[1]?.trim() || "";
 }
 
 function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {

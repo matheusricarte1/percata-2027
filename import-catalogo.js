@@ -42,15 +42,6 @@ function deriveGnd(codigoNatureza) {
   return `${value[0]}.${value[1]}.${value.slice(2, 4)}.${value.slice(4, 6)}`;
 }
 
-function parseEfiscoDate(value) {
-  const text = clean(value);
-  if (!text) return null;
-  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const [, day, month, year, hour, minute, second] = match;
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-}
-
 async function upsertBatch(table, rows, options) {
   if (rows.length === 0) return;
   const { error } = await supabase.from(table).upsert(rows, options);
@@ -113,17 +104,11 @@ async function importCatalogo() {
         tipo_objeto: tipoObjeto,
         codigo_grupo: clean(record.CODIGO_GRUPO),
         nome_grupo: clean(record.NOME_GRUPO),
-        descricao_grupo: clean(record.DESCRICAO_GRUPO),
-        situacao_grupo: clean(record.SITUACAO_GRUPO),
         codigo_classe: clean(record.CODIGO_CLASSE),
         nome_classe: clean(record.NOME_CLASSE),
         descricao_classe: clean(record.DESCRICAO_CLASSE),
-        situacao_classe: clean(record.SITUACAO_CLASSE),
         codigo_material_servico: clean(record.CODIGO_MATERIAL_SERVICO),
         nome_material_servico: clean(record.NOME_MATERIAL_SERVICO),
-        situacao_material_servico: clean(record.SITUACAO_MATERIAL_SERVICO),
-        data_inclusao_item: parseEfiscoDate(record.DATA_INCLUSAO_ITEM),
-        situacao_item: clean(record.SITUACAO_ITEM),
         codigo_natureza_preferencial: codigoNatureza,
         gnd_preferencial: gnd,
         natureza_count: 0,

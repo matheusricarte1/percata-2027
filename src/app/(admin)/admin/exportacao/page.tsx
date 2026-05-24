@@ -128,6 +128,7 @@ export default function ExportacaoPage() {
         profilesRes,
         userUnitsRes,
         collectiveRes,
+        collectiveAuthorRes,
         emailQueueRes,
       ] = await Promise.all([
         supabase.from("vw_admin_kpis").select("*").single(),
@@ -147,6 +148,7 @@ export default function ExportacaoPage() {
         supabase.from("profiles").select("*"),
         supabase.from("user_units").select("*"),
         supabase.from("dfd_collective_contributions").select("*"),
+        supabase.from("dfd_collective_dfd_authors").select("*"),
         supabase.from("email_alert_queue").select("*"),
       ]);
 
@@ -159,6 +161,7 @@ export default function ExportacaoPage() {
       if (profilesRes.error) notices.push("Perfis indisponíveis para enriquecer solicitantes.");
       if (userUnitsRes.error) notices.push("Vínculos de usuários indisponíveis para a exportação.");
       if (collectiveRes.error) notices.push("Contribuições coletivas indisponíveis para a exportação.");
+      if (collectiveAuthorRes.error) notices.push("Autoria coletiva das DFDs indisponível para a exportação.");
       if (emailQueueRes.error) notices.push("Detalhes da fila de e-mail indisponíveis para a exportação.");
       if (dfdsRes.error) throw dfdsRes.error;
       if (itemsRes.error) throw itemsRes.error;
@@ -170,6 +173,9 @@ export default function ExportacaoPage() {
       const profileRows = (profilesRes.error ? [] : profilesRes.data || []) as ReportLookupRow[];
       const userUnitRows = (userUnitsRes.error ? [] : userUnitsRes.data || []) as ReportLookupRow[];
       const collectiveRows = (collectiveRes.error ? [] : collectiveRes.data || []) as ReportLookupRow[];
+      const collectiveAuthorRows = (collectiveAuthorRes.error
+        ? []
+        : collectiveAuthorRes.data || []) as ReportLookupRow[];
       const emailQueueRows = (emailQueueRes.error ? [] : emailQueueRes.data || []) as ReportLookupRow[];
       let catalogRows: ReportLookupRow[] = [];
       try {
@@ -181,6 +187,14 @@ export default function ExportacaoPage() {
       const departamentosById = toMap(departamentoRows);
       const laboratoriosById = toMap(laboratorioRows);
       const profilesById = toMap(profileRows);
+      const collectiveAuthorsByDfd = collectiveAuthorRows.reduce<Map<string, ReportLookupRow[]>>((map, row) => {
+        const key = String(row.dfd_id || "").trim();
+        if (!key) return map;
+        const current = map.get(key) || [];
+        current.push(row);
+        map.set(key, current);
+        return map;
+      }, new Map());
       const dfdRows = ((dfdsRes.data || []) as DfdReportRow[]).map((dfd) => {
         const campus = campiById.get(String(dfd.campus_id || ""));
         const isLaboratorio = String(dfd.tipo_unidade || "").toLowerCase().includes("laboratorio");
@@ -194,6 +208,24 @@ export default function ExportacaoPage() {
           ? laboratoriosById.get(String(dfd.analysis_unidade_id || ""))
           : departamentosById.get(String(dfd.analysis_unidade_id || ""));
         const solicitante = profilesById.get(String(dfd.solicitante_id || ""));
+        const collectiveAuthors = (collectiveAuthorsByDfd.get(String(dfd.id || "")) || [])
+          .map((row) => {
+            const profile = profilesById.get(String(row.contribution_user_id || ""));
+            const authorName = String(
+              row.author_name_snapshot ||
+                profile?.full_name ||
+                row.author_email_snapshot ||
+                profile?.email ||
+                row.contribution_user_id ||
+                "",
+            ).trim();
+            if (!authorName) return null;
+            return `${authorName} (qtd ${Number(row.quantidade_total || 0)}, R$ ${Number(
+              row.valor_total_estimado || 0,
+            ).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+          })
+          .filter(Boolean)
+          .join(" ; ");
 
         return {
           ...dfd,
@@ -203,6 +235,36 @@ export default function ExportacaoPage() {
           analysis_unidade_nome_relatorio: pickUnitName(analysisUnidade),
           solicitante_nome_relatorio: solicitante?.full_name || "",
           solicitante_email_relatorio: solicitante?.email || "",
+          coautoria_coletiva_relatorio: collectiveAuthors,
+        };
+      });
+      const dfdById = new Map(dfdRows.map((row) => [String(row.id), row]));
+      const enrichedCollectiveRows = collectiveRows.map((row) => {
+        const contributor = profilesById.get(String(row.user_id || ""));
+        const linkedDfd = dfdById.get(String(row.consolidated_dfd_id || ""));
+        return {
+          ...row,
+          contributor_nome_relatorio:
+            contributor?.full_name || String(row.user_name || row.user_email || row.user_id || "").trim(),
+          contributor_email_relatorio:
+            contributor?.email || String(row.user_email || "").trim(),
+          consolidated_dfd_numero_protocolo_relatorio: linkedDfd?.numero_protocolo || "",
+          consolidated_dfd_objeto_relatorio: linkedDfd?.objeto_contratacao || "",
+        };
+      });
+      const enrichedCollectiveAuthorRows = collectiveAuthorRows.map((row) => {
+        const contributor = profilesById.get(String(row.contribution_user_id || ""));
+        const linkedDfd = dfdById.get(String(row.dfd_id || ""));
+        return {
+          ...row,
+          contributor_nome_relatorio:
+            contributor?.full_name ||
+            String(row.author_name_snapshot || row.author_email_snapshot || row.contribution_user_id || "").trim(),
+          contributor_email_relatorio:
+            contributor?.email || String(row.author_email_snapshot || "").trim(),
+          consolidated_dfd_numero_protocolo_relatorio: linkedDfd?.numero_protocolo || "",
+          consolidated_dfd_objeto_relatorio: linkedDfd?.objeto_contratacao || "",
+          collective_origin_room_title_relatorio: linkedDfd?.collective_origin_room_title || "",
         };
       });
 
@@ -215,7 +277,8 @@ export default function ExportacaoPage() {
         Laboratorios: laboratorioRows,
         Perfis: profileRows,
         Usuarios_Unidades: userUnitRows,
-        Contribuicoes_Coletivas: collectiveRows,
+        Contribuicoes_Coletivas: enrichedCollectiveRows,
+        Autoria_Coletiva_DFD: enrichedCollectiveAuthorRows,
         Fila_Email: emailQueueRows,
         Catalogo_Itens: catalogRows,
       });

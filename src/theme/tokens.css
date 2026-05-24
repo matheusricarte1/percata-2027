@@ -1,0 +1,187 @@
+/*
+ * tokens.css — fonte única da verdade de design tokens do PERCATA.
+ *
+ * Antes desta consolidação, tokens viviam em 4 lugares:
+ *   1. `--md-*` (Material Web Components)
+ *   2. `--percata-*` (MUI cssVariables prefix; nunca usado)
+ *   3. `--upe-*` / `--semantic-*` / `--ds-*` (globals.css)
+ *   4. `upe.*` (tailwind.config.js)
+ *
+ * Esta camada CSS define tokens canônicos com prefixo `--p-` (PERCATA)
+ * e mapeia as variáveis legadas para eles. Migração:
+ *   - novo código USA `--p-color-*` / `--p-radius-*` / etc.
+ *   - código existente continua funcionando porque os tokens legados
+ *     são derivados destes via `var(--p-...)`.
+ *   - quando MUI for removido (ver docs/MIGRATION_REMOVE_MUI.md),
+ *     este arquivo se torna a única fonte real.
+ *
+ * Dark mode: ativado por `html[data-theme-mode="dark"]`. Hoje há 3 ativadores
+ * conflitantes (InitColorSchemeScript do MUI, manual via dataset, e
+ * next-themes em Sonner). O patch separado em providers/AppProviders.tsx
+ * deve eleger 1 só dono — este arquivo apenas define os valores.
+ */
+
+:root {
+  /* ============ Cores institucionais UPE ============ */
+  --p-color-brand-50: #f4f7fc;
+  --p-color-brand-100: #e8eef7;
+  --p-color-brand-200: #c7d7ea;
+  --p-color-brand-300: #97b3d5;
+  --p-color-brand-400: #4f7fb5;
+  --p-color-brand-500: #164073; /* azul UPE oficial */
+  --p-color-brand-600: #103260;
+  --p-color-brand-700: #0b234a;
+  --p-color-brand-800: #061735;
+  --p-color-brand-900: #030c1f;
+
+  /* ============ Cores semânticas ============ */
+  --p-color-bg: #ffffff;
+  --p-color-bg-elevated: #fafbfc;
+  --p-color-bg-muted: #f3f2f1;
+  --p-color-fg: #17233c;
+  --p-color-fg-muted: #5b6675;
+  --p-color-fg-subtle: #7d98b8;
+  --p-color-border: #d9e0e8;
+  --p-color-border-strong: #b3c0d4;
+
+  --p-color-success: #2f6b3f;
+  --p-color-success-bg: #e7f0ea;
+  --p-color-success-border: #bfd8c6;
+
+  --p-color-warning: #9a5b12;
+  --p-color-warning-bg: #fff3e6;
+  --p-color-warning-border: #f0d1a8;
+
+  --p-color-danger: #a91520;
+  --p-color-danger-bg: #ffe8ea;
+  --p-color-danger-border: #f3b8be;
+
+  --p-color-info: #164073;
+  --p-color-info-bg: #eaf2ff;
+  --p-color-info-border: #c7d7ea;
+
+  /* Ação primária (CTA) — mapeia para brand por padrão. */
+  --p-color-action: var(--p-color-brand-500);
+  --p-color-action-hover: var(--p-color-brand-600);
+  --p-color-action-active: var(--p-color-brand-700);
+  --p-color-action-fg: #ffffff;
+
+  /* ============ Raio ============ */
+  --p-radius-xs: 4px;
+  --p-radius-sm: 8px;
+  --p-radius-md: 12px;
+  --p-radius-lg: 16px;
+  --p-radius-xl: 24px;
+  --p-radius-pill: 999px;
+
+  /* ============ Elevação (Material Design 3) ============ */
+  --p-elevation-0: none;
+  --p-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  --p-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.06);
+  --p-elevation-3: 0 4px 12px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.06);
+  --p-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.08);
+
+  /* ============ Movimento ============ */
+  --p-motion-fast: 120ms;
+  --p-motion-base: 200ms;
+  --p-motion-slow: 320ms;
+  --p-motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --p-motion-ease-emphasized: cubic-bezier(0.2, 0, 0.05, 1);
+  --p-motion-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+
+  /* ============ Foco ============ */
+  --p-focus-ring-color: color-mix(in srgb, var(--p-color-action) 50%, transparent);
+  --p-focus-ring-color-fallback: rgba(22, 64, 115, 0.5);
+  --p-focus-ring-width: 3px;
+  --p-focus-ring-offset: 2px;
+
+  /* ============ Tipografia ============ */
+  --p-font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --p-font-display: "Outfit", var(--p-font-sans);
+  --p-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+
+  /* ============ Compat (mapeia tokens legados) ============ */
+  /* MD/Material Web */
+  --md-primary: var(--p-color-brand-500);
+  --md-on-primary: var(--p-color-action-fg);
+  /* UPE */
+  --upe-blue-upe: var(--p-color-brand-500);
+  /* Semantic legacy */
+  --semantic-action: var(--p-color-action);
+}
+
+/* ============ Dark mode ============ */
+html[data-theme-mode="dark"] {
+  --p-color-bg: #0b1220;
+  --p-color-bg-elevated: #111a2d;
+  --p-color-bg-muted: #0f1626;
+  --p-color-fg: #e6edf8;
+  --p-color-fg-muted: #a4b2c7;
+  --p-color-fg-subtle: #7a8aa6;
+  --p-color-border: #2a3650;
+  --p-color-border-strong: #3a4a6b;
+
+  --p-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.5);
+  --p-elevation-2: 0 2px 6px rgba(0, 0, 0, 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  --p-elevation-3: 0 4px 12px rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.45);
+  --p-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.55),
+    0 16px 48px rgba(0, 0, 0, 0.5);
+
+  /* Ação no dark fica mais clara para manter contraste em fg-subtle. */
+  --p-color-action: var(--p-color-brand-400);
+  --p-color-action-hover: var(--p-color-brand-300);
+}
+
+/* ============ Foco visível centralizado ============ */
+/*
+ * Antes: 3 anéis de foco competiam (globals.css outline + Button ring-4 +
+ * Input ring-3). Esta regra única substitui. Componentes shadcn já têm
+ * `focus-visible:outline-none` por padrão — adicionamos box-shadow neste
+ * arquivo para não competir.
+ */
+*:focus-visible {
+  outline: var(--p-focus-ring-width) solid var(--p-focus-ring-color);
+  outline-offset: var(--p-focus-ring-offset);
+  /* Fallback para browsers sem color-mix (Safari < 16.4, Firefox < 113). */
+  box-shadow: 0 0 0 var(--p-focus-ring-width) var(--p-focus-ring-color-fallback);
+}
+
+/*
+ * Reduced motion: regra única, sem `!important` na duração, para que
+ * Framer Motion e GSAP possam respeitar via JS (useReducedMotion hook).
+ * Reservamos `!important` apenas para `animation-iteration-count: 1`
+ * — interrompe loops infinitos que ignoram useReducedMotion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
+
+html[data-reduced-motion="1"],
+html[data-show-animations="0"] {
+  /* Mesma anulação, agora forçada via dataset (preferência do usuário
+   * salva em localStorage, mesmo quando o SO não declara reduced-motion). */
+}
+html[data-reduced-motion="1"] *,
+html[data-show-animations="0"] *,
+html[data-reduced-motion="1"] *::before,
+html[data-show-animations="0"] *::before {
+  animation-duration: 0.01ms;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms;
+}

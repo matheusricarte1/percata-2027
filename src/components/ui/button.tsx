@@ -4,9 +4,13 @@ import React from "react";
 import { motion, HTMLMotionProps } from "framer-motion";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center rounded-2xl text-sm font-semibold uppercase tracking-tight transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-40 focus-visible:ring-4 focus-visible:ring-primary/20",
+  // O foco visível agora vem de tokens.css (regra global *:focus-visible).
+  // Removida a duplicação de `focus-visible:ring-4 ring-primary/20` que competia
+  // com o outline global + outline de Input, criando 3 anéis sobrepostos.
+  "inline-flex shrink-0 items-center justify-center rounded-2xl text-sm font-semibold uppercase tracking-tight transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
@@ -37,26 +41,35 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends
-    Omit<HTMLMotionProps<"button">, "ref">,
+  extends Omit<HTMLMotionProps<"button">, "ref">,
     VariantProps<typeof buttonVariants> {}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, ...props }, ref) => {
-    return (
-      <motion.button
-        ref={ref}
-        whileHover={{
+    // Respeita preferência de movimento. Hover/tap micro-animation só
+    // ativos quando o usuário NÃO pediu redução. Caso contrário,
+    // botão fica estático (mas mantém hover de cor via Tailwind).
+    // Resolve violação WCAG 2.3.3 reportada na revisão dialética.
+    const reduced = useReducedMotion();
+    const hoverAnim = reduced
+      ? undefined
+      : {
           y: -2,
           scale: 1.02,
           boxShadow: variant === "ghost" ? "none" : "var(--elevation-3)",
-        }}
-        whileTap={{ scale: 0.96, y: 1 }}
-        transition={{
-          type: "spring",
-          stiffness: 400,
-          damping: 17,
-        }}
+        };
+    const tapAnim = reduced ? undefined : { scale: 0.96, y: 1 };
+
+    return (
+      <motion.button
+        ref={ref}
+        whileHover={hoverAnim}
+        whileTap={tapAnim}
+        transition={
+          reduced
+            ? { duration: 0 }
+            : { type: "spring", stiffness: 400, damping: 17 }
+        }
         className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       />

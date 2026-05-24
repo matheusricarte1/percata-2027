@@ -174,12 +174,30 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const callbackOrigin = origin;
 
-  // if "next" is in param, use it as the redirect URL
-  const rawNext = searchParams.get("next") ?? "/dashboard";
-  const next =
-    rawNext.startsWith("/") && !rawNext.startsWith("//")
-      ? rawNext
-      : "/dashboard";
+  // Sanitização de `next` contra open redirect.
+  // Aceitar APENAS caminhos relativos que não sejam protocol-relative.
+  // Antes: `rawNext.startsWith("/") && !rawNext.startsWith("//")` deixava
+  // passar `/\evil.com`, `/%2fevil.com`, e variações com backslash que
+  // browsers normalizam para `//evil.com`.
+  // Estratégia robusta: resolver contra o origin e exigir que continue
+  // no mesmo origin; rejeitar qualquer protocolo, host ou backslash no path.
+  function safeNextPath(raw: string | null): string {
+    if (!raw) return "/dashboard";
+    if (raw.length > 512) return "/dashboard";
+    // Rejeitar protocolo absoluto, protocol-relative e backslash (Windows-style).
+    if (!raw.startsWith("/")) return "/dashboard";
+    if (raw.startsWith("//") || raw.startsWith("/\\")) return "/dashboard";
+    if (/[\\\r\n\t]/.test(raw)) return "/dashboard";
+    try {
+      const resolved = new URL(raw, callbackOrigin);
+      if (resolved.origin !== callbackOrigin) return "/dashboard";
+      // Reconstruir explicitamente para descartar credenciais / host embutidos.
+      return `${resolved.pathname}${resolved.search}${resolved.hash}` || "/dashboard";
+    } catch {
+      return "/dashboard";
+    }
+  }
+  const next = safeNextPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

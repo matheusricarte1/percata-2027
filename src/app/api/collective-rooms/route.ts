@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   actorHasUnit,
+  actorIsChefiaForUnit,
   apiError,
+  assertCanSeeRoom,
   buildRoomDetail,
+  createNotifications,
   createSupabaseAdminClient,
   insertRoomEvent,
-  isAdminActor,
+  loadUnitRecipientUserIds,
   requireCollectiveRoomActor,
   sanitizeLongText,
   sanitizeText,
   sanitizeUuid,
 } from "@/lib/collective-room-api";
+import { toPublicSiteUrl } from "@/lib/site-url";
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     const visibleRooms = (data || []).filter((room: any) => {
-      if (!isAdminActor(actor) && !actorHasUnit(actor, room.unit_id, room.unit_type)) {
+      if (!assertCanSeeRoom(actor, room)) {
         return false;
       }
       if (!term) return true;
@@ -74,6 +78,8 @@ export async function POST(request: NextRequest) {
     if (!actorHasUnit(actor, unitId, unitType)) {
       return apiError("Voce nao possui vinculo com esta unidade.", 403);
     }
+    const isChefia = actorIsChefiaForUnit(actor, unitId);
+    const status = isChefia ? "aberta" : "proposta";
 
     const admin = createSupabaseAdminClient();
     const { data: room, error } = await admin
@@ -82,11 +88,13 @@ export async function POST(request: NextRequest) {
         title,
         description,
         scope,
-        status: "aberta",
+        status,
         unit_id: unitId,
         unit_type: unitType,
         campus_id: actor.campus_id,
         created_by: actor.id,
+        published_at: isChefia ? new Date().toISOString() : null,
+        published_by: isChefia ? actor.id : null,
         cycle_year: cycleYear,
       })
       .select("*")
@@ -96,9 +104,47 @@ export async function POST(request: NextRequest) {
     await insertRoomEvent(admin, {
       roomId: room.id,
       actorId: actor.id,
-      eventType: "room_created",
-      message: "DFD coletiva criada.",
+      eventType: isChefia ? "room_published" : "room_proposed",
+      message: isChefia
+        ? "DFD coletiva aberta pela chefia."
+        : "Proposta de DFD coletiva enviada para publicacao da chefia.",
     });
+
+    const roomUrl = toPublicSiteUrl(`/dfds-coletivas/${room.id}`, request.nextUrl.origin).toString();
+    if (isChefia) {
+      const unitMemberIds = await loadUnitRecipientUserIds(admin, {
+        unitId,
+        unitType,
+      });
+      await createNotifications(
+        admin,
+        unitMemberIds
+          .filter((userId) => userId !== actor.id)
+          .map((userId) => ({
+            user_id: userId,
+            title: "DFD coletiva publicada",
+            message: `A sala coletiva "${title}" foi publicada para contribuições do setor. Acesse: ${roomUrl}`,
+            type: "info" as const,
+          })),
+      );
+    } else {
+      const chefiaIds = await loadUnitRecipientUserIds(admin, {
+        unitId,
+        unitType,
+        roleInUnit: "chefia",
+      });
+      await createNotifications(
+        admin,
+        chefiaIds
+          .filter((userId) => userId !== actor.id)
+          .map((userId) => ({
+            user_id: userId,
+            title: "Nova proposta de DFD coletiva",
+            message: `${actor.full_name || "Um membro da unidade"} propôs a sala "${title}" e aguarda publicação da chefia. Acesse: ${roomUrl}`,
+            type: "info" as const,
+          })),
+      );
+    }
 
     return NextResponse.json({ room }, { status: 201 });
   } catch (error: any) {

@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import {
   ArrowRight,
   Buildings,
-  FunnelSimple,
+  CaretLeft,
+  CaretRight,
   MagnifyingGlass,
   Package,
   Plus,
@@ -28,10 +29,17 @@ type RoomListItem = {
   title: string;
   description: string | null;
   scope: string | null;
-  status: "aberta" | "em_revisao" | "convertida" | "arquivada";
+  status:
+    | "proposta"
+    | "aberta"
+    | "em_consolidacao_chefia"
+    | "pronta_para_conversao"
+    | "convertida"
+    | "arquivada";
   unit_id: string;
   unit_type: "departamento" | "laboratorio";
   unit_name: string;
+  actor_role?: "membro" | "chefia" | "admin" | "superadmin";
   updated_at: string;
   summary?: {
     participantCount: number;
@@ -43,38 +51,25 @@ type RoomListItem = {
 };
 
 const STATUS_LABELS: Record<RoomListItem["status"], string> = {
+  proposta: "Proposta",
   aberta: "Aberta",
-  em_revisao: "Em revisão",
+  em_consolidacao_chefia: "Consolidação da chefia",
+  pronta_para_conversao: "Pronta para conversão",
   convertida: "Convertida",
   arquivada: "Arquivada",
 };
 
-const COLLECTIVE_GUIDE = [
-  {
-    icon: <Plus size={18} weight="bold" />,
-    title: "Abra com contexto",
-    description: "Defina o tema, o recorte e o que faz sentido entrar nesta DFD coletiva.",
-  },
-  {
-    icon: <UsersThree size={18} weight="bold" />,
-    title: "Receba contribuições",
-    description: "Cada participante adiciona itens com justificativa, quantidade e referência.",
-  },
-  {
-    icon: <ArrowRight size={18} weight="bold" />,
-    title: "Revise antes de converter",
-    description: "A sala consolida a demanda do setor antes de virar DFD oficial.",
-  },
-] as const;
+const PAGE_SIZE = 6;
 
 export default function DfdsColetivasPage() {
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("ativas");
+  const [statusFilter, setStatusFilter] = useState("operacionais");
   const [search, setSearch] = useState("");
   const [cycleYear, setCycleYear] = useState(new Date().getFullYear());
+  const [page, setPage] = useState(1);
   const [draft, setDraft] = useState({
     title: "",
     description: "",
@@ -136,23 +131,18 @@ export default function DfdsColetivasPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (statusFilter !== "ativas") params.set("status", statusFilter);
       if (search.trim()) params.set("q", search.trim());
       const response = await fetch(`/api/collective-rooms?${params.toString()}`);
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Erro ao carregar DFDs coletivas.");
       const nextRooms = (payload.rooms || []) as RoomListItem[];
-      setRooms(
-        statusFilter === "ativas"
-          ? nextRooms.filter((room) => room.status !== "arquivada")
-          : nextRooms,
-      );
+      setRooms(nextRooms);
     } catch (error: any) {
       toast.error(error?.message || "Erro ao carregar DFDs coletivas.");
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search]);
 
   useEffect(() => {
     loadUnits().catch((error) => {
@@ -172,6 +162,81 @@ export default function DfdsColetivasPage() {
     () => units.find((unit) => unitKey(unit) === draft.unitKey) || null,
     [draft.unitKey, units],
   );
+  const selectedUnitIsChefia = selectedUnit?.role_in_unit === "chefia";
+  const visibleRooms = useMemo(() => {
+    if (statusFilter === "propostas") {
+      return rooms.filter((room) => room.status === "proposta");
+    }
+    if (statusFilter === "abertas") {
+      return rooms.filter((room) => room.status === "aberta");
+    }
+    if (statusFilter === "consolidacao") {
+      return rooms.filter(
+        (room) =>
+          room.status === "em_consolidacao_chefia" ||
+          room.status === "pronta_para_conversao",
+      );
+    }
+    if (statusFilter === "finalizadas") {
+      return rooms.filter(
+        (room) => room.status === "convertida" || room.status === "arquivada",
+      );
+    }
+    return rooms.filter(
+      (room) =>
+        room.status === "aberta" ||
+        room.status === "em_consolidacao_chefia" ||
+        room.status === "pronta_para_conversao",
+    );
+  }, [rooms, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(visibleRooms.length / PAGE_SIZE));
+  const paginatedRooms = useMemo(
+    () => visibleRooms.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, visibleRooms],
+  );
+  const filterTabs = useMemo(
+    () => [
+      {
+        value: "operacionais",
+        label: "Operacionais",
+        count: rooms.filter(
+          (room) =>
+            room.status === "aberta" ||
+            room.status === "em_consolidacao_chefia" ||
+            room.status === "pronta_para_conversao",
+        ).length,
+      },
+      {
+        value: "propostas",
+        label: "Propostas",
+        count: rooms.filter((room) => room.status === "proposta").length,
+      },
+      {
+        value: "abertas",
+        label: "Abertas",
+        count: rooms.filter((room) => room.status === "aberta").length,
+      },
+      {
+        value: "consolidacao",
+        label: "Sob consolidação",
+        count: rooms.filter(
+          (room) =>
+            room.status === "em_consolidacao_chefia" ||
+            room.status === "pronta_para_conversao",
+        ).length,
+      },
+      {
+        value: "finalizadas",
+        label: "Finalizadas",
+        count: rooms.filter((room) => room.status === "convertida" || room.status === "arquivada").length,
+      },
+    ],
+    [rooms],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, search]);
 
   async function createRoom(event: FormEvent) {
     event.preventDefault();
@@ -195,7 +260,11 @@ export default function DfdsColetivasPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Erro ao criar sala.");
-      toast.success("DFD coletiva criada.");
+      toast.success(
+        selectedUnitIsChefia
+          ? "DFD coletiva aberta para o setor."
+          : "Proposta enviada para publicação da chefia.",
+      );
       setDraft({
         title: "",
         description: "",
@@ -212,7 +281,7 @@ export default function DfdsColetivasPage() {
 
   const totals = useMemo(
     () => ({
-      rooms: rooms.length,
+      rooms: rooms.filter((room) => room.status !== "convertida" && room.status !== "arquivada").length,
       participants: rooms.reduce(
         (acc, room) => acc + Number(room.summary?.participantCount || 0),
         0,
@@ -223,21 +292,23 @@ export default function DfdsColetivasPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] px-5 py-7 text-[#111827]">
+    <main className="min-h-screen bg-[var(--semantic-neutral-soft)] px-5 py-7 text-[#111827]">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-7">
-        <section className="rounded-lg border border-[#E2E8F0] bg-white p-7 shadow-[0_18px_55px_rgba(15,23,42,0.07)]">
+        <section className="ux-panel relative overflow-hidden rounded-[24px] p-7">
+          <div className="ux-accent-rule absolute inset-x-0 top-0 h-1" />
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-3xl font-semibold text-[#0F1F3D]">
+              <p className="ux-kicker">Coautoria do setor</p>
+              <h1 className="ux-title mt-1 text-3xl font-semibold">
                 DFDs coletivas para construir demandas em conjunto
               </h1>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-[#526070]">
-                Reuna contribuições do setor num fluxo mais claro: a equipe adiciona itens, a sala consolida a demanda
-                e a chefia transforma tudo em DFD oficial com menos ruído no caminho.
+              <p className="ux-muted mt-3 max-w-2xl text-base leading-7">
+                Pares contribuem. A chefia homologa. A sala vira uma ou mais DFDs oficiais com autoria preservada.
               </p>
-              <div className="mt-5 inline-flex w-fit items-center gap-2 rounded-full border border-[#D8E0EA] bg-[#FBFCFF] px-4 py-2 text-sm text-[#526070]">
-                <UsersThree size={16} className="text-[#0B4AA2]" weight="duotone" />
-                Uma sala coletiva organiza a conversa antes da formalização.
+              <div className="mt-5 flex flex-wrap gap-2">
+                <span className="ux-chip ux-chip-collab text-sm">Membro propõe</span>
+                <span className="ux-chip ux-chip-warning text-sm">Chefia publica e consolida</span>
+                <span className="ux-chip ux-chip-success text-sm">Autoria preservada</span>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -248,45 +319,30 @@ export default function DfdsColetivasPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          {COLLECTIVE_GUIDE.map((item) => (
-            <div
-              key={item.title}
-              className="rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF4FF] text-[#0B4AA2]">
-                {item.icon}
-              </div>
-              <h2 className="mt-4 text-base font-semibold text-[#0F1F3D]">{item.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#526070]">{item.description}</p>
-            </div>
-          ))}
-        </section>
-
         <section className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
           <form
             onSubmit={createRoom}
-            className="rounded-lg border border-[#E2E8F0] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]"
+            className="ux-panel rounded-[22px] p-6"
           >
             <div className="flex items-center gap-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[#0B4AA2] text-[#0B4AA2]">
+              <div className="ux-icon-collab flex h-11 w-11 items-center justify-center rounded-full border border-[var(--semantic-collab-border)]">
                 <Plus size={22} weight="bold" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-[#0F1F3D]">Abra uma DFD coletiva com contexto</h2>
                 <p className="text-sm text-[#667085]">
-                  Defina o tema, o setor e o recorte da sala antes de convidar contribuições.
+                  {selectedUnitIsChefia
+                    ? "Como chefia, você já pode abrir a sala para a unidade contribuir."
+                    : "Como membro, você propõe o rascunho e a chefia publica para o restante do setor."}
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 rounded-lg border border-[#DDE5EF] bg-[#FBFCFF] p-4">
-              <p className="text-sm font-semibold text-[#0B3473]">O que precisa ficar claro desde o início</p>
-              <ul className="mt-3 grid gap-2 text-sm leading-6 text-[#526070]">
-                <li>• qual problema ou necessidade a sala pretende reunir;</li>
-                <li>• qual unidade responde pela consolidação;</li>
-                <li>• que tipo de item deve ou não deve entrar.</li>
-              </ul>
+            <div className="mt-5 rounded-lg border border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-soft)] p-4">
+              <p className="text-sm font-semibold text-[#8A5A00]">Antes de abrir</p>
+              <p className="mt-2 text-sm leading-6 text-[#526070]">
+                Informe problema, unidade responsável e critério do que entra ou fica fora da sala.
+              </p>
             </div>
 
             <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-[#4B5563]">
@@ -297,7 +353,7 @@ export default function DfdsColetivasPage() {
                   setDraft((current) => ({ ...current, title: event.target.value }))
                 }
                 required
-                className="mt-2 w-full rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
+                className="mt-2 w-full rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[var(--semantic-collab)]"
                 placeholder="Ex.: Equipamentos para salas de aula"
               />
             </label>
@@ -309,7 +365,7 @@ export default function DfdsColetivasPage() {
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, unitKey: event.target.value }))
                 }
-                className="mt-2 w-full rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
+                className="mt-2 w-full rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[var(--semantic-collab)]"
               >
                 {units.map((unit) => (
                   <option key={unitKey(unit)} value={unitKey(unit)}>
@@ -331,7 +387,7 @@ export default function DfdsColetivasPage() {
                 }
                 rows={4}
                 maxLength={500}
-                className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
+                className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[var(--semantic-collab)]"
                 placeholder="Explique por que esta DFD coletiva foi aberta e qual contexto ela atende."
               />
             </label>
@@ -345,7 +401,7 @@ export default function DfdsColetivasPage() {
                 }
                 rows={4}
                 maxLength={500}
-                className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[#0B4AA2]"
+                className="mt-2 w-full resize-none rounded-md border border-[#CBD5E1] px-4 py-3 text-sm normal-case tracking-normal outline-none focus:border-[var(--semantic-collab)]"
                 placeholder="Descreva o que entra, o que fica fora e o critério usado para as contribuições."
               />
             </label>
@@ -353,19 +409,23 @@ export default function DfdsColetivasPage() {
             <button
               type="submit"
               disabled={creating || units.length === 0}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+              className="ux-btn-collab mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={16} weight="bold" />
-              {creating ? "Criando..." : "Criar DFD coletiva"}
+              {creating
+                ? "Criando..."
+                : selectedUnitIsChefia
+                  ? "Abrir DFD coletiva"
+                  : "Propor DFD coletiva"}
             </button>
           </form>
 
-          <section className="rounded-lg border border-[#E2E8F0] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <section className="ux-panel rounded-[22px] p-6">
+            <div className="flex flex-col gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-semibold text-[#0F1F3D]">Salas abertas e histórico recente</p>
+                <p className="text-lg font-semibold text-[#0F1F3D]">Salas por etapa</p>
                 <p className="mt-1 text-sm text-[#667085]">
-                  Acompanhe o que já está em andamento, retome revisões e veja onde sua equipe já contribuiu.
+                  Operacionais primeiro; finalizadas ficam em aba própria.
                 </p>
                 <div className="relative mt-4">
                   <MagnifyingGlass
@@ -375,28 +435,40 @@ export default function DfdsColetivasPage() {
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    className="w-full rounded-md border border-[#CBD5E1] py-3 pl-12 pr-4 text-sm outline-none focus:border-[#0B4AA2]"
+                    className="w-full rounded-md border border-[#CBD5E1] py-3 pl-12 pr-4 text-sm outline-none focus:border-[var(--semantic-collab)]"
                     placeholder="Buscar por tema, descrição ou escopo"
                   />
                 </div>
               </div>
-              <div className="relative">
-                <FunnelSimple
-                  size={18}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#0B4AA2]"
-                />
-                <select
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                  className="min-w-[190px] appearance-none rounded-md border border-[#CBD5E1] bg-white py-3 pl-10 pr-8 text-sm font-medium outline-none focus:border-[#0B4AA2]"
-                >
-                  <option value="ativas">Ativas e histórico</option>
-                  <option value="aberta">Abertas</option>
-                  <option value="em_revisao">Em revisão</option>
-                  <option value="convertida">Convertidas</option>
-                  <option value="arquivada">Arquivadas</option>
-                  <option value="todas">Todas</option>
-                </select>
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filtrar DFDs coletivas por etapa">
+                {filterTabs.map((tab) => {
+                  const active = statusFilter === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setStatusFilter(tab.value)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
+                        active
+                          ? "border-[var(--semantic-action)] bg-[var(--semantic-action)] text-white shadow-sm"
+                          : "border-[var(--semantic-neutral-border)] bg-white text-[#42526B] hover:border-[var(--semantic-collab)] hover:text-[var(--semantic-action)]",
+                      )}
+                    >
+                      {tab.label}
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs",
+                          active ? "bg-white/20 text-white" : "bg-[#EEF2F7] text-[#526070]",
+                        )}
+                      >
+                        {tab.count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -408,7 +480,7 @@ export default function DfdsColetivasPage() {
                     className="h-28 animate-pulse rounded-lg border border-[#E5E7EB] bg-[#F3F4F6]"
                   />
                 ))
-              ) : rooms.length === 0 ? (
+              ) : visibleRooms.length === 0 ? (
                 <div className="flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-10 text-center">
                   <img
                     src="/guidance/collective-empty-room.png"
@@ -427,13 +499,21 @@ export default function DfdsColetivasPage() {
                     className="mt-5 inline-flex items-center justify-center gap-2 rounded-md border border-[#0B4AA2] px-5 py-3 text-sm font-semibold text-[#0B4AA2]"
                   >
                     <Plus size={16} weight="bold" />
-                    Abrir nova DFD coletiva
+                    {selectedUnitIsChefia ? "Abrir nova DFD coletiva" : "Propor nova DFD coletiva"}
                   </button>
                 </div>
               ) : (
-                rooms.map((room) => <RoomCard key={room.id} room={room} />)
+                paginatedRooms.map((room) => <RoomCard key={room.id} room={room} />)
               )}
             </div>
+            {!loading && visibleRooms.length > 0 ? (
+              <RoomsPagination
+                page={page}
+                totalPages={totalPages}
+                count={visibleRooms.length}
+                onPageChange={setPage}
+              />
+            ) : null}
           </section>
         </section>
       </div>
@@ -456,8 +536,8 @@ function Metric({
   value: number;
 }) {
   return (
-    <div className="flex min-w-[160px] items-center gap-4 rounded-lg border border-[#D8E0EA] bg-[#FBFCFF] px-5 py-4">
-      <div className="text-[#0B4AA2]">{icon}</div>
+    <div className="flex min-w-[160px] items-center gap-4 rounded-2xl border border-[var(--semantic-neutral-border)] bg-white px-5 py-4 shadow-sm">
+      <div className="text-[var(--semantic-collab)]">{icon}</div>
       <div>
         <p className="text-xs font-semibold uppercase text-[#667085]">{label}</p>
         <p className="text-2xl font-semibold text-[#0F1F3D]">{value}</p>
@@ -469,17 +549,21 @@ function Metric({
 function RoomCard({ room }: { room: RoomListItem }) {
   const summary = room.summary;
   const stageHint =
-    room.status === "aberta"
+    room.status === "proposta"
+      ? "Rascunho visível apenas ao proponente e à chefia."
+      : room.status === "aberta"
       ? "Recebendo contribuições do setor."
-      : room.status === "em_revisao"
-        ? "Em conferência antes da conversão."
+      : room.status === "em_consolidacao_chefia"
+        ? "A chefia assumiu a consolidação e pode reescrever contribuições."
+        : room.status === "pronta_para_conversao"
+          ? "Prévia pronta para gerar uma ou mais DFDs oficiais."
         : room.status === "convertida"
           ? "Já gerou DFD oficial."
           : "Sala encerrada para novas contribuições.";
   return (
     <Link
       href={`/dfds-coletivas/${room.id}`}
-      className="group rounded-lg border border-[#E5E7EB] bg-white p-5 no-underline transition hover:border-[#0B4AA2] hover:bg-[#FBFCFF]"
+      className="group rounded-[18px] border border-[#E5E7EB] bg-white p-5 no-underline shadow-sm transition hover:border-[var(--semantic-collab)] hover:bg-[#FBFCFF]"
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
@@ -487,27 +571,29 @@ function RoomCard({ room }: { room: RoomListItem }) {
             <span
               className={cn(
                 "rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                room.status === "aberta" && "bg-[#E8F5E9] text-[#1B5E20]",
-                room.status === "em_revisao" && "bg-[#FFF7ED] text-[#9A3412]",
-                room.status === "convertida" && "bg-[#E8EDF2] text-[#164073]",
+                room.status === "proposta" && "ux-chip-insight",
+                room.status === "aberta" && "ux-chip-collab",
+                room.status === "em_consolidacao_chefia" && "ux-chip-warning",
+                room.status === "pronta_para_conversao" && "ux-chip-warning",
+                room.status === "convertida" && "ux-chip-success",
                 room.status === "arquivada" && "bg-[#F3F4F6] text-[#4B5563]",
               )}
             >
               {STATUS_LABELS[room.status]}
             </span>
             {summary?.userHasContributed && (
-              <span className="rounded-full bg-[#ECFDF5] px-2.5 py-1 text-[11px] font-semibold text-[#047857]">
+              <span className="ux-chip ux-chip-success px-2.5 py-1 text-[11px]">
                 Você contribuiu
               </span>
             )}
           </div>
-          <h3 className="mt-2 truncate text-base font-semibold text-[#0B3473]">
+          <h3 className="mt-2 truncate text-base font-semibold text-[var(--semantic-text)]">
             {room.title}
           </h3>
           <p className="mt-1 line-clamp-2 text-sm text-[#5B6472]">
             {room.description || room.scope || "DFD coletiva sem descrição."}
           </p>
-          <p className="mt-2 text-xs font-semibold text-[#0B4AA2]">{stageHint}</p>
+          <p className="mt-2 text-xs font-semibold text-[var(--semantic-collab)]">{stageHint}</p>
           <p className="mt-2 text-xs font-medium text-[#6B7280]">
             {room.unit_name} · Atualizada em{" "}
             {new Date(room.updated_at).toLocaleDateString("pt-BR")}
@@ -527,20 +613,61 @@ function RoomCard({ room }: { room: RoomListItem }) {
           />
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-end text-xs font-semibold uppercase tracking-wider text-[#0B4AA2]">
+      <div className="mt-3 flex items-center justify-end text-xs font-semibold uppercase tracking-wider text-[var(--semantic-collab)]">
         Entrar na sala <ArrowRight size={14} className="ml-1" weight="bold" />
       </div>
     </Link>
   );
 }
 
+function RoomsPagination({
+  page,
+  totalPages,
+  count,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  count: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-[var(--semantic-neutral-border)] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-[#667085]">
+        {count} salas · página {page} de {totalPages}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="ux-btn-secondary inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <CaretLeft size={14} weight="bold" />
+          Anterior
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          className="ux-btn-secondary inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Próxima
+          <CaretRight size={14} weight="bold" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MiniMetric({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-md bg-[#F3F6FA] px-2 py-2 text-center">
+    <div className="rounded-xl bg-[var(--semantic-neutral-soft)] px-2 py-2 text-center">
       <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6B7280]">
         {label}
       </p>
-      <p className="truncate text-xs font-semibold text-[#0B3473]">{value}</p>
+      <p className="truncate text-xs font-semibold text-[var(--semantic-text)]">{value}</p>
     </div>
   );
 }

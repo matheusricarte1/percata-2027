@@ -1,26 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { normalizeRole } from "@/lib/access";
-
-async function requireAdminOrSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  const role = normalizeRole(profile?.role, user.email);
-  if (role !== "admin" && role !== "superadmin") return null;
-
-  return { user, role };
-}
+import { withAuthorizedRole } from "@/lib/api-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 function readFullName(metadata: Record<string, any> | undefined): string | null {
   const fullName = String(metadata?.full_name || metadata?.name || "").trim();
@@ -47,14 +27,18 @@ function isMissingLegacyTableError(error: any): boolean {
   );
 }
 
-export async function POST() {
-  try {
-    const actor = await requireAdminOrSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
+export const POST = withAuthorizedRole(
+  ["admin", "superadmin"],
+  async ({ request, supabaseAdmin, user }) => {
+    // Sync varre todo auth.users + faz upsert + linka legacy. É caro: 2/min basta.
+    const limited = await enforceRateLimit(
+      request,
+      { bucket: "users-sync", limit: 2, windowSec: 60 },
+      user.id,
+    );
+    if (limited) return limited;
 
-    const admin = createSupabaseAdminClient();
+    const admin = supabaseAdmin!;
     const perPage = 200;
     let page = 1;
     let processed = 0;
@@ -136,10 +120,6 @@ export async function POST() {
       upserted,
       linkedLegacy,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao sincronizar contas de acesso." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

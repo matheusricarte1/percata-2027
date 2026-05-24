@@ -1,46 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
-import { isSuperadminEmail, normalizeRole } from "@/lib/access";
 import {
   buildCusteioKitDescription,
   UNIVERSITY_CUSTEIO_KIT_TEMPLATES,
 } from "@/lib/university-custeio-kits";
+import { withAuthorizedRole } from "@/lib/api-auth";
 
-async function requireSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id || !user.email) return null;
-
-  if (isSuperadminEmail(user.email)) return user;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (normalizeRole(profile?.role, user.email) !== "superadmin") return null;
-  return user;
-}
-
-export async function POST() {
-  try {
-    const actor = await requireSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
-    if (!hasSupabaseAdminCredentials()) {
-      return NextResponse.json(
-        { error: "Credenciais administrativas do Supabase não configuradas." },
-        { status: 503 },
-      );
-    }
-
-    const admin = createSupabaseAdminClient();
+export const POST = withAuthorizedRole(
+  ["superadmin"],
+  async ({ supabaseAdmin, user }) => {
+    const admin = supabaseAdmin!;
     const allCodes = Array.from(
       new Set(
         UNIVERSITY_CUSTEIO_KIT_TEMPLATES.flatMap((template) =>
@@ -62,14 +30,19 @@ export async function POST() {
       ]),
     );
 
-    const results = [];
+    const results: Array<{
+      slug: string;
+      kitId: string;
+      insertedItems: number;
+      unmatched: string[];
+    }> = [];
 
     for (const template of UNIVERSITY_CUSTEIO_KIT_TEMPLATES) {
       const kitPayload = {
         nome: template.nome,
         descricao: buildCusteioKitDescription(template),
         categoria: template.categoria,
-        created_by: actor.id,
+        created_by: user.id,
         is_active: true,
       };
 
@@ -91,7 +64,11 @@ export async function POST() {
         if (error) throw error;
         kit = data;
       } else {
-        const { data, error } = await admin.from("kits").insert(kitPayload).select("*").single();
+        const { data, error } = await admin
+          .from("kits")
+          .insert(kitPayload)
+          .select("*")
+          .single();
         if (error) throw error;
         kit = data;
       }
@@ -106,13 +83,22 @@ export async function POST() {
             quantidade: item.quantidade,
           };
         })
-        .filter(Boolean) as Array<{ kit_id: string; item_id: number | string; quantidade: number }>;
+        .filter(Boolean) as Array<{
+          kit_id: string;
+          item_id: number | string;
+          quantidade: number;
+        }>;
 
-      const { error: deleteItemsError } = await admin.from("kit_items").delete().eq("kit_id", kit.id);
+      const { error: deleteItemsError } = await admin
+        .from("kit_items")
+        .delete()
+        .eq("kit_id", kit.id);
       if (deleteItemsError) throw deleteItemsError;
 
       if (kitRows.length > 0) {
-        const { error: insertItemsError } = await admin.from("kit_items").insert(kitRows);
+        const { error: insertItemsError } = await admin
+          .from("kit_items")
+          .insert(kitRows);
         if (insertItemsError) throw insertItemsError;
       }
 
@@ -127,10 +113,6 @@ export async function POST() {
     }
 
     return NextResponse.json({ ok: true, results });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao montar kits de custeio." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog-search-learning";
 import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
 import { createClient } from "@/utils/supabase/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 function sanitizeText(value: unknown, maxLength: number) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -27,6 +28,15 @@ export async function POST(request: NextRequest) {
   if (userError || !user) {
     return NextResponse.json({ error: "Usuario nao autenticado." }, { status: 401 });
   }
+
+  // Telemetria de clique. 240/min permite uso intensivo (scroll + adicionar);
+  // bloqueia script enviando milhares para inflar métricas/poluir tabela.
+  const limited = await enforceRateLimit(
+    request,
+    { bucket: "catalog-click", limit: 240, windowSec: 60 },
+    user.id,
+  );
+  if (limited) return limited;
 
   if (!hasSupabaseAdminCredentials()) {
     return NextResponse.json({ ok: true, skipped: true });

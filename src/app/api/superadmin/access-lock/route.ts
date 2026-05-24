@@ -1,39 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { normalizeRole } from "@/lib/access";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { NextResponse } from "next/server";
 import { sanitizePlainText } from "@/lib/settings-sanitize";
 import {
   ACCESS_LOCK_KEY,
   normalizeAccessLock,
 } from "@/lib/system-access";
+import { withAuthorizedRole } from "@/lib/api-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-async function requireSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id || !user.email) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = normalizeRole(profile?.role, user.email);
-  if (role !== "superadmin") return null;
-  return user;
-}
-
-export async function GET() {
-  try {
-    const actor = await requireSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
-    const admin = createSupabaseAdminClient();
+export const GET = withAuthorizedRole(
+  ["superadmin"],
+  async ({ supabaseAdmin }) => {
+    const admin = supabaseAdmin!;
     const { data, error } = await admin
       .from("app_system_settings")
       .select("value,updated_at")
@@ -47,33 +24,35 @@ export async function GET() {
       value: normalizeAccessLock(data?.value),
       updated_at: data?.updated_at || null,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao carregar bloqueio global." },
-      { status: 500 },
+  },
+  { requireAdminClient: true },
+);
+
+export const POST = withAuthorizedRole(
+  ["superadmin"],
+  async ({ request, supabaseAdmin, user }) => {
+    // Bloqueio global é evento de alto impacto — 6/min é mais que suficiente
+    // para reverter um lock acidental, e barra script malicioso fechando
+    // o sistema em loop.
+    const limited = await enforceRateLimit(
+      request,
+      { bucket: "access-lock", limit: 6, windowSec: 60 },
+      user.id,
     );
-  }
-}
+    if (limited) return limited;
 
-export async function POST(request: NextRequest) {
-  try {
-    const actor = await requireSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
-
+    const admin = supabaseAdmin!;
     const payload = await request.json().catch(() => ({}));
     const lock = normalizeAccessLock({
       enabled: payload?.enabled === true,
       message: sanitizePlainText(payload?.message, 240),
     });
 
-    const admin = createSupabaseAdminClient();
     const { error } = await admin.from("app_system_settings").upsert(
       {
         key: ACCESS_LOCK_KEY,
         value: lock,
-        updated_by: actor.id,
+        updated_by: user.id,
       },
       { onConflict: "key" },
     );
@@ -81,10 +60,6 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ key: ACCESS_LOCK_KEY, value: lock });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao atualizar bloqueio global." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

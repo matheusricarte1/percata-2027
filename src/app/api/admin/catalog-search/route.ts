@@ -1,7 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { normalizeRole } from "@/lib/access";
+import { NextResponse } from "next/server";
 import {
   buildCatalogSearchActionQueues,
   buildCatalogSearchInsights,
@@ -10,23 +7,7 @@ import {
   type CatalogSearchLogRow,
   type CatalogSearchOverrideRow,
 } from "@/lib/catalog-search-admin";
-
-async function requireAdminOrSuperadmin() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  const role = normalizeRole(profile?.role, user.email);
-  if (role !== "admin" && role !== "superadmin") return null;
-  return { user, role };
-}
+import { withAuthorizedRole } from "@/lib/api-auth";
 
 function parseLimit(value: string | null, fallback: number, max: number) {
   const parsed = Number(value);
@@ -34,37 +15,53 @@ function parseLimit(value: string | null, fallback: number, max: number) {
   return Math.max(1, Math.min(max, Math.floor(parsed)));
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const actor = await requireAdminOrSuperadmin();
-    if (!actor) {
-      return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
-    }
+export const GET = withAuthorizedRole(
+  ["admin", "superadmin"],
+  async ({ request, supabaseAdmin }) => {
+    const admin = supabaseAdmin!;
+    const logsLimit = parseLimit(
+      request.nextUrl.searchParams.get("logs"),
+      250,
+      1000,
+    );
+    const clicksLimit = parseLimit(
+      request.nextUrl.searchParams.get("clicks"),
+      250,
+      1000,
+    );
+    const overridesLimit = parseLimit(
+      request.nextUrl.searchParams.get("overrides"),
+      100,
+      500,
+    );
 
-    const logsLimit = parseLimit(request.nextUrl.searchParams.get("logs"), 250, 1000);
-    const clicksLimit = parseLimit(request.nextUrl.searchParams.get("clicks"), 250, 1000);
-    const overridesLimit = parseLimit(request.nextUrl.searchParams.get("overrides"), 100, 500);
-
-    const admin = createSupabaseAdminClient();
-
-    const [{ data: logs, error: logsError }, { data: clicks, error: clicksError }, { data: overrides, error: overridesError }] =
-      await Promise.all([
-        admin
-          .from("catalog_search_logs")
-          .select("id,query_text,query_norm,category,context,source,result_count,top_catalog_id,top_codigo_efisco,created_at")
-          .order("created_at", { ascending: false })
-          .limit(logsLimit),
-        admin
-          .from("catalog_search_clicks")
-          .select("id,action_type,query_text,query_norm,category,context,source,result_position,catalog_id,codigo_efisco,item_descricao,created_at")
-          .order("created_at", { ascending: false })
-          .limit(clicksLimit),
-        admin
-          .from("catalog_search_overrides")
-          .select("id,query_norm,match_mode,override_type,catalog_id,codigo_efisco,weight,notes,is_active,created_at,updated_at")
-          .order("updated_at", { ascending: false })
-          .limit(overridesLimit),
-      ]);
+    const [
+      { data: logs, error: logsError },
+      { data: clicks, error: clicksError },
+      { data: overrides, error: overridesError },
+    ] = await Promise.all([
+      admin
+        .from("catalog_search_logs")
+        .select(
+          "id,query_text,query_norm,category,context,source,result_count,top_catalog_id,top_codigo_efisco,created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(logsLimit),
+      admin
+        .from("catalog_search_clicks")
+        .select(
+          "id,action_type,query_text,query_norm,category,context,source,result_position,catalog_id,codigo_efisco,item_descricao,created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(clicksLimit),
+      admin
+        .from("catalog_search_overrides")
+        .select(
+          "id,query_norm,match_mode,override_type,catalog_id,codigo_efisco,weight,notes,is_active,created_at,updated_at",
+        )
+        .order("updated_at", { ascending: false })
+        .limit(overridesLimit),
+    ]);
 
     if (logsError) throw logsError;
     if (clicksError) throw clicksError;
@@ -82,10 +79,6 @@ export async function GET(request: NextRequest) {
       recentClicks: typedClicks.slice(0, 80),
       overrides: typedOverrides,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || "Falha ao carregar inteligencia da busca." },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requireAdminClient: true },
+);

@@ -10,6 +10,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* 2.1 Tokens canônicos PERCATA (fonte única; substitui md-/upe- gradualmente).
+   Importado antes do bloco @theme para que tokens shadcn possam referenciar
+   --p-color-* quando refatorados. Ver theme/tokens.css. */
+@import "../theme/tokens.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -168,6 +173,34 @@
   --ds-color-30: var(--upe-support-blue-bluish-mist);
   --ds-color-10: var(--upe-blue-upe);
   --ds-color-alert: var(--upe-red-dark);
+
+  /* --- Semantic UX Tokens ---
+     Keep UPE blue as institutional action, but give each product concept
+     a stable color role so screens do not read as a single blue layer. */
+  --semantic-action: #164073;
+  --semantic-action-strong: #0f2e57;
+  --semantic-action-soft: #eaf2ff;
+  --semantic-action-border: #c7d7ea;
+  --semantic-collab: #1f6f78;
+  --semantic-collab-strong: #155a62;
+  --semantic-collab-soft: #e6f5f4;
+  --semantic-collab-border: #b8dddd;
+  --semantic-success: #5f735c;
+  --semantic-success-soft: #e7f0ea;
+  --semantic-success-border: #cfe3d5;
+  --semantic-warning: #b88a2f;
+  --semantic-warning-soft: #fff6df;
+  --semantic-warning-border: #efd49a;
+  --semantic-danger: #c14953;
+  --semantic-danger-soft: #fff0f2;
+  --semantic-danger-border: #f1c7cc;
+  --semantic-insight: #7a5fb4;
+  --semantic-insight-soft: #f3efff;
+  --semantic-insight-border: #d9cdf7;
+  --semantic-neutral-soft: #f7f9fc;
+  --semantic-neutral-border: #d9e0e8;
+  --semantic-text: #17233c;
+  --semantic-text-muted: #5b6675;
 
   /* --- 4px Spatial Grid Tokens --- */
   --ds-space-1: 4px;
@@ -336,6 +369,163 @@ html[data-route-pending="1"] {
   h3,
   .font-display {
     font-family: "Outfit", sans-serif;
+  }
+
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--semantic-action) 28%, transparent);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .ux-panel {
+    border: 1px solid var(--semantic-neutral-border);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 14px 34px rgba(22, 64, 115, 0.07);
+  }
+
+  .ux-panel-soft {
+    border: 1px solid var(--semantic-neutral-border);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 249, 252, 0.96) 100%);
+    box-shadow: 0 10px 26px rgba(22, 64, 115, 0.06);
+  }
+
+  .ux-kicker {
+    color: var(--semantic-text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .ux-title {
+    color: var(--semantic-text);
+    letter-spacing: -0.015em;
+  }
+
+  .ux-muted {
+    color: var(--semantic-text-muted);
+  }
+
+  .ux-btn-primary {
+    background: var(--semantic-action);
+    color: #fff;
+  }
+
+  .ux-btn-primary:hover {
+    background: var(--semantic-action-strong);
+  }
+
+  .ux-btn-collab {
+    background: var(--semantic-collab);
+    color: #fff;
+  }
+
+  .ux-btn-collab:hover {
+    background: var(--semantic-collab-strong);
+  }
+
+  .ux-btn-secondary {
+    border: 1px solid var(--semantic-action-border);
+    background: #fff;
+    color: var(--semantic-action);
+  }
+
+  .ux-btn-secondary:hover {
+    background: var(--semantic-action-soft);
+  }
+
+  .ux-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 0.25rem 0.75rem;
+    font-weight: 700;
+  }
+
+  .ux-chip-action {
+    border-color: var(--semantic-action-border);
+    background: var(--semantic-action-soft);
+    color: var(--semantic-action);
+  }
+
+  .ux-chip-collab {
+    border-color: var(--semantic-collab-border);
+    background: var(--semantic-collab-soft);
+    color: var(--semantic-collab);
+  }
+
+  .ux-chip-success {
+    border-color: var(--semantic-success-border);
+    background: var(--semantic-success-soft);
+    color: var(--semantic-success);
+  }
+
+  .ux-chip-warning {
+    border-color: var(--semantic-warning-border);
+    background: var(--semantic-warning-soft);
+    color: #8a5a00;
+  }
+
+  .ux-chip-danger {
+    border-color: var(--semantic-danger-border);
+    background: var(--semantic-danger-soft);
+    color: var(--semantic-danger);
+  }
+
+  .ux-chip-insight {
+    border-color: var(--semantic-insight-border);
+    background: var(--semantic-insight-soft);
+    color: var(--semantic-insight);
+  }
+
+  .ux-icon-action,
+  .ux-icon-collab,
+  .ux-icon-success,
+  .ux-icon-warning,
+  .ux-icon-danger,
+  .ux-icon-insight {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+  }
+
+  .ux-icon-action {
+    background: var(--semantic-action-soft);
+    color: var(--semantic-action);
+  }
+
+  .ux-icon-collab {
+    background: var(--semantic-collab-soft);
+    color: var(--semantic-collab);
+  }
+
+  .ux-icon-success {
+    background: var(--semantic-success-soft);
+    color: var(--semantic-success);
+  }
+
+  .ux-icon-warning {
+    background: var(--semantic-warning-soft);
+    color: var(--semantic-warning);
+  }
+
+  .ux-icon-danger {
+    background: var(--semantic-danger-soft);
+    color: var(--semantic-danger);
+  }
+
+  .ux-icon-insight {
+    background: var(--semantic-insight-soft);
+    color: var(--semantic-insight);
+  }
+
+  .ux-accent-rule {
+    background: linear-gradient(90deg, var(--semantic-action), var(--semantic-collab), var(--semantic-warning), var(--semantic-danger));
   }
 
   /* Design system text utilities (4px scale) */
