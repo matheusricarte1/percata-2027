@@ -480,6 +480,36 @@ export default function ConsolidationPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const chunkArray = <T,>(values: T[], chunkSize = 150): T[][] => {
+        if (values.length === 0) return [];
+        const safeChunkSize = Math.max(1, chunkSize);
+        const chunks: T[][] = [];
+        for (let i = 0; i < values.length; i += safeChunkSize) {
+          chunks.push(values.slice(i, i + safeChunkSize));
+        }
+        return chunks;
+      };
+
+      const fetchByInChunks = async (
+        table: string,
+        selectColumns: string,
+        inColumn: string,
+        ids: string[],
+        chunkSize = 150,
+      ): Promise<any[]> => {
+        if (ids.length === 0) return [];
+        const rows: any[] = [];
+        for (const idChunk of chunkArray(ids, chunkSize)) {
+          const { data, error } = await supabase
+            .from(table)
+            .select(selectColumns)
+            .in(inColumn, idChunk);
+          if (error) throw error;
+          rows.push(...((data || []) as any[]));
+        }
+        return rows;
+      };
+
       let dfdsRes: any = await supabase
         .from("dfds")
         .select("*")
@@ -543,47 +573,45 @@ export default function ConsolidationPage() {
       );
 
       const [campiRes, profilesRes, departamentosRes, laboratoriosRes] = await Promise.all([
-        campusIds.length > 0
-          ? supabase.from("campi").select("id, nome, sigla").in("id", campusIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        solicitanteIds.length > 0
-          ? supabase
-              .from("profiles")
-              .select("id, full_name, email, avatar_url")
-              .in("id", solicitanteIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        departamentoIds.length > 0
-          ? supabase.from("departamentos").select("id, nome").in("id", departamentoIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        laboratorioIds.length > 0
-          ? supabase.from("laboratorios").select("id, nome").in("id", laboratorioIds)
-          : Promise.resolve({ data: [], error: null } as any),
+        fetchByInChunks("campi", "id, nome, sigla", "id", campusIds),
+        fetchByInChunks("profiles", "id, full_name, email, avatar_url", "id", solicitanteIds),
+        fetchByInChunks("departamentos", "id, nome", "id", departamentoIds),
+        fetchByInChunks("laboratorios", "id, nome", "id", laboratorioIds),
       ]);
 
-      if (campiRes.error) throw campiRes.error;
-      if (profilesRes.error) throw profilesRes.error;
-      if (departamentosRes.error) throw departamentosRes.error;
-      if (laboratoriosRes.error) throw laboratoriosRes.error;
+      const campiData = campiRes as any[];
+      const profilesData = profilesRes as any[];
+      const departamentosData = departamentosRes as any[];
+      const laboratoriosData = laboratoriosRes as any[];
 
-      let itemsRes: any = await supabase
-        .from("dfd_items")
-        .select("*")
-        .in("dfd_id", dfdIds);
+      const itemsRowsData: any[] = [];
+      const legacyItemsSelect =
+        "id, dfd_id, codigo_tce, codigo_item_efisco, descricao, quantidade, valor_unitario_estimado, is_highlight_item, gnd, link_referencia, justificativa_item, justificativa_quantidade";
 
-      if (
-        itemsRes.error &&
-        /criticidade|moscow_categoria|local_uso/i.test(String(itemsRes.error.message || ""))
-      ) {
-        itemsRes = await supabase
+      for (const dfdChunk of chunkArray(dfdIds, 120)) {
+        const primaryRes: any = await supabase
           .from("dfd_items")
-          .select(
-            "id, dfd_id, codigo_tce, codigo_item_efisco, descricao, quantidade, valor_unitario_estimado, is_highlight_item, gnd, link_referencia, justificativa_item, justificativa_quantidade",
-          )
-          .in("dfd_id", dfdIds);
-      }
-      if (itemsRes.error) throw itemsRes.error;
+          .select("*")
+          .in("dfd_id", dfdChunk);
 
-      const itemsRows = ((itemsRes.data || []) as any[])
+        if (
+          primaryRes.error &&
+          /criticidade|moscow_categoria|local_uso/i.test(String(primaryRes.error.message || ""))
+        ) {
+          const fallbackRes: any = await supabase
+            .from("dfd_items")
+            .select(legacyItemsSelect)
+            .in("dfd_id", dfdChunk);
+          if (fallbackRes.error) throw fallbackRes.error;
+          itemsRowsData.push(...((fallbackRes.data || []) as any[]));
+          continue;
+        }
+
+        if (primaryRes.error) throw primaryRes.error;
+        itemsRowsData.push(...((primaryRes.data || []) as any[]));
+      }
+
+      const itemsRows = itemsRowsData
         .map(
           (row) => {
             const itemCode = resolveConsolidationItemCode(row);
@@ -616,7 +644,7 @@ export default function ConsolidationPage() {
         .filter((row) => row.dfd_id && row.item_key);
 
       const campusMap = new Map(
-        ((campiRes.data || []) as any[]).map((campus) => [
+        campiData.map((campus) => [
           campus.id,
           String(campus.sigla || campus.nome || "N/D"),
         ]),
@@ -629,7 +657,7 @@ export default function ConsolidationPage() {
           avatarUrl: string | null;
         }
       >(
-        ((profilesRes.data || []) as any[]).map((profile) => [
+        profilesData.map((profile) => [
           profile.id,
           {
             nome: String(profile.full_name || profile.email || "Usuário"),
@@ -639,13 +667,13 @@ export default function ConsolidationPage() {
         ]),
       );
       const departamentoMap = new Map(
-        ((departamentosRes.data || []) as any[]).map((row) => [
+        departamentosData.map((row) => [
           String(row.id),
           String(row.nome || "").trim(),
         ]),
       );
       const laboratorioMap = new Map(
-        ((laboratoriosRes.data || []) as any[]).map((row) => [
+        laboratoriosData.map((row) => [
           String(row.id),
           String(row.nome || "").trim(),
         ]),
