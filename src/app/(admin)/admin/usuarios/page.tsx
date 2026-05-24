@@ -24,9 +24,14 @@ interface UserRow {
   profile_id: string | null;
   full_name: string;
   email: string;
+  avatar_url: string | null;
   role: RowRole;
   campus_nome: string | null;
   campus_sigla: string | null;
+  departamento_id: string | null;
+  laboratorio_id: string | null;
+  departamento_nome: string | null;
+  laboratorio_nome: string | null;
   source: "perfil" | "legado" | "auth";
   last_sign_in_at: string | null;
   created_at: string | null;
@@ -37,6 +42,19 @@ interface CampusOption {
   id: string;
   nome: string;
   sigla: string;
+}
+
+interface UnitOption {
+  id: string;
+  nome: string;
+  campus_id: string | null;
+}
+
+interface UserUnitMembership {
+  user_id: string | null;
+  unit_type: "departamento" | "laboratorio" | string | null;
+  unit_id: string | null;
+  role_in_unit: string | null;
 }
 
 interface AdminAuditRow {
@@ -98,9 +116,15 @@ export default function AdminUsuarios() {
   const [currentUserRole, setCurrentUserRole] =
     useState<UserRole>("solicitante");
   const [campi, setCampi] = useState<CampusOption[]>([]);
+  const [departamentos, setDepartamentos] = useState<UnitOption[]>([]);
+  const [laboratorios, setLaboratorios] = useState<UnitOption[]>([]);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingCampusId, setEditingCampusId] = useState<string>("__none__");
+  const [editingDepartamentoId, setEditingDepartamentoId] =
+    useState<string>("__none__");
+  const [editingLaboratorioId, setEditingLaboratorioId] =
+    useState<string>("__none__");
   const [actionUser, setActionUser] = useState<UserRow | null>(null);
   const [savingAction, setSavingAction] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -137,7 +161,15 @@ export default function AdminUsuarios() {
         setCurrentUserRole(normalizeRole(profile?.role, authUser.email));
       }
 
-      const [profilesResult, legacyResult, campiResult, authUsersResponse] =
+      const [
+        profilesResult,
+        legacyResult,
+        campiResult,
+        departamentosResult,
+        laboratoriosResult,
+        userUnitsResult,
+        authUsersResponse,
+      ] =
         await Promise.all([
         supabase
           .from("profiles")
@@ -146,6 +178,7 @@ export default function AdminUsuarios() {
             id,
             full_name,
             email,
+            avatar_url,
             role,
             campi:campus_id (nome, sigla)
           `,
@@ -160,12 +193,28 @@ export default function AdminUsuarios() {
           .select("id,nome,sigla")
           .eq("ativo", true)
           .order("nome"),
+        supabase
+          .from("departamentos")
+          .select("id,nome,campus_id")
+          .order("nome"),
+        supabase
+          .from("laboratorios")
+          .select("id,nome,campus_id")
+          .order("nome"),
+        supabase
+          .from("user_units")
+          .select("user_id,unit_type,unit_id,role_in_unit")
+          .in("unit_type", ["departamento", "laboratorio"])
+          .or("role_in_unit.eq.membro,role_in_unit.is.null"),
         fetch("/api/admin/users/auth-users?limit=3000"),
       ]);
 
       if (profilesResult.error) throw profilesResult.error;
       if (legacyResult.error) throw legacyResult.error;
       if (campiResult.error) throw campiResult.error;
+      if (departamentosResult.error) throw departamentosResult.error;
+      if (laboratoriosResult.error) throw laboratoriosResult.error;
+      if (userUnitsResult.error) throw userUnitsResult.error;
       if (!authUsersResponse.ok) {
         const payload = await authUsersResponse.json().catch(() => ({}));
         throw new Error(
@@ -173,6 +222,32 @@ export default function AdminUsuarios() {
         );
       }
       setCampi((campiResult.data || []) as CampusOption[]);
+      const departamentoRows = (departamentosResult.data || []) as UnitOption[];
+      const laboratorioRows = (laboratoriosResult.data || []) as UnitOption[];
+      setDepartamentos(departamentoRows);
+      setLaboratorios(laboratorioRows);
+      const deptById = new Map(departamentoRows.map((row) => [row.id, row]));
+      const labById = new Map(laboratorioRows.map((row) => [row.id, row]));
+      const unitByUserId = new Map<
+        string,
+        { departamento_id: string | null; laboratorio_id: string | null }
+      >();
+      ((userUnitsResult.data || []) as UserUnitMembership[]).forEach((unit) => {
+        const userId = String(unit.user_id || "");
+        const unitId = String(unit.unit_id || "");
+        if (!userId || !unitId) return;
+        const current = unitByUserId.get(userId) || {
+          departamento_id: null,
+          laboratorio_id: null,
+        };
+        if (unit.unit_type === "departamento" && !current.departamento_id) {
+          current.departamento_id = unitId;
+        }
+        if (unit.unit_type === "laboratorio" && !current.laboratorio_id) {
+          current.laboratorio_id = unitId;
+        }
+        unitByUserId.set(userId, current);
+      });
 
       const authPayload = (await authUsersResponse.json()) as {
         data?: AuthUserSnapshot[];
@@ -195,14 +270,28 @@ export default function AdminUsuarios() {
       const profileRows: UserRow[] = (profilesResult.data || [])
         .filter((profile: any) => Boolean(profile.email))
         .map((profile: any) => ({
+          ...(unitByUserId.get(String(profile.id)) || {
+            departamento_id: null,
+            laboratorio_id: null,
+          }),
           id: profile.id,
           auth_user_id: profile.id,
           profile_id: profile.id,
           full_name: profile.full_name || "Usuário sem nome",
           email: String(profile.email).toLowerCase(),
+          avatar_url:
+            profile.avatar_url ||
+            authByEmail.get(String(profile.email).toLowerCase())?.avatar_url ||
+            null,
           role: normalizeRole(profile.role, profile.email),
           campus_nome: profile.campi?.nome || null,
           campus_sigla: profile.campi?.sigla || null,
+          departamento_nome: (unitByUserId.get(String(profile.id))?.departamento_id
+            ? deptById.get(String(unitByUserId.get(String(profile.id))?.departamento_id || ""))?.nome
+            : null) || null,
+          laboratorio_nome: (unitByUserId.get(String(profile.id))?.laboratorio_id
+            ? labById.get(String(unitByUserId.get(String(profile.id))?.laboratorio_id || ""))?.nome
+            : null) || null,
           source: "perfil",
           last_sign_in_at:
             authByEmail.get(String(profile.email).toLowerCase())?.last_sign_in_at ||
@@ -238,9 +327,14 @@ export default function AdminUsuarios() {
               legacy.server_name ||
               "Usuário ativo importado",
             email: normalizedEmail,
+            avatar_url: authUser?.avatar_url || null,
             role: authUser ? "pendente" : "legado",
             campus_nome: null,
             campus_sigla: null,
+            departamento_id: null,
+            laboratorio_id: null,
+            departamento_nome: null,
+            laboratorio_nome: null,
             source: authUser ? "auth" : "legado",
             last_sign_in_at: authUser?.last_sign_in_at || null,
             created_at: authUser?.created_at || null,
@@ -262,9 +356,14 @@ export default function AdminUsuarios() {
                 .trim() ||
               "Conta autenticada",
             email: String(authUser.email).toLowerCase(),
+            avatar_url: authUser.avatar_url || null,
             role: "pendente",
             campus_nome: null,
             campus_sigla: null,
+            departamento_id: null,
+            laboratorio_id: null,
+            departamento_nome: null,
+            laboratorio_nome: null,
             source: "auth",
             last_sign_in_at: authUser.last_sign_in_at,
             created_at: authUser.created_at,
@@ -408,18 +507,6 @@ export default function AdminUsuarios() {
   };
 
   const openEditPanel = (user: UserRow) => {
-    if (!user.profile_id) {
-      if (user.source === "auth") {
-        toast.info(
-          "Conta autenticada ainda sem perfil local. Use 'Sincronizar acessos'.",
-        );
-      } else {
-        toast.info(
-          "Usuário importado sem perfil local. Sincronize os acessos primeiro.",
-        );
-      }
-      return;
-    }
     setActionUser(null);
     setEditingUser(user);
     setEditingName(user.full_name || "");
@@ -429,6 +516,8 @@ export default function AdminUsuarios() {
         (user.campus_sigla && entry.sigla === user.campus_sigla),
     );
     setEditingCampusId(campus?.id || "__none__");
+    setEditingDepartamentoId(user.departamento_id || "__none__");
+    setEditingLaboratorioId(user.laboratorio_id || "__none__");
   };
 
   const saveUserConfig = async () => {
@@ -443,6 +532,10 @@ export default function AdminUsuarios() {
           profile_id: editingUser.profile_id,
           full_name: sanitizePlainText(editingName, 160) || null,
           campus_id: editingCampusId === "__none__" ? null : editingCampusId,
+          departamento_id:
+            editingDepartamentoId === "__none__" ? null : editingDepartamentoId,
+          laboratorio_id:
+            editingLaboratorioId === "__none__" ? null : editingLaboratorioId,
         }),
       });
       const payload = await response.json();
@@ -614,6 +707,44 @@ export default function AdminUsuarios() {
       return matchesSearch && matchesRole;
     });
   }, [usuarios, search, filterRole]);
+
+  const filteredDepartamentos = useMemo(() => {
+    if (editingCampusId === "__none__") return [] as UnitOption[];
+    return departamentos.filter(
+      (item) => String(item.campus_id || "") === String(editingCampusId),
+    );
+  }, [departamentos, editingCampusId]);
+
+  const filteredLaboratorios = useMemo(() => {
+    if (editingCampusId === "__none__") return [] as UnitOption[];
+    return laboratorios.filter(
+      (item) => String(item.campus_id || "") === String(editingCampusId),
+    );
+  }, [laboratorios, editingCampusId]);
+
+  useEffect(() => {
+    if (editingCampusId === "__none__") {
+      setEditingDepartamentoId("__none__");
+      setEditingLaboratorioId("__none__");
+      return;
+    }
+
+    const deptStillValid = filteredDepartamentos.some(
+      (item) => item.id === editingDepartamentoId,
+    );
+    if (!deptStillValid) setEditingDepartamentoId("__none__");
+
+    const labStillValid = filteredLaboratorios.some(
+      (item) => item.id === editingLaboratorioId,
+    );
+    if (!labStillValid) setEditingLaboratorioId("__none__");
+  }, [
+    editingCampusId,
+    editingDepartamentoId,
+    editingLaboratorioId,
+    filteredDepartamentos,
+    filteredLaboratorios,
+  ]);
 
   return (
     <div className="p-8 bg-[#F3F2F1] min-h-screen space-y-8">
@@ -820,9 +951,12 @@ export default function AdminUsuarios() {
                     >
                       <td className="p-8">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-upe-accent-washed-blue/25 text-[#164073] rounded-2xl flex items-center justify-center font-semibold text-xs shadow-sm border border-upe-accent-washed-blue/70 group-hover:scale-110 transition-transform">
-                            {user.full_name?.charAt(0) || "?"}
-                          </div>
+                          <UserAvatar
+                            name={user.full_name}
+                            avatarUrl={user.avatar_url}
+                            sizeClassName="h-12 w-12 group-hover:scale-110 transition-transform"
+                            textClassName="text-xs"
+                          />
                           <div>
                             <div className="font-semibold text-[#323130] uppercase tracking-tight">
                               {user.full_name}
@@ -858,6 +992,12 @@ export default function AdminUsuarios() {
                         </div>
                         <div className="text-[9px] uppercase font-semibold text-black/20 tracking-tighter">
                           SIGLA: {user.campus_sigla || "N/A"}
+                        </div>
+                        <div className="mt-1 text-[10px] text-[#5B6675]">
+                          Setor: {user.departamento_nome || "não vinculado"}
+                        </div>
+                        <div className="text-[10px] text-[#5B6675]">
+                          Laboratório: {user.laboratorio_nome || "não vinculado"}
                         </div>
                       </td>
                       <td className="p-8">
@@ -1181,9 +1321,71 @@ export default function AdminUsuarios() {
         <div className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-[28px] border border-black/10 bg-white p-6 shadow-2xl">
             <h3 className="font-display text-2xl font-semibold text-[#164073] uppercase tracking-tight">
-              Configurar Usuário
+              Perfil Completo do Usuário
             </h3>
             <p className="mt-1 text-xs text-black/45">{editingUser.email}</p>
+
+            <div className="mt-4 rounded-2xl border border-black/10 bg-[#F8FAFC] p-4">
+              <div className="flex items-center gap-3">
+                <UserAvatar
+                  name={editingUser.full_name}
+                  avatarUrl={editingUser.avatar_url}
+                  sizeClassName="h-14 w-14"
+                  textClassName="text-sm"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#323130]">
+                    {editingUser.full_name}
+                  </p>
+                  <p className="truncate text-xs text-[#5B6675]">{editingUser.email}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#164073] ring-1 ring-black/10">
+                      {editingUser.role}
+                    </span>
+                    <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#5B6675] ring-1 ring-black/10">
+                      {editingUser.source === "perfil"
+                        ? "Perfil ativo"
+                        : editingUser.source === "auth"
+                          ? "Conta autenticada"
+                          : "Cadastro importado"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] text-[#5B6675] md:grid-cols-2">
+                <p>
+                  <b>Último acesso:</b>{" "}
+                  {editingUser.last_sign_in_at
+                    ? new Date(editingUser.last_sign_in_at).toLocaleString("pt-BR")
+                    : "não registrado"}
+                </p>
+                <p>
+                  <b>Criado em:</b>{" "}
+                  {editingUser.created_at
+                    ? new Date(editingUser.created_at).toLocaleString("pt-BR")
+                    : "não informado"}
+                </p>
+                <p>
+                  <b>Provedor:</b> {editingUser.auth_provider || "não informado"}
+                </p>
+                <p>
+                  <b>ID perfil:</b> {editingUser.profile_id || "não vinculado"}
+                </p>
+                <p>
+                  <b>Setor atual:</b> {editingUser.departamento_nome || "não vinculado"}
+                </p>
+                <p>
+                  <b>Laboratório atual:</b> {editingUser.laboratorio_nome || "não vinculado"}
+                </p>
+              </div>
+            </div>
+
+            {!editingUser.profile_id && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                Este usuário ainda não tem perfil local editável. Use
+                &nbsp;<b>Sincronizar acessos</b> para criar/vincular o perfil.
+              </div>
+            )}
 
             <div className="mt-5 grid gap-3">
               <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
@@ -1192,6 +1394,7 @@ export default function AdminUsuarios() {
               <input
                 value={editingName}
                 onChange={(event) => setEditingName(event.target.value)}
+                disabled={!editingUser.profile_id}
                 className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
               />
 
@@ -1201,12 +1404,47 @@ export default function AdminUsuarios() {
               <select
                 value={editingCampusId}
                 onChange={(event) => setEditingCampusId(event.target.value)}
+                disabled={!editingUser.profile_id}
                 className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
               >
                 <option value="__none__">Sem vínculo de campus</option>
                 {campi.map((campus) => (
                   <option key={campus.id} value={campus.id}>
                     {campus.nome} ({campus.sigla})
+                  </option>
+                ))}
+              </select>
+
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                Setor (departamento)
+              </label>
+              <select
+                value={editingDepartamentoId}
+                onChange={(event) => setEditingDepartamentoId(event.target.value)}
+                disabled={!editingUser.profile_id || editingCampusId === "__none__"}
+                className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
+              >
+                <option value="__none__">Sem setor vinculado</option>
+                {filteredDepartamentos.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.nome}
+                  </option>
+                ))}
+              </select>
+
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                Laboratório
+              </label>
+              <select
+                value={editingLaboratorioId}
+                onChange={(event) => setEditingLaboratorioId(event.target.value)}
+                disabled={!editingUser.profile_id || editingCampusId === "__none__"}
+                className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
+              >
+                <option value="__none__">Sem laboratório vinculado</option>
+                {filteredLaboratorios.map((lab) => (
+                  <option key={lab.id} value={lab.id}>
+                    {lab.nome}
                   </option>
                 ))}
               </select>
@@ -1223,10 +1461,10 @@ export default function AdminUsuarios() {
               <button
                 type="button"
                 onClick={saveUserConfig}
-                disabled={savingAction}
+                disabled={savingAction || !editingUser.profile_id}
                 className="h-10 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-widest text-white hover:bg-upe-blue-deep"
               >
-                Salvar configurações
+                Salvar alterações
               </button>
             </div>
           </div>
@@ -1278,5 +1516,40 @@ function CollapsibleSection({
       </div>
       {open ? <div className="border-t border-black/5 p-5 pt-4">{children}</div> : null}
     </section>
+  );
+}
+
+function UserAvatar({
+  name,
+  avatarUrl,
+  sizeClassName = "h-12 w-12",
+  textClassName = "text-xs",
+}: {
+  name: string;
+  avatarUrl: string | null;
+  sizeClassName?: string;
+  textClassName?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const initial = String(name || "?").trim().charAt(0).toUpperCase() || "?";
+
+  if (!avatarUrl || broken) {
+    return (
+      <div
+        className={`${sizeClassName} rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 text-[#164073] shadow-sm flex items-center justify-center font-semibold ${textClassName}`}
+      >
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={avatarUrl}
+      alt={`Foto de ${name}`}
+      className={`${sizeClassName} rounded-2xl border border-upe-accent-washed-blue/70 object-cover shadow-sm`}
+      loading="lazy"
+      onError={() => setBroken(true)}
+    />
   );
 }

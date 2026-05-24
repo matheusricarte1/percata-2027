@@ -459,8 +459,9 @@ export default function DfdDetailsPage() {
   );
   const canMarkAsKit = currentRole === "admin" || currentRole === "superadmin";
   const canDeleteDfdAsSuperadmin = currentRole === "superadmin";
+  const isEditablePhase = dfd.status === "rascunho" || dfd.status === "devolvida";
   const canSendToChefia =
-    (dfd.status === "rascunho" || dfd.status === "devolvida") &&
+    isEditablePhase &&
     canSendDfdToChefia({
       currentUserId,
       solicitanteId: dfd.solicitante_id,
@@ -486,15 +487,16 @@ export default function DfdDetailsPage() {
     .join("; ");
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 px-4 py-5 pb-28 md:px-6">
-      <header className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-24 md:px-6">
+      <header className="rounded-2xl border border-[#D9E0E8] bg-white p-5 shadow-sm md:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D9E0E8] bg-[#FAFBFC] text-[#3E4C5F] hover:bg-[#F4F7FA]"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D9E0E8] bg-[#FAFBFC] text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40"
+                aria-label="Voltar"
               >
                 <ArrowLeft size={16} />
               </button>
@@ -507,32 +509,25 @@ export default function DfdDetailsPage() {
                 {status.label}
               </span>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#164073]">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#164073] md:text-3xl">
               {dfd.objeto_contratacao || "Demanda sem objeto informado"}
             </h1>
-            <p className="mt-1 text-sm text-[#5B6675]">
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#5B6675]">
               Uma leitura clara da demanda, dos itens e das decisões já registradas.
+            </p>
+            <p className="mt-2 text-xs font-medium text-[#64748B]">
+              {campusLabel} • registrada em{" "}
+              {new Date(dfd.created_at).toLocaleDateString("pt-BR")}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {canMarkAsKit && (
-              <button
-                type="button"
-                onClick={handleMarkAsKit}
-                disabled={markingKit}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-[#164073] hover:bg-[#EAF2FF] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Package size={14} weight="bold" />
-                {markingKit ? "Marcando..." : "Marcar como kit"}
-              </button>
-            )}
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             {canSendToChefia && (
               <button
                 type="button"
                 onClick={handleSendToTriagem}
                 disabled={sendingToChefia}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-white hover:bg-[#1C5A6B] disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-white hover:bg-[#1C5A6B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {sendingToChefia ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -542,12 +537,23 @@ export default function DfdDetailsPage() {
                 {sendingToChefia ? "Enviando..." : "Enviar para análise"}
               </button>
             )}
+            {canMarkAsKit && (
+              <button
+                type="button"
+                onClick={handleMarkAsKit}
+                disabled={markingKit}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-[#164073] hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Package size={14} weight="bold" />
+                {markingKit ? "Marcando..." : "Marcar como kit"}
+              </button>
+            )}
             {canDeleteDfdAsSuperadmin && (
               <button
                 type="button"
                 onClick={handleDeleteDfdAsSuperadmin}
                 disabled={deletingDfd}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deletingDfd ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -557,7 +563,7 @@ export default function DfdDetailsPage() {
                 {deletingDfd ? "Excluindo..." : "Excluir DFD"}
               </button>
             )}
-            {(dfd.status === "rascunho" || dfd.status === "devolvida") && !canSendToChefia && (
+            {isEditablePhase && !canSendToChefia && (
               <span className="inline-flex min-h-10 max-w-[260px] items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A6424]">
                 Somente quem criou a DFD pode enviar
               </span>
@@ -565,38 +571,49 @@ export default function DfdDetailsPage() {
             <button
               type="button"
               onClick={() => router.push(`/dfd/${id}/impressao`)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#D9E0E8] bg-[#FAFBFC] text-[#3E4C5F] hover:bg-[#F4F7FA]"
-              title="Imprimir DFD"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
+              aria-label="Imprimir DFD"
             >
-              <Printer size={17} weight="fill" />
+              <Printer size={14} weight="fill" />
+              Imprimir
             </button>
             <button
               type="button"
               onClick={handleDownloadData}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#D9E0E8] bg-[#FAFBFC] text-[#3E4C5F] hover:bg-[#F4F7FA]"
-              title="Baixar dados da DFD"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
+              aria-label="Baixar dados da DFD"
             >
-              <DownloadSimple size={17} weight="bold" />
+              <DownloadSimple size={14} weight="bold" />
+              CSV
             </button>
           </div>
         </div>
       </header>
 
-      <section className="rounded-2xl border border-[#D9E0E8] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FBFF_100%)] p-5 shadow-sm">
+      <section className="rounded-2xl border border-[#D9E0E8] bg-white p-5 shadow-sm">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
               Leitura da etapa atual
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-[#164073]">{statusGuide.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-[#52627A]">{statusGuide.description}</p>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {statusGuide.highlights.map((item) => (
-                <div key={item} className="rounded-xl border border-[#D9E0E8] bg-white p-4 text-sm leading-6 text-[#445164]">
-                  <div className="mb-3 h-2 w-10 rounded-full bg-[#DCEAF0]" />
-                  {item}
-                </div>
-              ))}
+            <h2 className="mt-2 text-lg font-semibold text-[#164073] md:text-xl">
+              {statusGuide.title}
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#52627A]">
+              {statusGuide.description}
+            </p>
+            <div className="mt-4 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#64748B]">
+                O que fazer agora
+              </p>
+              <ul className="mt-2 space-y-2 text-sm text-[#445164]">
+                {statusGuide.highlights.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#47739F]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
           <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4">
@@ -610,9 +627,9 @@ export default function DfdDetailsPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <section className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073]">
                 <FileText size={18} weight="fill" />
@@ -723,22 +740,11 @@ export default function DfdDetailsPage() {
                 </p>
               ) : null}
             </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <GuidanceCard
-                title="O que esta tela responde"
-                body="Quem pediu, o que foi solicitado, quanto isso representa e quais itens sustentam a demanda."
-              />
-              <GuidanceCard
-                title="Quando ainda vale revisar"
-                body="Principalmente em rascunho ou devolução: objeto, justificativa, itens e referências precisam conversar entre si."
-              />
-            </div>
           </section>
 
-          <section className="rounded-2xl border border-black/5 bg-white shadow-sm">
+          <section className="rounded-2xl border border-[#D9E0E8] bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-[#E8EDF2] px-4 py-3">
-              <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073]">
+              <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073] md:text-lg">
                 <Package size={18} weight="fill" />
                 Itens da DFD ({items.length})
               </h2>
@@ -765,10 +771,10 @@ export default function DfdDetailsPage() {
                   return (
                     <article
                       key={item.id}
-                      className="rounded-xl border border-[#E8EDF2] bg-[#FAFBFC] p-3"
+                      className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3"
                     >
-                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="min-w-0">
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+                        <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full bg-[#E8EDF2] px-2 py-0.5 text-[10px] font-semibold text-[#164073]">
                               Item {index + 1}
@@ -780,21 +786,21 @@ export default function DfdDetailsPage() {
                               </span>
                             ) : null}
                           </div>
-                          <h3 className="mt-1 break-words text-sm font-semibold leading-snug text-[#164073]">
+                          <h3 className="break-words text-sm font-semibold leading-snug text-[#164073] md:text-[15px]">
                             {item.descricao || "Descrição não informada"}
                           </h3>
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                            <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
+                            <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
+                            <SmallInfo label="GND" value={item.gnd || "Não informado"} />
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:ml-4 xl:min-w-[300px] xl:max-w-[340px] xl:shrink-0">
+                        <div className="grid grid-cols-3 gap-2 lg:ml-4">
                           <MetricChip label="Qtd." value={String(qtd)} />
                           <MetricChip label="Unitário" value={formatCurrency(unit)} />
                           <MetricChip label="Subtotal" value={formatCurrency(subtotal)} />
                         </div>
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                        <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
-                        <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
                       </div>
 
                       {justificationText ? (
@@ -834,12 +840,12 @@ export default function DfdDetailsPage() {
           </section>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <motion.section
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm"
           >
             <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073]">
               <Clock size={18} weight="fill" />
@@ -875,10 +881,10 @@ function MetaCard({
   rightContent?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[#E8EDF2] bg-[#FAFBFC] p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">{label}</p>
+    <div className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">{label}</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-[#3E4C5F]">
+        <p className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-[#334155]">
           <Icon size={14} />
           <span className="truncate">{value}</span>
         </p>
@@ -890,9 +896,9 @@ function MetaCard({
 
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[#E8EDF2] bg-white p-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">{label}</p>
-      <p className="mt-0.5 text-xs font-semibold text-[#3E4C5F]">{value}</p>
+    <div className="rounded-lg border border-[#E2E8F0] bg-white p-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">{label}</p>
+      <p className="mt-0.5 text-xs font-semibold text-[#334155]">{value}</p>
     </div>
   );
 }
@@ -900,7 +906,7 @@ function SmallInfo({ label, value }: { label: string; value: string }) {
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-[#D9E0E8] bg-white px-2.5 py-2 text-center">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.11em] text-[#7D98B8]">{label}</p>
+      <p className="text-[9px] font-semibold uppercase tracking-[0.11em] text-[#64748B]">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold leading-tight text-[#164073]">{value}</p>
     </div>
   );
@@ -947,18 +953,9 @@ function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | 
 
 function ReadinessMetric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl border border-[#E8EDF2] bg-[#FAFBFC] p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">{label}</p>
+    <div className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">{label}</p>
       <p className="mt-1 text-base font-semibold text-[#164073]">{value}</p>
-    </div>
-  );
-}
-
-function GuidanceCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-xl border border-[#D9E0E8] bg-white p-4">
-      <p className="text-sm font-semibold text-[#164073]">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-[#52627A]">{body}</p>
     </div>
   );
 }

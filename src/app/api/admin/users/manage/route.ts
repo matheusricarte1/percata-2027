@@ -18,6 +18,8 @@ type ManageAction =
       profile_id: string;
       full_name?: string | null;
       campus_id?: string | null;
+      departamento_id?: string | null;
+      laboratorio_id?: string | null;
     }
   | {
       action: "send_access_reminder";
@@ -154,11 +156,95 @@ export const POST = withAuthorizedRole(
     if (body.action === "update_profile") {
       const nextName = sanitizePlainText(body.full_name, 160);
       const nextCampusId = body.campus_id ? sanitizeUuid(body.campus_id) : null;
+      const nextDepartamentoId = body.departamento_id
+        ? sanitizeUuid(body.departamento_id)
+        : null;
+      const nextLaboratorioId = body.laboratorio_id
+        ? sanitizeUuid(body.laboratorio_id)
+        : null;
       if (body.campus_id && !nextCampusId) {
         return NextResponse.json(
           { error: "Campus informado é inválido." },
           { status: 400 },
         );
+      }
+      if (body.departamento_id && !nextDepartamentoId) {
+        return NextResponse.json(
+          { error: "Setor informado é inválido." },
+          { status: 400 },
+        );
+      }
+      if (body.laboratorio_id && !nextLaboratorioId) {
+        return NextResponse.json(
+          { error: "Laboratório informado é inválido." },
+          { status: 400 },
+        );
+      }
+      if ((nextDepartamentoId || nextLaboratorioId) && !nextCampusId) {
+        return NextResponse.json(
+          {
+            error:
+              "Selecione o campus antes de vincular setor ou laboratório.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const { data: existingUnits, error: existingUnitsError } = await admin
+        .from("user_units")
+        .select("unit_type,unit_id,role_in_unit")
+        .eq("user_id", target.id)
+        .in("unit_type", ["departamento", "laboratorio"])
+        .or("role_in_unit.eq.membro,role_in_unit.is.null");
+      if (existingUnitsError) throw existingUnitsError;
+
+      const previousDepartamentoId =
+        existingUnits?.find((row: any) => row.unit_type === "departamento")
+          ?.unit_id || null;
+      const previousLaboratorioId =
+        existingUnits?.find((row: any) => row.unit_type === "laboratorio")
+          ?.unit_id || null;
+
+      if (nextDepartamentoId) {
+        const { data: deptData, error: deptError } = await admin
+          .from("departamentos")
+          .select("id,campus_id")
+          .eq("id", nextDepartamentoId)
+          .maybeSingle();
+        if (deptError) throw deptError;
+        if (!deptData) {
+          return NextResponse.json(
+            { error: "Setor informado não foi encontrado." },
+            { status: 404 },
+          );
+        }
+        if (String(deptData.campus_id || "") !== String(nextCampusId || "")) {
+          return NextResponse.json(
+            { error: "Setor não pertence ao campus selecionado." },
+            { status: 400 },
+          );
+        }
+      }
+
+      if (nextLaboratorioId) {
+        const { data: labData, error: labError } = await admin
+          .from("laboratorios")
+          .select("id,campus_id")
+          .eq("id", nextLaboratorioId)
+          .maybeSingle();
+        if (labError) throw labError;
+        if (!labData) {
+          return NextResponse.json(
+            { error: "Laboratório informado não foi encontrado." },
+            { status: 404 },
+          );
+        }
+        if (String(labData.campus_id || "") !== String(nextCampusId || "")) {
+          return NextResponse.json(
+            { error: "Laboratório não pertence ao campus selecionado." },
+            { status: 400 },
+          );
+        }
       }
 
       const { error } = await admin
@@ -170,6 +256,45 @@ export const POST = withAuthorizedRole(
         .eq("id", target.id);
       if (error) throw error;
 
+      const { error: deleteUnitsError } = await admin
+        .from("user_units")
+        .delete()
+        .eq("user_id", target.id)
+        .in("unit_type", ["departamento", "laboratorio"])
+        .or("role_in_unit.eq.membro,role_in_unit.is.null");
+      if (deleteUnitsError) throw deleteUnitsError;
+
+      const unitInserts = [
+        nextDepartamentoId
+          ? {
+              user_id: target.id,
+              unit_type: "departamento",
+              unit_id: nextDepartamentoId,
+              role_in_unit: "membro",
+            }
+          : null,
+        nextLaboratorioId
+          ? {
+              user_id: target.id,
+              unit_type: "laboratorio",
+              unit_id: nextLaboratorioId,
+              role_in_unit: "membro",
+            }
+          : null,
+      ].filter(Boolean) as Array<{
+        user_id: string;
+        unit_type: "departamento" | "laboratorio";
+        unit_id: string;
+        role_in_unit: "membro";
+      }>;
+
+      if (unitInserts.length > 0) {
+        const { error: insertUnitsError } = await admin
+          .from("user_units")
+          .insert(unitInserts);
+        if (insertUnitsError) throw insertUnitsError;
+      }
+
       await insertAuditLog({
         action: "update_profile",
         details: {
@@ -177,6 +302,10 @@ export const POST = withAuthorizedRole(
           next_full_name: nextName || null,
           previous_campus_id: target.campus_id,
           next_campus_id: nextCampusId,
+          previous_departamento_id: previousDepartamentoId,
+          next_departamento_id: nextDepartamentoId,
+          previous_laboratorio_id: previousLaboratorioId,
+          next_laboratorio_id: nextLaboratorioId,
         },
       });
       return NextResponse.json({ ok: true });
