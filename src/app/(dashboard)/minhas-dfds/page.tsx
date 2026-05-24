@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { getDfdProcessStage } from "@/lib/dfd-process-guide";
 import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type DfdStatus =
   | "rascunho"
@@ -51,6 +52,11 @@ type DfdRow = {
   objeto_contratacao?: string | null;
   valor_total_estimado?: number | null;
 };
+
+type DraftActionModalState =
+  | { mode: "review"; dfd: DfdRow }
+  | { mode: "submit"; dfd: DfdRow }
+  | null;
 
 type LegacyDemandSummary = {
   legacy_year: number;
@@ -136,6 +142,7 @@ export default function MinhasDFDsPage() {
   const [sendingDfdId, setSendingDfdId] = useState<string | null>(null);
   const [submittedDfd, setSubmittedDfd] = useState<{ id: string; protocol?: string | null } | null>(null);
   const [markingKitId, setMarkingKitId] = useState<string | null>(null);
+  const [draftActionModal, setDraftActionModal] = useState<DraftActionModalState>(null);
 
   const fetchActiveDfds = useCallback(async () => {
     setLoading(true);
@@ -302,6 +309,20 @@ export default function MinhasDFDsPage() {
     } finally {
       setMarkingKitId(null);
     }
+  };
+
+  const handleConfirmDraftAction = async () => {
+    if (!draftActionModal) return;
+    if (draftActionModal.mode === "review") {
+      const targetId = draftActionModal.dfd.id;
+      setDraftActionModal(null);
+      router.push(`/dfd/${targetId}`);
+      return;
+    }
+
+    const targetId = draftActionModal.dfd.id;
+    setDraftActionModal(null);
+    await handleSendToChefia(targetId);
   };
 
   const activeBySearch = useMemo(() => {
@@ -608,19 +629,29 @@ export default function MinhasDFDsPage() {
                     <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EDF2] pt-4">
                       <div className="flex flex-wrap items-center gap-3">
                         {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
-                          <button
-                            type="button"
-                            onClick={() => handleSendToChefia(dfd.id)}
-                            disabled={sendingDfdId === dfd.id}
-                            className="ux-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {sendingDfdId === dfd.id ? (
-                              <CircleNotch size={14} className="animate-spin" />
-                            ) : (
-                              <PaperPlaneTilt size={14} weight="bold" />
-                            )}
-                            {sendingDfdId === dfd.id ? "Enviando..." : "Enviar à chefia"}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setDraftActionModal({ mode: "review", dfd })}
+                              className="ux-btn-secondary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold"
+                            >
+                              <ClipboardText size={14} weight="bold" />
+                              Fiscalizar rascunho
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDraftActionModal({ mode: "submit", dfd })}
+                              disabled={sendingDfdId === dfd.id}
+                              className="ux-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {sendingDfdId === dfd.id ? (
+                                <CircleNotch size={14} className="animate-spin" />
+                              ) : (
+                                <PaperPlaneTilt size={14} weight="bold" />
+                              )}
+                              {sendingDfdId === dfd.id ? "Encaminhando..." : "Encaminhar à chefia"}
+                            </button>
+                          </>
                         )}
                         {canCreateKits ? (
                           <button
@@ -767,6 +798,55 @@ export default function MinhasDFDsPage() {
           )}
         </section>
       )}
+      <Dialog open={Boolean(draftActionModal)} onOpenChange={(open) => !open && setDraftActionModal(null)}>
+        <DialogContent className="max-w-[560px] rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
+          <DialogHeader className="border-b border-[#E8EDF2] p-5">
+            <DialogTitle className="text-xl font-semibold text-[#164073]">
+              {draftActionModal?.mode === "review" ? "Fiscalizar rascunho" : "Encaminhar à chefia"}
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm text-[#5B6675]">
+              {draftActionModal?.mode === "review"
+                ? "Você vai abrir os detalhes da DFD para revisar itens, justificativas e valores."
+                : "A DFD será enviada para análise da chefia e passará para o status Em análise."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 px-5 pb-5 pt-3 text-sm text-[#3E4C5F]">
+            <p>
+              <b>Protocolo:</b>{" "}
+              {draftActionModal?.dfd.numero_protocolo ||
+                (draftActionModal?.dfd.id ? `DFD-${draftActionModal.dfd.id.slice(0, 8).toUpperCase()}` : "-")}
+            </p>
+            <p>
+              <b>Objeto:</b> {draftActionModal?.dfd.objeto_contratacao || "Demanda sem objeto informado"}
+            </p>
+            <p className="rounded-xl border border-[#D9E0E8] bg-[#F8FAFC] px-3 py-2 text-xs leading-5">
+              {draftActionModal?.mode === "review"
+                ? "Depois de revisar, você pode encaminhar para chefia com mais segurança."
+                : "Após o encaminhamento, você acompanha o andamento por aqui em Minhas DFDs."}
+            </p>
+          </div>
+
+          <DialogFooter className="border-t border-[#E8EDF2] bg-[#FAFBFC] p-4">
+            <button
+              type="button"
+              onClick={() => setDraftActionModal(null)}
+              className="h-10 rounded-lg border border-[#D9E0E8] px-4 text-[#3E4C5F] hover:bg-[#F4F7FA]"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleConfirmDraftAction();
+              }}
+              className="h-10 rounded-lg bg-[#164073] px-5 text-white hover:bg-[#0F2E57]"
+            >
+              {draftActionModal?.mode === "review" ? "Abrir rascunho" : "Confirmar encaminhamento"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <DfdSubmissionAnimation
         open={Boolean(submittedDfd)}
         protocol={submittedDfd?.protocol}
