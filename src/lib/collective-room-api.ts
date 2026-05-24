@@ -660,7 +660,7 @@ export async function convertRoomToOfficialDfds(params: {
         collective_origin_expense_class: group.expenseClass,
         previsao_recebimento: null,
         valor_total_estimado: valorTotalEstimado,
-        status: "rascunho",
+        status: "triagem",
       })
       .select("id,numero_protocolo")
       .single();
