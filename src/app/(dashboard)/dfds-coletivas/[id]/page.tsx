@@ -485,6 +485,24 @@ export default function DfdColetivaDetailPage() {
     router.push("/dfds-coletivas");
   }
 
+  async function handleConsolidateAction() {
+    if (!canConsolidateRoom) {
+      finalizeMyContributions();
+      return;
+    }
+    if (detail?.room.status === "aberta") {
+      await updateRoomStatus(
+        "em_consolidacao_chefia",
+        "Coautoria encerrada. A chefia assumiu a consolidação.",
+      );
+      setSelectionDrawerOpen(false);
+      setActiveStage("consolidar");
+      return;
+    }
+    setSelectionDrawerOpen(false);
+    setActiveStage("consolidar");
+  }
+
   async function saveMetadata(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!detail) return;
@@ -1122,11 +1140,7 @@ export default function DfdColetivaDetailPage() {
                 setSelectionDrawerOpen(true);
               }}
               onContinue={() => {
-                if (canConsolidateRoom) {
-                  setActiveStage("consolidar");
-                  return;
-                }
-                finalizeMyContributions();
+                void handleConsolidateAction();
               }}
             />
             <FlyingCartItems
@@ -1158,12 +1172,7 @@ export default function DfdColetivaDetailPage() {
               pendingCartValue={pendingCartValue}
               canConsolidate={canConsolidateRoom}
               onContinue={() => {
-                if (canConsolidateRoom) {
-                  setSelectionDrawerOpen(false);
-                  setActiveStage("consolidar");
-                  return;
-                }
-                finalizeMyContributions();
+                void handleConsolidateAction();
               }}
             />
           </>
