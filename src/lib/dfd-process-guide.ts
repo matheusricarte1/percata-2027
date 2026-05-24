@@ -121,36 +121,48 @@ export function getDfdSendReadiness(input: DfdSendReadinessInput) {
 export function getDfdProcessChecklist(input: DfdSendReadinessInput) {
   const normalizedStatus = String(input.status || "rascunho").toLowerCase();
   const alreadySent = !["rascunho", "devolvida"].includes(normalizedStatus);
+  const hasItems = input.itemCount > 0;
+  const hasContext = input.hasObject && input.hasJustification;
 
   return [
     {
       id: "items",
-      label: "Itens e quantidades",
-      helper: "A DFD precisa ter itens com quantidade e valor estimado.",
-      state: input.itemCount > 0 ? "done" : "attention",
+      label: "Itens com quantidade e valor",
+      helper: hasItems
+        ? "Pronto: já existem itens com quantidade e valor informado."
+        : "Falta agora: adicione pelo menos 1 item com quantidade e valor estimado.",
+      state: hasItems ? "done" : "attention",
     },
     {
       id: "expense-class",
-      label: "Custeio ou capital",
-      helper: "Não misture custeio e capital na mesma DFD.",
+      label: "Separar custeio e capital",
+      helper: input.hasOnlyOneExpenseClass
+        ? "Pronto: a DFD está em uma única classe (custeio ou capital)."
+        : "Falta agora: separe em DFDs diferentes para não misturar custeio e capital.",
       state: input.hasOnlyOneExpenseClass ? "done" : "attention",
     },
     {
       id: "context",
-      label: "Objeto e justificativa",
-      helper: "Explique o que será contratado e por que é necessário.",
-      state: input.hasObject && input.hasJustification ? "done" : "attention",
+      label: "O que será contratado e por quê",
+      helper: hasContext
+        ? "Pronto: objeto e justificativa já foram preenchidos."
+        : "Falta agora: descreva o objeto e a justificativa da necessidade.",
+      state: hasContext ? "done" : "attention",
     },
     {
       id: "quantity-basis",
-      label: "Base de cálculo",
-      helper: "Mostre como chegou às quantidades solicitadas.",
+      label: "Como chegou nas quantidades",
+      helper: input.hasQuantityBasis
+        ? "Pronto: a explicação das quantidades já foi informada."
+        : "Falta agora: explique o cálculo das quantidades (turmas, consumo, pessoas, período).",
       state: input.hasQuantityBasis ? "done" : "attention",
     },
     {
       id: "unit",
-      label: "Setor/laboratório",
-      helper: "O vínculo define para qual chefia a DFD será enviada.",
+      label: "Local de uso e unidade que analisa",
+      helper: input.hasUnit
+        ? "Pronto: local de uso e responsável pela análise já estão definidos."
+        : "Falta agora: selecione setor/laboratório de uso e a unidade responsável pela análise.",
       state: input.hasUnit ? "done" : "attention",
     },
     {

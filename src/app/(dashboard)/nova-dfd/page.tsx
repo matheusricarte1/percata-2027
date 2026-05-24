@@ -764,6 +764,10 @@ export default function NovaDFDPage() {
       }),
     [dfdGroups, items.length],
   );
+  const checklistPreview = processChecklist.slice(0, 5);
+  const checklistPendingCount = checklistPreview.filter(
+    (item) => item.state !== "done",
+  ).length;
 
   const totalGeral = useMemo(
     () =>
@@ -1286,10 +1290,15 @@ export default function NovaDFDPage() {
 
                 <div className="rounded-2xl border border-[#D9E0E8] bg-white p-3">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#164073]">
-                    Confira antes de concluir
+                    O que falta para concluir
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#66758A]">
+                    {checklistPendingCount === 0
+                      ? "Tudo certo para concluir."
+                      : `${checklistPendingCount} pendência(s) para liberar a conclusão.`}
                   </p>
                   <div className="mt-3 space-y-2">
-                    {processChecklist.slice(0, 5).map((item) => (
+                    {checklistPreview.map((item) => (
                       <div key={item.id} className="flex items-start gap-2 text-xs">
                         {item.state === "done" ? (
                           <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0 text-emerald-600" />
