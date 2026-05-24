@@ -129,8 +129,11 @@ const EXPERIENCES = [
 ];
 
 const LANDING_HEROES = [
-  "/brands/dashboard-hero-petrolina-v3.png",
-  "/brands/dashboard-hero-ouricuri-v3.png",
+  "/brands/landing-chatgpt-01.png",
+  "/brands/landing-chatgpt-02.png",
+  "/brands/landing-chatgpt-03.png",
+  "/brands/landing-chatgpt-04.png",
+  "/brands/landing-chatgpt-05.png",
 ];
 
 export function HumanLandingPage({
@@ -165,13 +168,44 @@ export function HumanLandingPage({
               className="absolute inset-0 h-full w-full object-cover object-center"
               animate={{
                 opacity: activeHeroIndex === index ? 0.95 : 0,
-                scale: activeHeroIndex === index ? 1.01 : 1.06,
-                x: activeHeroIndex === index ? 0 : 16,
+                scale:
+                  activeHeroIndex === index
+                    ? [1.075, 1.02, 1.07]
+                    : 1.09,
+                x:
+                  activeHeroIndex === index
+                    ? [10, -9, 8]
+                    : 20,
+                y: activeHeroIndex === index ? [0, -3, 0] : 0,
                 filter: activeHeroIndex === index ? "blur(0px)" : "blur(5px)",
               }}
               transition={{
-                duration: reduceMotion ? 0.2 : 1.9,
-                ease: [0.22, 1, 0.36, 1],
+                opacity: {
+                  duration: reduceMotion ? 0.2 : 1.1,
+                  ease: [0.22, 1, 0.36, 1],
+                },
+                scale: {
+                  duration: reduceMotion ? 0.2 : 6.4,
+                  repeat: activeHeroIndex === index && !reduceMotion ? Infinity : 0,
+                  repeatType: "mirror",
+                  ease: "easeInOut",
+                },
+                x: {
+                  duration: reduceMotion ? 0.2 : 7.2,
+                  repeat: activeHeroIndex === index && !reduceMotion ? Infinity : 0,
+                  repeatType: "mirror",
+                  ease: "easeInOut",
+                },
+                y: {
+                  duration: reduceMotion ? 0.2 : 6.8,
+                  repeat: activeHeroIndex === index && !reduceMotion ? Infinity : 0,
+                  repeatType: "mirror",
+                  ease: "easeInOut",
+                },
+                filter: {
+                  duration: reduceMotion ? 0.2 : 0.9,
+                  ease: [0.22, 1, 0.36, 1],
+                },
               }}
               style={{
                 maskImage:
