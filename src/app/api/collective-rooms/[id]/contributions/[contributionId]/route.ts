@@ -3,6 +3,7 @@ import {
   actorIsChefiaForUnit,
   apiError,
   createSupabaseAdminClient,
+  isAdminActor,
   insertRoomEvent,
   loadRoomOrNull,
   requireCollectiveRoomActor,
@@ -135,16 +136,16 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       return apiError("Contribuicao nao encontrada.", 404);
     }
 
-    const isChefia = actorIsChefiaForUnit(actor, room.unit_id);
+    const actorIsAdmin = isAdminActor(actor);
+    if (!actorIsAdmin) {
+      return apiError("Solicitacao bloqueada: apenas admin/superadmin pode excluir itens ja solicitados.", 403);
+    }
     if (
-      !canMutateContribution({
-        actorId: actor.id,
-        isChefia,
-        roomStatus: room.status,
-        contribution,
-      })
+      room.status === "proposta" ||
+      room.status === "convertida" ||
+      room.status === "arquivada"
     ) {
-      return apiError("Acesso negado.", 403);
+      return apiError("A sala não permite exclusão neste estágio.", 409);
     }
 
     const { error } = await admin
@@ -156,13 +157,11 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     await insertRoomEvent(admin, {
       roomId: room.id,
       actorId: actor.id,
-      eventType: isChefia ? "contribution_discarded_by_chefia" : "contribution_removed",
-      message: isChefia
-        ? `A chefia descartou a contribuicao: ${contribution.descricao}.`
-        : `Contribuicao removida: ${contribution.descricao}.`,
+      eventType: "contribution_removed_by_admin",
+      message: `Contribuicao removida por administrador: ${contribution.descricao}.`,
       metadata: {
         contribution_id: contribution.id,
-        discarded_by_chefia: isChefia,
+        discarded_by_admin: true,
       },
     });
 

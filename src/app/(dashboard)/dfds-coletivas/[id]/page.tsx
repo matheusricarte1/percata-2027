@@ -24,6 +24,7 @@ import {
   CaretDown,
   CheckCircle,
   ClipboardText,
+  Info,
   CurrencyDollar,
   DownloadSimple,
   DotsThreeVertical,
@@ -35,6 +36,8 @@ import {
   PaperPlaneTilt,
   Plus,
   ShoppingCart,
+  ShieldWarning,
+  Trash,
   UsersThree,
   X,
 } from "@phosphor-icons/react";
@@ -83,11 +86,20 @@ type Contribution = {
   user_name?: string | null;
   user_email?: string | null;
   user_avatar_url?: string | null;
+  codigo_item_efisco?: string | null;
+  codigo_tce?: string | null;
   descricao: string;
+  unidade_medida?: string | null;
   quantidade: number;
   valor_unitario_estimado: number;
   justificativa_item?: string | null;
   link_referencia?: string | null;
+  gnd?: string | null;
+  gnd_derivado?: string | null;
+  codigo_natureza_despesa?: string | null;
+  nome_grupo?: string | null;
+  nome_classe?: string | null;
+  status?: string | null;
   can_edit?: boolean;
   adjusted_by_chefia?: boolean;
   adjusted_at?: string | null;
@@ -236,10 +248,13 @@ export default function DfdColetivaDetailPage() {
   const [cartItems, setCartItems] = useState<CartDraftItem[]>([]);
   const [activeCartId, setActiveCartId] = useState<string | null>(null);
   const [selectionDrawerOpen, setSelectionDrawerOpen] = useState(false);
+  const [selectionDrawerSection, setSelectionDrawerSection] = useState<"cart" | "requested">("cart");
   const [savingCart, setSavingCart] = useState(false);
   const [flyingCartItems, setFlyingCartItems] = useState<FlyingCartItem[]>([]);
   const [cartPulseKey, setCartPulseKey] = useState(0);
   const [viewerUserId, setViewerUserId] = useState<string | null>(null);
+  const [showCollectiveFlowGuide, setShowCollectiveFlowGuide] = useState(false);
+  const [deleteLockedNotice, setDeleteLockedNotice] = useState<Contribution | null>(null);
   const cartTargetRef = useRef<HTMLButtonElement | null>(null);
   const roomStatus = detail?.room.status;
 
@@ -435,6 +450,22 @@ export default function DfdColetivaDetailPage() {
     () => cartItems.reduce((acc, item) => acc + getDraftSubtotal(item), 0),
     [cartItems],
   );
+  const myRequestedContributions = useMemo(() => {
+    if (!detail || !viewerUserId) return [];
+    return detail.contributions
+      .filter(
+        (contribution) =>
+          String(contribution.user_id || "") === String(viewerUserId) &&
+          String(contribution.status || "") !== "arquivada",
+      )
+      .sort((a, b) => {
+        const aTime = new Date(a.created_at || 0).getTime();
+        const bTime = new Date(b.created_at || 0).getTime();
+        return bTime - aTime;
+      });
+  }, [detail, viewerUserId]);
+  const canDeleteRequestedContribution =
+    detail?.room.actor_role === "admin" || detail?.room.actor_role === "superadmin";
 
   async function saveMetadata(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -493,6 +524,7 @@ export default function DfdColetivaDetailPage() {
 
     if (existing) {
       setActiveCartId(existing.cartId);
+      setSelectionDrawerSection("cart");
       setSelectionDrawerOpen(true);
       setCartPulseKey((current) => current + 1);
       toast.info("Item já está no carrinho.");
@@ -502,6 +534,7 @@ export default function DfdColetivaDetailPage() {
     const nextItem = createCartDraftItem(item);
     setCartItems((current) => [...current, nextItem]);
     setActiveCartId(nextItem.cartId);
+    setSelectionDrawerSection("cart");
     setSelectionDrawerOpen(true);
     setCartPulseKey((current) => current + 1);
 
@@ -543,6 +576,7 @@ export default function DfdColetivaDetailPage() {
     const existing = cartItems.find((cartItem) => getCatalogItemKey(cartItem.item) === key);
     if (existing) {
       setActiveCartId(existing.cartId);
+      setSelectionDrawerSection("cart");
       setSelectionDrawerOpen(true);
       setCartPulseKey((current) => current + 1);
       return;
@@ -561,9 +595,75 @@ export default function DfdColetivaDetailPage() {
     };
     setCartItems((current) => [...current, seededDraft]);
     setActiveCartId(seededDraft.cartId);
+    setSelectionDrawerSection("cart");
     setSelectionDrawerOpen(true);
     setCartPulseKey((current) => current + 1);
     toast.success("Item preparado para você informar sua quantidade.");
+  }
+
+  function seedContributionInCart(contribution: Contribution) {
+    if (!canContributeInOpenRoom) {
+      toast.warning("Esta sala não está aberta para novas contribuições.");
+      return;
+    }
+    const mappedItem: CatalogItem = {
+      id: String(contribution.codigo_item_efisco || contribution.codigo_tce || createClientId("contrib")),
+      codigo_efisco: contribution.codigo_item_efisco || contribution.codigo_tce || null,
+      codigo_tce: contribution.codigo_tce || contribution.codigo_item_efisco || null,
+      descricao: contribution.descricao || "Item sem descrição",
+      nome_grupo: contribution.nome_grupo || null,
+      nome_classe: contribution.nome_classe || null,
+      codigo_natureza_preferencial: contribution.codigo_natureza_despesa || null,
+      gnd_preferencial: contribution.gnd || contribution.gnd_derivado || null,
+      unidade_medida: contribution.unidade_medida || "UN",
+    };
+    const key = getCatalogItemKey(mappedItem);
+    const existing = cartItems.find((cartItem) => getCatalogItemKey(cartItem.item) === key);
+    if (existing) {
+      setActiveCartId(existing.cartId);
+      setSelectionDrawerSection("cart");
+      setSelectionDrawerOpen(true);
+      return;
+    }
+    const seededDraft: CartDraftItem = {
+      ...createCartDraftItem(mappedItem),
+      quantidade: 1,
+      valor_unitario_estimado:
+        Number(contribution.valor_unitario_estimado || 0) > 0
+          ? String(contribution.valor_unitario_estimado)
+          : "",
+      justificativa_item:
+        contribution.justificativa_item ||
+        "Complemento de quantidade para item já solicitado.",
+      link_referencia: contribution.link_referencia || "",
+    };
+    setCartItems((current) => [...current, seededDraft]);
+    setActiveCartId(seededDraft.cartId);
+    setSelectionDrawerSection("cart");
+    setSelectionDrawerOpen(true);
+    setCartPulseKey((current) => current + 1);
+  }
+
+  async function deleteRequestedContribution(contribution: Contribution) {
+    if (!detail) return;
+    if (!canDeleteRequestedContribution) {
+      setDeleteLockedNotice(contribution);
+      return;
+    }
+    if (!window.confirm("Arquivar esta solicitação? Esta ação remove o item da sala coletiva.")) return;
+
+    try {
+      const response = await fetch(
+        `/api/collective-rooms/${roomId}/contributions/${contribution.id}`,
+        { method: "DELETE" },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Não foi possível remover a solicitação.");
+      toast.success("Solicitação removida da sala.");
+      await loadDetail();
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao remover solicitação.");
+    }
   }
 
   function launchCartAnimation(event: MouseEvent<HTMLButtonElement>, label: string) {
@@ -615,6 +715,7 @@ export default function DfdColetivaDetailPage() {
     );
     if (invalidItem) {
       setActiveCartId(invalidItem.cartId);
+      setSelectionDrawerSection("cart");
       setSelectionDrawerOpen(true);
       toast.warning("Preencha quantidade, valor unitário e justificativa dos itens no carrinho.");
       return;
@@ -806,6 +907,13 @@ export default function DfdColetivaDetailPage() {
               <div className="flex flex-wrap gap-3 lg:justify-end">
                 <button
                   type="button"
+                  onClick={() => setShowCollectiveFlowGuide(true)}
+                  className="ux-btn-secondary inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold"
+                >
+                  <Info size={17} weight="bold" /> Como funciona
+                </button>
+                <button
+                  type="button"
                   onClick={exportCollectiveCsv}
                   className="ux-btn-secondary inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold"
                 >
@@ -981,11 +1089,19 @@ export default function DfdColetivaDetailPage() {
               activeCartItem={activeCartItem}
               pendingCount={cartItems.length}
               consolidatedCount={detail.items.length}
+              requestedCount={myRequestedContributions.length}
               totalValue={totalValue}
               pendingCartValue={pendingCartValue}
               cartPulseKey={cartPulseKey}
               cartTargetRef={cartTargetRef}
-              onOpen={() => setSelectionDrawerOpen(true)}
+              onOpen={() => {
+                setSelectionDrawerSection("cart");
+                setSelectionDrawerOpen(true);
+              }}
+              onOpenRequested={() => {
+                setSelectionDrawerSection("requested");
+                setSelectionDrawerOpen(true);
+              }}
               onContinue={() => setActiveStage("consolidar")}
             />
             <FlyingCartItems
@@ -999,9 +1115,14 @@ export default function DfdColetivaDetailPage() {
               onClose={() => setSelectionDrawerOpen(false)}
               cartItems={cartItems}
               activeCartItem={activeCartItem}
+              section={selectionDrawerSection}
               setActiveCartId={setActiveCartId}
               updateActiveCartDraft={updateActiveCartDraft}
               removeCartItem={removeCartItem}
+              contributions={myRequestedContributions}
+              canDeleteContribution={canDeleteRequestedContribution}
+              onAddMoreContribution={seedContributionInCart}
+              onDeleteContribution={deleteRequestedContribution}
               addContribution={addContribution}
               subtotal={selectedSubtotal}
               disabled={!canContributeInOpenRoom || savingCart}
@@ -1015,6 +1136,14 @@ export default function DfdColetivaDetailPage() {
             />
           </>
         )}
+        <CollectiveFlowGuideModal
+          open={showCollectiveFlowGuide}
+          onClose={() => setShowCollectiveFlowGuide(false)}
+        />
+        <DeleteLockedNoticeModal
+          contribution={deleteLockedNotice}
+          onClose={() => setDeleteLockedNotice(null)}
+        />
       </div>
     </main>
   );
@@ -1448,21 +1577,25 @@ function SelectionFloatingBar({
   activeCartItem,
   pendingCount,
   consolidatedCount,
+  requestedCount,
   totalValue,
   pendingCartValue,
   cartPulseKey,
   cartTargetRef,
   onOpen,
+  onOpenRequested,
   onContinue,
 }: {
   activeCartItem: CartDraftItem | null;
   pendingCount: number;
   consolidatedCount: number;
+  requestedCount: number;
   totalValue: number;
   pendingCartValue: number;
   cartPulseKey: number;
   cartTargetRef: RefObject<HTMLButtonElement | null>;
   onOpen: () => void;
+  onOpenRequested: () => void;
   onContinue: () => void;
 }) {
   const hasPendingItems = pendingCount > 0;
@@ -1517,6 +1650,13 @@ function SelectionFloatingBar({
               </span>
             </button>
             <div className="flex shrink-0 gap-2 px-1 pb-1 sm:pb-0">
+              <button
+                type="button"
+                onClick={onOpenRequested}
+                className="h-10 rounded-full border border-[#CBD5E1] px-4 text-sm font-semibold text-[#0B4AA2] transition hover:bg-[#F7FBFF]"
+              >
+                Já solicitados ({requestedCount})
+              </button>
               <button
                 type="button"
                 onClick={onOpen}
@@ -1589,9 +1729,14 @@ function SelectedItemDrawer({
   onClose,
   cartItems,
   activeCartItem,
+  section,
   setActiveCartId,
   updateActiveCartDraft,
   removeCartItem,
+  contributions,
+  canDeleteContribution,
+  onAddMoreContribution,
+  onDeleteContribution,
   addContribution,
   subtotal,
   disabled,
@@ -1604,9 +1749,14 @@ function SelectedItemDrawer({
   onClose: () => void;
   cartItems: CartDraftItem[];
   activeCartItem: CartDraftItem | null;
+  section: "cart" | "requested";
   setActiveCartId: (cartId: string) => void;
   updateActiveCartDraft: (update: SetStateAction<ContributionDraft>) => void;
   removeCartItem: (cartId: string) => void;
+  contributions: Contribution[];
+  canDeleteContribution: boolean;
+  onAddMoreContribution: (contribution: Contribution) => void;
+  onDeleteContribution: (contribution: Contribution) => void;
   addContribution: (event: FormEvent) => void;
   subtotal: number;
   disabled: boolean;
@@ -1615,6 +1765,15 @@ function SelectedItemDrawer({
   pendingCartValue: number;
   onContinue: () => void;
 }) {
+  const cartSectionRef = useRef<HTMLDivElement | null>(null);
+  const requestedSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const target = section === "requested" ? requestedSectionRef.current : cartSectionRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [open, section]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -1658,7 +1817,7 @@ function SelectedItemDrawer({
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
-              <section className="rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+              <section ref={cartSectionRef} className="rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
                 <SectionTitle icon={<ShoppingCart size={18} weight="fill" />} title="Itens no carrinho" />
                 {cartItems.length === 0 ? (
                   <p className="mt-4 rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-4 text-center text-sm text-[#667085]">
@@ -1708,6 +1867,62 @@ function SelectedItemDrawer({
                         );
                       })}
                     </AnimatePresence>
+                  </div>
+                )}
+              </section>
+
+              <section ref={requestedSectionRef} className="mt-4 rounded-lg border border-[#DDE5EF] bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+                <SectionTitle icon={<UsersThree size={18} weight="bold" />} title="Itens já solicitados por você" />
+                {contributions.length === 0 ? (
+                  <p className="mt-4 rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-4 text-center text-sm text-[#667085]">
+                    Você ainda não solicitou itens nesta sala.
+                  </p>
+                ) : (
+                  <div className="mt-4 divide-y divide-[#EEF2F7]">
+                    {contributions.map((contribution) => (
+                      <div key={contribution.id} className="py-3">
+                        <div className="flex items-start gap-3">
+                          <UserAvatar
+                            name={contribution.user_name || contribution.user_email || "Usuário"}
+                            avatarUrl={contribution.user_avatar_url || null}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-[#0F172A]">
+                              {contribution.descricao}
+                            </p>
+                            <p className="mt-1 text-xs text-[#526070]">
+                              Minha quantidade: {contribution.quantidade} · Valor unit.: {formatCurrency(contribution.valor_unitario_estimado)}
+                            </p>
+                            <p className="mt-1 text-[11px] text-[#8A94A6]">
+                              {formatDateTime(contribution.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onAddMoreContribution(contribution)}
+                            className="inline-flex h-8 items-center gap-2 rounded-md border border-[#CBD5E1] bg-white px-3 text-xs font-semibold text-[#0B4AA2] hover:bg-[#F1F5F9]"
+                          >
+                            <Plus size={13} weight="bold" />
+                            Adicionar mais
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteContribution(contribution)}
+                            className={cn(
+                              "inline-flex h-8 items-center gap-2 rounded-md border px-3 text-xs font-semibold",
+                              canDeleteContribution
+                                ? "border-[#F4C7C3] bg-white text-[#B42318] hover:bg-[#FEF3F2]"
+                                : "border-[#D5DCE6] bg-[#F8FAFC] text-[#667085]",
+                            )}
+                          >
+                            <Trash size={13} weight="bold" />
+                            {canDeleteContribution ? "Excluir solicitação" : "Bloqueado para usuário comum"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </section>
@@ -1795,6 +2010,121 @@ function DrawerMetric({ label, value }: { label: string; value: ReactNode }) {
       <p className="text-xs text-[#526070]">{label}</p>
       <p className="mt-1 text-base font-semibold text-[#0F172A]">{value}</p>
     </div>
+  );
+}
+
+function CollectiveFlowGuideModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[85] bg-[#0F172A]/45"
+          />
+          <motion.section
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 18, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed left-1/2 top-1/2 z-[90] w-[min(760px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[#DDE5EF] bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.25)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-[#0B3473]">Como funciona a sala coletiva</h3>
+                <p className="mt-1 text-sm text-[#526070]">
+                  Fluxo curto para participação em equipe e consolidação pela chefia.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-[#CBD5E1] text-[#0B4AA2]"
+                aria-label="Fechar guia"
+              >
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+            <ol className="mt-5 grid gap-3">
+              <li className="rounded-xl border border-[#DDE5EF] bg-[#F8FAFC] p-3 text-sm text-[#344054]">
+                <strong className="text-[#0F172A]">1. Sala aberta:</strong> os membros adicionam itens e justificativas.
+              </li>
+              <li className="rounded-xl border border-[#DDE5EF] bg-[#F8FAFC] p-3 text-sm text-[#344054]">
+                <strong className="text-[#0F172A]">2. Consolidar:</strong> a chefia encerra coautoria e valida o recorte final.
+              </li>
+              <li className="rounded-xl border border-[#DDE5EF] bg-[#F8FAFC] p-3 text-sm text-[#344054]">
+                <strong className="text-[#0F172A]">3. Prévia:</strong> revisão final antes de gerar as DFDs oficiais.
+              </li>
+              <li className="rounded-xl border border-[#DDE5EF] bg-[#F8FAFC] p-3 text-sm text-[#344054]">
+                <strong className="text-[#0F172A]">4. Conversão:</strong> emissão das DFDs e registro completo no histórico.
+              </li>
+            </ol>
+          </motion.section>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function DeleteLockedNoticeModal({
+  contribution,
+  onClose,
+}: {
+  contribution: Contribution | null;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {contribution && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[95] bg-[#0F172A]/45"
+          />
+          <motion.section
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="fixed left-1/2 top-1/2 z-[100] w-[min(520px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[#F0D5D1] bg-white p-6 shadow-[0_20px_48px_rgba(15,23,42,0.24)]"
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#FEF3F2] text-[#B42318]">
+                <ShieldWarning size={20} weight="fill" />
+              </span>
+              <div>
+                <h3 className="text-base font-semibold text-[#7A271A]">Solicitação bloqueada</h3>
+                <p className="mt-2 text-sm leading-6 text-[#526070]">
+                  Após solicitar um item, ele fica protegido. Apenas <strong>admin/superadmin</strong> pode excluir.
+                </p>
+                <p className="mt-2 line-clamp-2 text-xs text-[#7C8798]">
+                  Item: {contribution.descricao}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-md bg-[#063F8F] px-4 text-sm font-semibold text-white"
+            >
+              Entendi
+            </button>
+          </motion.section>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -2498,6 +2828,18 @@ function ParticipantDots({
         </span>
       )}
     </div>
+  );
+}
+
+function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#D8E0EA] bg-[#EEF2F7] text-xs font-semibold text-[#344054]">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        getInitial(name || "U")
+      )}
+    </span>
   );
 }
 
