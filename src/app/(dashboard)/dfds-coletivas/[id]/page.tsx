@@ -1045,12 +1045,23 @@ export default function DfdColetivaDetailPage() {
               checklist={checklist}
               canEdit={canEdit}
               updatingStatus={updatingStatus}
-              onContinue={() =>
-                updateRoomStatus(
-                  "em_consolidacao_chefia",
-                  "Coautoria encerrada. A chefia assumiu a consolidação.",
-                )
-              }
+              onContinue={async () => {
+                if (detail.room.status === "aberta") {
+                  await updateRoomStatus(
+                    "em_consolidacao_chefia",
+                    "Coautoria encerrada. A chefia assumiu a consolidação.",
+                  );
+                  return;
+                }
+                if (detail.room.status === "em_consolidacao_chefia") {
+                  await updateRoomStatus(
+                    "pronta_para_conversao",
+                    "Consolidação concluída. Sala pronta para prévia de conversão.",
+                  );
+                  return;
+                }
+                setActiveStage("revisao");
+              }}
               onSaveAndExit={() => router.push("/dfds-coletivas")}
             />
           </section>
@@ -2465,9 +2476,7 @@ function ConsolidatedItemsTable({
                       Solicitar
                     </button>
                   ) : (
-                    <button type="button" className="rounded-md p-2 text-[#0B3473] hover:bg-[#F1F5F9]" aria-label="Mais ações">
-                      <DotsThreeVertical size={18} weight="bold" />
-                    </button>
+                    <ItemActionsMenu item={item} />
                   )}
                 </td>
               </tr>
@@ -2475,6 +2484,69 @@ function ConsolidatedItemsTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ItemActionsMenu({ item }: { item: AggregatedItem }) {
+  const [open, setOpen] = useState(false);
+  const participantSummary = (item.contributors || [])
+    .map((contributor) => `${contributor.user_name || contributor.user_email || "Usuário"}: ${contributor.quantidade}`)
+    .join(" · ");
+
+  async function copyText(value: string, success: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(success);
+    } catch {
+      toast.error("Não foi possível copiar.");
+    } finally {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="rounded-md p-2 text-[#0B3473] hover:bg-[#F1F5F9]"
+        aria-label="Mais ações"
+      >
+        <DotsThreeVertical size={18} weight="bold" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 z-20 w-56 rounded-md border border-[#DDE5EF] bg-white p-1 text-left shadow-lg">
+          <button
+            type="button"
+            onClick={() =>
+              copyText(item.descricao || "", "Descrição copiada.")
+            }
+            className="flex w-full items-center rounded-md px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7FAFC]"
+          >
+            Copiar descrição
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              copyText(item.codigo_item_efisco || item.codigo_tce || "", "Código copiado.")
+            }
+            className="mt-1 flex w-full items-center rounded-md px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7FAFC]"
+          >
+            Copiar código
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              toast.info(participantSummary || "Sem participantes identificados.");
+              setOpen(false);
+            }}
+            className="mt-1 flex w-full items-center rounded-md px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7FAFC]"
+          >
+            Ver participantes
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2498,12 +2570,25 @@ function ConsolidationSummary({
   onContinue: () => void;
   onSaveAndExit: () => void;
 }) {
+  const isOpen = detail.room.status === "aberta";
+  const isConsolidating = detail.room.status === "em_consolidacao_chefia";
+  const ctaLabel = updatingStatus
+    ? isOpen
+      ? "Encerrando..."
+      : "Avançando..."
+    : isOpen
+      ? "Encerrar coautoria e consolidar"
+      : isConsolidating
+        ? "Avançar para prévia de conversão"
+        : "Abrir prévia de conversão";
   return (
     <Panel>
       <h2 className="text-base font-semibold text-[#0B3473]">Resumo da consolidação</h2>
       <SummaryRows detail={detail} breakdown={breakdown} totalValue={totalValue} />
       <div className="mt-5 rounded-md border border-[#DDE5EF] bg-[#F7FBFF] p-4 text-xs leading-5 text-[#667085]">
-        Ao avançar, a sala deixa a coautoria aberta e passa a ser conduzida exclusivamente pela chefia.
+        {isOpen
+          ? "Ao avançar, a sala deixa a coautoria aberta e passa a ser conduzida exclusivamente pela chefia."
+          : "Coautoria já encerrada. O próximo passo é abrir a prévia de conversão para revisão final."}
       </div>
       <Checklist title="Antes de avançar, verifique:" checklist={checklist} />
       <button
@@ -2512,7 +2597,7 @@ function ConsolidationSummary({
         disabled={!canEdit || updatingStatus || detail.items.length === 0}
         className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#063F8F] text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {updatingStatus ? "Encerrando..." : "Encerrar coautoria e consolidar"} <ArrowRight size={17} weight="bold" />
+        {ctaLabel} <ArrowRight size={17} weight="bold" />
       </button>
       <button
         type="button"
