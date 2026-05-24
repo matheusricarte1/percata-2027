@@ -487,8 +487,8 @@ export default function DfdDetailsPage() {
     .join("; ");
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 pb-24 md:px-6">
-      <header className="rounded-2xl border border-[#D9E0E8] bg-white p-5 shadow-sm md:p-6">
+    <div className="mx-auto max-w-[1280px] space-y-5 px-4 py-5 pb-24 md:px-6 lg:px-8">
+      <header className="rounded-2xl border border-[#C9D7E8] bg-gradient-to-b from-white to-[#F7FAFD] p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -500,34 +500,45 @@ export default function DfdDetailsPage() {
               >
                 <ArrowLeft size={16} />
               </button>
-              <span className="rounded-full bg-[#E8EDF2] px-3 py-1 text-[11px] font-semibold text-[#164073]">
+              <span className="rounded-full bg-[#E3ECF7] px-3 py-1 text-xs font-semibold text-[#123B6B]">
                 {dfd.numero_protocolo || `DFD-${dfd.id.slice(0, 8).toUpperCase()}`}
               </span>
               <span
-                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${status.className}`}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}
               >
                 {status.label}
               </span>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#164073] md:text-3xl">
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#123B6B] md:text-[2.2rem]">
               {dfd.objeto_contratacao || "Demanda sem objeto informado"}
             </h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-[#5B6675]">
+            <p className="mt-1 max-w-3xl text-[15px] leading-6 text-[#4A5D75]">
               Uma leitura clara da demanda, dos itens e das decisões já registradas.
             </p>
-            <p className="mt-2 text-xs font-medium text-[#64748B]">
+            <p className="mt-2 text-sm font-medium text-[#5E748E]">
               {campusLabel} • registrada em{" "}
               {new Date(dfd.created_at).toLocaleDateString("pt-BR")}
             </p>
+            <div className="mt-4 grid grid-cols-2 gap-2 md:max-w-3xl md:grid-cols-4">
+              <QuickStat label="Status" value={status.label} />
+              <QuickStat label="Itens" value={String(items.length)} />
+              <QuickStat label="Total estimado" value={formatCurrency(totalGeral)} />
+              <QuickStat label="Prontidão" value={`${readinessPercent}%`} />
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <div className="w-full rounded-xl border border-[#D8E3EF] bg-white/90 p-3 lg:w-auto lg:min-w-[360px]">
+            <p className="text-sm font-semibold text-[#123B6B]">Ações da DFD</p>
+            <p className="mt-0.5 text-xs text-[#5E748E]">
+              A ação principal aparece primeiro; opções auxiliares ficam em segundo plano.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
             {canSendToChefia && (
               <button
                 type="button"
                 onClick={handleSendToTriagem}
                 disabled={sendingToChefia}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-[12px] font-semibold text-white hover:bg-[#1C5A6B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-sm font-semibold text-white hover:bg-[#1C5A6B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {sendingToChefia ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -542,7 +553,7 @@ export default function DfdDetailsPage() {
                 type="button"
                 onClick={handleMarkAsKit}
                 disabled={markingKit}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-[12px] font-semibold text-[#164073] hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-sm font-semibold text-[#164073] hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Package size={14} weight="bold" />
                 {markingKit ? "Marcando..." : "Marcar como kit"}
@@ -553,7 +564,7 @@ export default function DfdDetailsPage() {
                 type="button"
                 onClick={handleDeleteDfdAsSuperadmin}
                 disabled={deletingDfd}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-[12px] font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deletingDfd ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -564,14 +575,14 @@ export default function DfdDetailsPage() {
               </button>
             )}
             {isEditablePhase && !canSendToChefia && (
-              <span className="inline-flex min-h-10 max-w-[260px] items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-3 text-[11px] font-semibold text-[#8A6424]">
+              <span className="inline-flex min-h-11 max-w-[260px] items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-3 text-xs font-semibold text-[#8A6424]">
                 Somente quem criou a DFD pode enviar
               </span>
             )}
             <button
               type="button"
               onClick={() => router.push(`/dfd/${id}/impressao`)}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[12px] font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
               aria-label="Imprimir DFD"
             >
               <Printer size={14} weight="fill" />
@@ -580,33 +591,34 @@ export default function DfdDetailsPage() {
             <button
               type="button"
               onClick={handleDownloadData}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[12px] font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
               aria-label="Baixar dados da DFD"
             >
               <DownloadSimple size={14} weight="bold" />
               CSV
             </button>
+            </div>
           </div>
         </div>
       </header>
 
-      <section className="rounded-2xl border border-[#D9E0E8] bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-[#C9D7E8] bg-gradient-to-r from-[#F2F7FC] to-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
-            <p className="text-[11px] font-semibold text-[#47739F]">
+            <p className="text-xs font-semibold tracking-[0.03em] text-[#3E6A95]">
               Leitura da etapa atual
             </p>
-            <h2 className="mt-2 text-lg font-semibold text-[#164073] md:text-xl">
+            <h2 className="mt-1 text-xl font-bold text-[#123B6B] md:text-2xl">
               {statusGuide.title}
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#52627A]">
+            <p className="mt-2 max-w-3xl text-[15px] leading-7 text-[#455B74]">
               {statusGuide.description}
             </p>
-            <div className="mt-4 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-4">
-              <p className="text-[11px] font-semibold text-[#64748B]">
+            <div className="mt-4 rounded-xl border border-[#D7E3F0] bg-white p-4">
+              <p className="text-sm font-semibold text-[#274A70]">
                 O que fazer agora
               </p>
-              <ul className="mt-2 space-y-2 text-sm text-[#445164]">
+              <ul className="mt-2 space-y-2.5 text-sm text-[#445164]">
                 {statusGuide.highlights.map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#47739F]" />
@@ -616,8 +628,8 @@ export default function DfdDetailsPage() {
               </ul>
             </div>
           </div>
-          <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4">
-              <p className="text-base font-semibold text-[#164073]">Pulso desta DFD</p>
+          <div className="rounded-2xl border border-[#D7E3F0] bg-white p-4">
+              <p className="text-base font-bold text-[#123B6B]">Pulso desta DFD</p>
             <div className="mt-4 grid gap-3">
               <ReadinessMetric label="Itens vinculados" value={items.length} />
               <ReadinessMetric label="Valor estimado" value={formatCurrency(totalGeral)} />
@@ -627,18 +639,18 @@ export default function DfdDetailsPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4 lg:col-span-2">
-          <section className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-[#D1DEEC] bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073]">
+              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#123B6B]">
                 <FileText size={18} weight="fill" />
                 Contexto da DFD
               </h2>
               <img src={campusBranding.logoSrc} alt={campusBranding.label} className="h-8 w-auto" />
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <MetaCard
                 icon={User}
                 label="Solicitante"
@@ -726,7 +738,7 @@ export default function DfdDetailsPage() {
               </div>
             ) : null}
 
-            <div className="mt-3 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-3">
+            <div className="mt-4 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-4">
               <p className="text-xs font-semibold tracking-[0.03em] text-[#5A7596]">
                 Justificativa da DFD
               </p>
@@ -742,9 +754,9 @@ export default function DfdDetailsPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[#D9E0E8] bg-white shadow-sm">
+          <section className="rounded-2xl border border-[#D1DEEC] bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
             <div className="flex items-center justify-between border-b border-[#E8EDF2] px-4 py-3">
-              <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-[#164073]">
+              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#123B6B]">
                 <Package size={18} weight="fill" />
                 Itens da DFD ({items.length})
               </h2>
@@ -761,7 +773,7 @@ export default function DfdDetailsPage() {
                 <p className="mt-2 text-sm font-medium text-[#5B6675]">Nenhum item vinculado.</p>
               </div>
             ) : (
-              <div className="space-y-3 p-4">
+              <div className="space-y-4 p-4">
                 {items.map((item, index) => {
                   const qtd = Number(item.quantidade || 0);
                   const unit = Number(item.valor_unitario_estimado || 0);
@@ -771,7 +783,7 @@ export default function DfdDetailsPage() {
                   return (
                     <article
                       key={item.id}
-                      className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3"
+                      className="rounded-2xl border border-[#DCE7F2] bg-white p-4 shadow-sm"
                     >
                       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
                         <div className="min-w-0 space-y-2">
@@ -845,16 +857,16 @@ export default function DfdDetailsPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-[#CAD8E8] bg-gradient-to-b from-white to-[#F8FBFF] p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
           >
-            <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073]">
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#123B6B]">
               <Clock size={18} weight="fill" />
               Histórico de tramitação
             </h2>
-            <p className="mt-1 text-xs leading-5 text-[#5B6675]">
+            <p className="mt-1 text-sm leading-6 text-[#4D6078]">
               Use este histórico para entender o que aconteceu e o que pode acontecer em seguida.
             </p>
-            <div className="mt-3">
+            <div className="mt-3 rounded-xl border border-[#D9E3EE] bg-white p-2">
               <DfdTimeline logs={logs} />
             </div>
           </motion.section>
@@ -890,6 +902,15 @@ function MetaCard({
         </p>
         {rightContent || null}
       </div>
+    </div>
+  );
+}
+
+function QuickStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#D6E2EF] bg-white px-3 py-2.5">
+      <p className="text-[11px] font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
+      <p className="mt-1 text-sm font-bold text-[#123B6B]">{value}</p>
     </div>
   );
 }
