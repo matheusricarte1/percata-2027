@@ -59,6 +59,8 @@ type DfdDetails = {
   analysis_unidade_id?: string | null;
   analysis_tipo_unidade?: "departamento" | "laboratorio" | null;
   analysis_routing_reason?: string | null;
+  analysis_responsavel_nome?: string | null;
+  analysis_responsavel_avatar_url?: string | null;
   profiles?: { full_name?: string | null; email?: string | null; avatar_url?: string | null } | null;
   campi?: { nome?: string | null; sigla?: string | null } | null;
 };
@@ -174,6 +176,34 @@ export default function DfdDetailsPage() {
 
       const unidadeNome =
         deptResult.data?.nome || labResult.data?.nome || dfdData?.local_de_uso || null;
+      let analysisResponsibleName: string | null = null;
+      let analysisResponsibleAvatarUrl: string | null = null;
+
+      if (analysisUnitId && analysisUnitType) {
+        const { data: chefiaLink, error: chefiaLinkError } = await supabase
+          .from("user_units")
+          .select("user_id")
+          .eq("unit_id", analysisUnitId)
+          .eq("unit_type", analysisUnitType)
+          .eq("role_in_unit", "chefia")
+          .limit(1)
+          .maybeSingle();
+        if (chefiaLinkError) throw chefiaLinkError;
+
+        if (chefiaLink?.user_id) {
+          const { data: chefiaProfile, error: chefiaProfileError } = await supabase
+            .from("profiles")
+            .select("full_name,email,avatar_url")
+            .eq("id", chefiaLink.user_id)
+            .maybeSingle();
+          if (chefiaProfileError) throw chefiaProfileError;
+          analysisResponsibleName =
+            String(chefiaProfile?.full_name || "").trim() ||
+            String(chefiaProfile?.email || "").trim() ||
+            null;
+          analysisResponsibleAvatarUrl = chefiaProfile?.avatar_url || null;
+        }
+      }
 
       setDfd({
         ...dfdData,
@@ -182,6 +212,8 @@ export default function DfdDetailsPage() {
         unidade_nome: unidadeNome,
         analysis_unidade_nome:
           String(analysisUnitResult.data?.nome || "").trim() || unidadeNome,
+        analysis_responsavel_nome: analysisResponsibleName,
+        analysis_responsavel_avatar_url: analysisResponsibleAvatarUrl,
       });
 
       if (dfdData?.origin_type === "collective") {
@@ -571,8 +603,18 @@ export default function DfdDetailsPage() {
           <MetaCard
             icon={ShieldCheck}
             label="Responsável pela análise"
-            value={dfd.analysis_unidade_nome || dfd.unidade_nome || "Não informado"}
+            value={dfd.analysis_responsavel_nome || "Chefia não definida"}
             tone="violet"
+            rightContent={
+              dfd.analysis_responsavel_nome ? (
+                <CategoryAvatar
+                  name={dfd.analysis_responsavel_nome}
+                  avatarUrl={dfd.analysis_responsavel_avatar_url || null}
+                  category="chefia"
+                  size="md"
+                />
+              ) : null
+            }
           />
           <MetaCard
             icon={CalendarBlank}
