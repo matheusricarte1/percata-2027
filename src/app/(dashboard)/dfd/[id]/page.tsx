@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Printer,
-  DownloadSimple,
   XCircle,
   CircleNotch,
   FileText,
@@ -15,17 +13,20 @@ import {
   Paperclip,
   Buildings,
   ShieldCheck,
-  Hash,
   PaperPlaneTilt,
-  CurrencyDollar,
   Trash,
+  CaretRight,
+  House,
+  DotsThreeVertical,
+  CalendarBlank,
+  PencilSimpleLine,
+  MapPin,
+  ListBullets,
 } from "@phosphor-icons/react";
 import { useRouter, useParams } from "next/navigation";
 import { getSafeUser, supabase } from "@/lib/supabase";
-import { DfdTimeline } from "@/components/dfd/DfdTimeline";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { resolveCampusBranding } from "@/lib/campus-branding";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { buildDfdPrintExportCsv } from "@/lib/dfd-print-export";
@@ -102,76 +103,6 @@ const STATUS_META: Record<DfdStatus, { label: string; className: string }> = {
   devolvida: { label: "Devolvida", className: "bg-[#FFF3E6] text-[#B9895A]" },
   pactuando: { label: "Pactuação", className: "bg-[#E8EDF2] text-[#2D5D94]" },
   concluida: { label: "Concluída", className: "bg-[#E7F0EA] text-[#5F735C]" },
-};
-
-const STATUS_GUIDANCE: Record<
-  DfdStatus,
-  {
-    title: string;
-    description: string;
-    highlights: string[];
-  }
-> = {
-  rascunho: {
-    title: "Esta DFD ainda está em construção",
-    description:
-      "O objetivo agora é garantir que a demanda esteja compreensível para quem vai analisar depois.",
-    highlights: [
-      "Conferir se o objeto está claro",
-      "Validar se cada item tem justificativa e referência",
-      "Enviar apenas quando a leitura estiver madura",
-    ],
-  },
-  devolvida: {
-    title: "Esta DFD voltou para ajuste",
-    description:
-      "Use o histórico e os itens para entender o que precisa ser corrigido antes do reenvio.",
-    highlights: [
-      "Ler o parecer da devolução",
-      "Revisar itens, quantidades e justificativas",
-      "Reenviar só depois de eliminar as pendências",
-    ],
-  },
-  triagem: {
-    title: "A demanda está em análise pela chefia",
-    description:
-      "Agora a função desta tela é acompanhar o processo e manter rastreabilidade do que foi enviado.",
-    highlights: [
-      "Acompanhar o histórico de tramitação",
-      "Usar a impressão e o CSV quando precisar compartilhar",
-      "Observar se houver devolução para correção",
-    ],
-  },
-  aprovada: {
-    title: "A DFD foi homologada",
-    description:
-      "A demanda já passou pela triagem e segue como referência oficial para as próximas etapas.",
-    highlights: [
-      "Usar esta tela como memória da decisão",
-      "Conferir itens homologados e valores",
-      "Acompanhar movimentações posteriores no histórico",
-    ],
-  },
-  pactuando: {
-    title: "A demanda está em pactuação",
-    description:
-      "Esta etapa exige leitura cuidadosa do que foi homologado e do que ainda pode sofrer ajuste institucional.",
-    highlights: [
-      "Conferir alinhamento entre valor e prioridade",
-      "Usar o histórico para sustentar decisões",
-      "Preservar o contexto original da demanda",
-    ],
-  },
-  concluida: {
-    title: "A DFD está concluída",
-    description:
-      "A demanda já percorreu o fluxo principal. Esta tela passa a servir como registro e consulta.",
-    highlights: [
-      "Retomar o histórico quando necessário",
-      "Usar a exportação para consultas futuras",
-      "Tomar esta DFD como referência final do processo",
-    ],
-  },
 };
 
 export default function DfdDetailsPage() {
@@ -452,7 +383,6 @@ export default function DfdDetailsPage() {
 
   const status = STATUS_META[dfd.status] || STATUS_META.rascunho;
   const campusLabel = dfd.campi?.nome || dfd.campi?.sigla || dfd.campus || "Campus UPE";
-  const campusBranding = resolveCampusBranding(campusLabel);
   const totalGeral = items.reduce(
     (acc, item) => acc + Number(item.quantidade || 0) * Number(item.valor_unitario_estimado || 0),
     0,
@@ -466,14 +396,6 @@ export default function DfdDetailsPage() {
       currentUserId,
       solicitanteId: dfd.solicitante_id,
     });
-  const statusGuide = STATUS_GUIDANCE[dfd.status] || STATUS_GUIDANCE.rascunho;
-  const infoReadiness = [
-    Boolean(String(dfd.objeto_contratacao || "").trim()),
-    Boolean(String(dfd.justificativa_contratacao || "").trim()),
-    items.length > 0,
-    items.every((item) => Boolean(String(item.justificativa_item || "").trim())),
-  ].filter(Boolean).length;
-  const readinessPercent = Math.round((infoReadiness / 4) * 100);
   const collectiveAuthorsSummary = collectiveAuthors
     .map((author) => {
       const name = String(
@@ -485,282 +407,183 @@ export default function DfdDetailsPage() {
       return `${name} (qtd ${Number(author.quantidade_total || 0)})`;
     })
     .join("; ");
+  const timelineEntries = buildTimelineEntries(logs);
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-5 px-4 py-5 pb-24 md:px-6 lg:px-8">
-      <header className="rounded-2xl border border-[#C9D7E8] bg-gradient-to-b from-white to-[#F7FAFD] p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:p-6">
+    <div className="mx-auto max-w-[1280px] space-y-4 px-4 py-5 pb-24 md:px-6 lg:px-8">
+      <nav className="flex items-center gap-2 text-sm font-medium text-[#466188]">
+        <button type="button" onClick={() => router.push("/dashboard")} className="inline-flex items-center gap-1.5 hover:text-[#1B57E0]">
+          <House size={14} />
+          Início
+        </button>
+        <CaretRight size={12} className="text-[#8BA0BC]" />
+        <button type="button" onClick={() => router.push("/minhas-dfds")} className="hover:text-[#1B57E0]">
+          DFDs
+        </button>
+        <CaretRight size={12} className="text-[#8BA0BC]" />
+        <span className="text-[#2A4267]">Detalhes da DFD</span>
+      </nav>
+
+      <header className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.06)] md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D9E0E8] bg-[#FAFBFC] text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D7E2F0] bg-[#F7FAFF] text-[#36557F] hover:bg-[#EDF3FD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
                 aria-label="Voltar"
               >
                 <ArrowLeft size={16} />
               </button>
-              <span className="rounded-full bg-[#E3ECF7] px-3 py-1 text-xs font-semibold text-[#123B6B]">
-                {dfd.numero_protocolo || `DFD-${dfd.id.slice(0, 8).toUpperCase()}`}
-              </span>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}
-              >
+              <h1 className="text-4xl font-bold tracking-tight text-[#0D2A62]">
+                {dfd.numero_protocolo || `DFD #${dfd.id.slice(0, 8).toUpperCase()}`}
+              </h1>
+              <span className={`rounded-full px-4 py-1 text-sm font-semibold ${status.className}`}>
                 {status.label}
               </span>
             </div>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#123B6B] md:text-[2.2rem]">
-              {dfd.objeto_contratacao || "Demanda sem objeto informado"}
-            </h1>
-            <p className="mt-1 max-w-3xl text-[15px] leading-6 text-[#4A5D75]">
-              Uma leitura clara da demanda, dos itens e das decisões já registradas.
-            </p>
-            <p className="mt-2 text-sm font-medium text-[#5E748E]">
-              {campusLabel} • registrada em{" "}
-              {new Date(dfd.created_at).toLocaleDateString("pt-BR")}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-2 md:max-w-3xl md:grid-cols-4">
-              <QuickStat label="Status" value={status.label} />
-              <QuickStat label="Itens" value={String(items.length)} />
-              <QuickStat label="Total estimado" value={formatCurrency(totalGeral)} />
-              <QuickStat label="Prontidão" value={`${readinessPercent}%`} />
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-lg text-[#8BA0BC]">
+              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[#244D87]">
+                <Buildings size={24} />
+                <span className="text-xl">{campusLabel}</span>
+              </p>
+              <span>|</span>
+              <p className="inline-flex items-center gap-2 text-lg font-semibold text-[#244D87]">
+                <CalendarBlank size={24} />
+                <span className="text-xl">Ciclo: {String(dfd.exercicio || 2027)}</span>
+              </p>
             </div>
           </div>
 
-          <div className="w-full rounded-xl border border-[#D8E3EF] bg-white/90 p-3 lg:w-auto lg:min-w-[360px]">
-            <p className="text-sm font-semibold text-[#123B6B]">Ações da DFD</p>
-            <p className="mt-0.5 text-xs text-[#5E748E]">
-              A ação principal aparece primeiro; opções auxiliares ficam em segundo plano.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-            {canSendToChefia && (
+          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <button
+              type="button"
+              onClick={() => router.push("/minhas-dfds")}
+              className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#BFD4F2] bg-white px-5 text-base font-semibold text-[#1B57E0] hover:bg-[#F3F8FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
+            >
+              <PencilSimpleLine size={18} />
+              Editar
+            </button>
+            {canSendToChefia ? (
               <button
                 type="button"
                 onClick={handleSendToTriagem}
                 disabled={sendingToChefia}
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-sm font-semibold text-white hover:bg-[#1C5A6B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-12 items-center gap-2 rounded-xl bg-[#1656E8] px-5 text-base font-semibold text-white hover:bg-[#1147C2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1656E8]/40 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {sendingToChefia ? (
-                  <CircleNotch size={14} className="animate-spin" />
-                ) : (
-                  <PaperPlaneTilt size={14} weight="bold" />
-                )}
+                {sendingToChefia ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneTilt size={18} />}
                 {sendingToChefia ? "Enviando..." : "Enviar para análise"}
               </button>
-            )}
-            {canMarkAsKit && (
-              <button
-                type="button"
-                onClick={handleMarkAsKit}
-                disabled={markingKit}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-sm font-semibold text-[#164073] hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Package size={14} weight="bold" />
-                {markingKit ? "Marcando..." : "Marcar como kit"}
-              </button>
-            )}
-            {canDeleteDfdAsSuperadmin && (
-              <button
-                type="button"
-                onClick={handleDeleteDfdAsSuperadmin}
-                disabled={deletingDfd}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {deletingDfd ? (
-                  <CircleNotch size={14} className="animate-spin" />
-                ) : (
-                  <Trash size={14} weight="bold" />
-                )}
-                {deletingDfd ? "Excluindo..." : "Excluir DFD"}
-              </button>
-            )}
-            {isEditablePhase && !canSendToChefia && (
-              <span className="inline-flex min-h-11 max-w-[260px] items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-3 text-xs font-semibold text-[#8A6424]">
+            ) : isEditablePhase ? (
+              <span className="inline-flex h-12 items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-4 text-sm font-semibold text-[#8A6424]">
                 Somente quem criou a DFD pode enviar
               </span>
-            )}
+            ) : null}
             <button
               type="button"
               onClick={() => router.push(`/dfd/${id}/impressao`)}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
-              aria-label="Imprimir DFD"
+              className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#BFD4F2] bg-white px-5 text-base font-semibold text-[#1B57E0] hover:bg-[#F3F8FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
             >
-              <Printer size={14} weight="fill" />
-              Imprimir
+              <Printer size={18} weight="fill" />
+              Exportar PDF
             </button>
             <button
               type="button"
               onClick={handleDownloadData}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
-              aria-label="Baixar dados da DFD"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#BFD4F2] bg-white text-[#1B57E0] hover:bg-[#F3F8FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B57E0]/30"
+              aria-label="Mais opções"
             >
-              <DownloadSimple size={14} weight="bold" />
-              CSV
+              <DotsThreeVertical size={18} weight="bold" />
             </button>
-            </div>
+            {canMarkAsKit ? (
+              <button
+                type="button"
+                onClick={handleMarkAsKit}
+                disabled={markingKit}
+                className="inline-flex h-12 items-center gap-2 rounded-xl border border-[#BFD4F2] bg-white px-4 text-sm font-semibold text-[#1B57E0] hover:bg-[#F3F8FF] disabled:opacity-60"
+              >
+                <Package size={16} />
+                {markingKit ? "Marcando..." : "Kit"}
+              </button>
+            ) : null}
+            {canDeleteDfdAsSuperadmin ? (
+              <button
+                type="button"
+                onClick={handleDeleteDfdAsSuperadmin}
+                disabled={deletingDfd}
+                className="inline-flex h-12 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+              >
+                {deletingDfd ? <CircleNotch size={16} className="animate-spin" /> : <Trash size={16} weight="bold" />}
+                Excluir
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
 
-      <section className="rounded-2xl border border-[#C9D7E8] bg-gradient-to-r from-[#F2F7FC] to-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.03em] text-[#3E6A95]">
-              Leitura da etapa atual
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-[#123B6B] md:text-2xl">
-              {statusGuide.title}
-            </h2>
-            <p className="mt-2 max-w-3xl text-[15px] leading-7 text-[#455B74]">
-              {statusGuide.description}
-            </p>
-            <div className="mt-4 rounded-xl border border-[#D7E3F0] bg-white p-4">
-              <p className="text-sm font-semibold text-[#274A70]">
-                O que fazer agora
-              </p>
-              <ul className="mt-2 space-y-2.5 text-sm text-[#445164]">
-                {statusGuide.highlights.map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#47739F]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-[#D7E3F0] bg-white p-4">
-              <p className="text-base font-bold text-[#123B6B]">Pulso desta DFD</p>
-            <div className="mt-4 grid gap-3">
-              <ReadinessMetric label="Itens vinculados" value={items.length} />
-              <ReadinessMetric label="Valor estimado" value={formatCurrency(totalGeral)} />
-              <ReadinessMetric label="Prontidão da leitura" value={`${readinessPercent}%`} />
-            </div>
-          </div>
+      <section className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetaCard
+            icon={User}
+            label="Solicitante"
+            value={dfd.profiles?.full_name || "Não identificado"}
+            tone="blue"
+            rightContent={
+              <ProfileAvatar
+                name={dfd.profiles?.full_name || "Usuário"}
+                avatarUrl={dfd.profiles?.avatar_url || null}
+              />
+            }
+          />
+          <MetaCard icon={Buildings} label="Campus" value={campusLabel} tone="teal" />
+          <MetaCard icon={MapPin} label="Local de uso" value={dfd.unidade_nome || "Não informado"} tone="violet" />
+          <MetaCard
+            icon={ShieldCheck}
+            label="Responsável pela análise"
+            value={dfd.analysis_unidade_nome || dfd.unidade_nome || "Não informado"}
+            tone="violet"
+          />
+          <MetaCard
+            icon={CalendarBlank}
+            label="Data de registro"
+            value={new Date(dfd.created_at).toLocaleDateString("pt-BR")}
+            tone="amber"
+          />
+          <MetaCard icon={Clock} label="Ciclo" value={String(dfd.exercicio || 2027)} tone="teal" />
+          <ValueCard label="Total estimado" value={formatCurrency(totalGeral)} className="md:col-span-2" />
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4 lg:col-span-2">
-          <section className="rounded-2xl border border-[#D1DEEC] bg-white p-5 shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#123B6B]">
-                <FileText size={18} weight="fill" />
-                Contexto da DFD
-              </h2>
-              <img src={campusBranding.logoSrc} alt={campusBranding.label} className="h-8 w-auto" />
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <MetaCard
-                icon={User}
-                label="Solicitante"
-                value={dfd.profiles?.full_name || "Não identificado"}
-                rightContent={
-                  <ProfileAvatar
-                    name={dfd.profiles?.full_name || "Usuário"}
-                    avatarUrl={dfd.profiles?.avatar_url || null}
-                  />
-                }
-              />
-              <MetaCard icon={Buildings} label="Campus" value={campusLabel} />
-              <MetaCard icon={Buildings} label="Local de uso" value={dfd.unidade_nome || "Não informado"} />
-              <MetaCard
-                icon={ShieldCheck}
-                label="Responsável pela análise"
-                value={dfd.analysis_unidade_nome || dfd.unidade_nome || "Não informado"}
-              />
-              <MetaCard
-                icon={Clock}
-                label="Data de registro"
-                value={new Date(dfd.created_at).toLocaleDateString("pt-BR")}
-              />
-              <MetaCard
-                icon={ShieldCheck}
-                label="Ciclo"
-                value={String(dfd.exercicio || 2027)}
-              />
-              <MetaCard
-                icon={CurrencyDollar}
-                label="Total estimado"
-                value={formatCurrency(totalGeral)}
-              />
-            </div>
-
-            {dfd.origin_type === "collective" ? (
-              <div className="mt-3 rounded-xl border border-[#D9E0E8] bg-[#F7FBFF] p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#47739F]">
-                  Procedência coletiva
-                </p>
-                <div className="mt-2 grid gap-3 md:grid-cols-3">
-                  <div>
-                    <p className="text-xs font-semibold text-[#164073]">Sala de origem</p>
-                    <p className="mt-1 text-sm text-[#3E4C5F]">
-                      {dfd.collective_origin_room_title || "Sala coletiva não identificada"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[#164073]">Natureza da saída</p>
-                    <p className="mt-1 text-sm text-[#3E4C5F]">
-                      {String(dfd.collective_origin_expense_class || "")
-                        .replace("custeio", "Despesa corrente")
-                        .replace("investimento", "Despesa de capital")
-                        .replace("outro", "Outra natureza")
-                        .replace("sem-gnd", "Sem GND")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[#164073]">Coautoria preservada</p>
-                    <p className="mt-1 text-sm text-[#3E4C5F]">
-                      {collectiveAuthors.length} participante(s) com registro estruturado
-                    </p>
-                  </div>
-                </div>
-                {collectiveAuthors.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {collectiveAuthors.map((author) => {
-                      const name = String(
-                        author.author_name_snapshot ||
-                          author.author_email_snapshot ||
-                          author.contribution_user_id ||
-                          "Autor",
-                      ).trim();
-                      return (
-                        <span
-                          key={author.contribution_user_id}
-                          className="inline-flex items-center rounded-full border border-[#C7D7EA] bg-white px-3 py-1 text-xs font-medium text-[#34506F]"
-                        >
-                          {name} • {Number(author.quantidade_total || 0)} un.
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="mt-4 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-4">
-              <p className="text-xs font-semibold tracking-[0.03em] text-[#5A7596]">
-                Justificativa da DFD
-              </p>
-              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#3E4C5F]">
-                {dfd.justificativa_contratacao ||
-                  "Sem justificativa registrada para esta solicitação."}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-4">
+          <section className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
+            <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-[#0D2A62]">
+              <FileText size={30} weight="fill" />
+              Justificativa da DFD
+            </h2>
+            <div className="mt-4 rounded-xl border border-[#C9DAF4] bg-[#F6FAFF] p-5">
+              <p className="whitespace-pre-wrap text-lg leading-relaxed text-[#1F3B63]">
+                {dfd.justificativa_contratacao || "Sem justificativa registrada para esta solicitação."}
               </p>
               {dfd.analysis_routing_reason ? (
-                <p className="mt-2 rounded-lg border border-[#D9E0E8] bg-white px-3 py-2 text-xs font-semibold text-[#3E4C5F]">
+                <p className="mt-4 rounded-lg border border-[#D9E0E8] bg-white px-3 py-2 text-sm font-semibold text-[#3E4C5F]">
                   Roteamento da chefia: {dfd.analysis_routing_reason}
                 </p>
               ) : null}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[#D1DEEC] bg-white shadow-[0_4px_16px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center justify-between border-b border-[#E8EDF2] px-4 py-3">
-              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#123B6B]">
-                <Package size={18} weight="fill" />
-                Itens da DFD ({items.length})
+          <section className="rounded-2xl border border-[#D5E1F0] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center justify-between border-b border-[#E2ECF7] px-5 py-4">
+              <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-[#0D2A62]">
+                <Package size={30} weight="fill" />
+                Itens da DFD
+                <span className="rounded-full bg-[#E8F0FF] px-3 py-1 text-sm font-semibold text-[#1B57E0]">
+                  {items.length} item{items.length === 1 ? "" : "s"}
+                </span>
               </h2>
-              <p className="text-sm font-semibold text-[#164073]">{formatCurrency(totalGeral)}</p>
+              <p className="text-xl font-bold text-[#1656E8]">{formatCurrency(totalGeral)}</p>
             </div>
 
             {items.length === 0 ? (
@@ -783,53 +606,53 @@ export default function DfdDetailsPage() {
                   return (
                     <article
                       key={item.id}
-                      className="rounded-2xl border border-[#DCE7F2] bg-white p-4 shadow-sm"
+                      className="rounded-xl border border-[#D7E2F1] bg-[#FCFEFF] p-4 shadow-sm"
                     >
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[#E8EDF2] px-2.5 py-1 text-[11px] font-semibold text-[#164073]">
-                              Item {index + 1}
+                      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#1B57E0] text-xl font-bold text-white">
+                              {String(index + 1).padStart(2, "0")}
                             </span>
-                            {item.codigo_tce ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#4B5C71]">
-                                <Hash size={11} />
-                                {item.codigo_tce}
-                              </span>
-                            ) : null}
+                            <div>
+                              <p className="text-sm text-[#60748D]">Código</p>
+                              <p className="text-2xl font-bold text-[#0D2A62]">#{item.codigo_tce || "N/A"}</p>
+                            </div>
                           </div>
-                          <h3 className="break-words text-base font-semibold leading-7 text-[#123B6B] [overflow-wrap:anywhere]">
+                          <h3 className="mt-3 break-words text-2xl font-semibold leading-[1.35] text-[#112F62] [overflow-wrap:anywhere]">
                             {formatCatalogDescription(item.descricao)}
                           </h3>
-                          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                            <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
-                            <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
-                            <SmallInfo label="GND" value={item.gnd || "Não informado"} />
-                          </div>
                         </div>
-
-                        <div className="grid grid-cols-3 gap-2 lg:ml-4">
-                          <MetricChip label="Qtd." value={String(qtd)} />
-                          <MetricChip label="Unitário" value={formatCurrency(unit)} />
+                        <div className="grid grid-cols-3 gap-2">
+                          <MetricChip label="QTD." value={String(qtd)} />
+                          <MetricChip label="Valor unitário" value={formatCurrency(unit)} />
                           <MetricChip label="Subtotal" value={formatCurrency(subtotal)} />
                         </div>
                       </div>
 
+                      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                        <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
+                        <SmallInfo label="Unidade" value={item.unidade_medida || "UN"} />
+                        <SmallInfo label="GND" value={item.gnd || "Não informado"} />
+                      </div>
+
                       {justificationText ? (
-                        <div className="mt-2 rounded-lg border border-[#D9E0E8] bg-white p-2.5">
-                          <p className="text-xs font-semibold tracking-[0.03em] text-[#5A7596]">
+                        <div className="mt-3 rounded-lg border border-[#D9E0E8] bg-white p-3">
+                          <p className="text-sm font-semibold tracking-[0.03em] text-[#5A7596]">
                             Justificativa do item
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-xs text-[#5B6675]">{justificationText}</p>
+                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#5B6675]">
+                            {justificationText}
+                          </p>
                         </div>
                       ) : null}
 
                       {dfd.origin_type === "collective" && distributionText ? (
                         <div className="mt-2 rounded-lg border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] p-2.5">
-                          <p className="text-xs font-semibold tracking-[0.03em] text-[var(--semantic-collab)]">
+                          <p className="text-sm font-semibold tracking-[0.03em] text-[var(--semantic-collab)]">
                             Distribuição da sala coletiva
                           </p>
-                          <p className="mt-1 break-words text-xs font-semibold text-[#3E4C5F]">{distributionText}</p>
+                          <p className="mt-1 break-words text-sm font-semibold text-[#3E4C5F]">{distributionText}</p>
                         </div>
                       ) : null}
 
@@ -838,9 +661,9 @@ export default function DfdDetailsPage() {
                           href={item.link_referencia}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#2D5D94] hover:underline"
+                          className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#1B57E0] hover:underline"
                         >
-                          <Paperclip size={13} />
+                          <Paperclip size={14} />
                           Abrir referência técnica
                         </a>
                       ) : null}
@@ -852,25 +675,62 @@ export default function DfdDetailsPage() {
           </section>
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="rounded-2xl border border-[#CAD8E8] bg-gradient-to-b from-white to-[#F8FBFF] p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
-          >
-            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-[#123B6B]">
-              <Clock size={18} weight="fill" />
-              Histórico de tramitação
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-[#4D6078]">
-              Use este histórico para entender o que aconteceu e o que pode acontecer em seguida.
-            </p>
-            <div className="mt-3 rounded-xl border border-[#D9E3EE] bg-white p-2">
-              <DfdTimeline logs={logs} />
+        <section className="rounded-2xl border border-[#D5E1F0] bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] lg:sticky lg:top-4 lg:h-fit">
+          <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-[#0D2A62]">
+            <Clock size={30} weight="fill" />
+            Histórico de tramitação
+          </h2>
+          <p className="mt-2 text-base leading-6 text-[#38567F]">
+            Acompanhe as etapas e movimentações desta DFD.
+          </p>
+
+          {timelineEntries.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-[#C9DAF4] bg-[#F6FAFF] px-4 py-8 text-center text-sm text-[#60748D]">
+              Ainda não há movimentações registradas.
             </div>
-          </motion.section>
-        </div>
+          ) : (
+            <div className="mt-5 space-y-5">
+              {timelineEntries.map((entry, index) => {
+                const meta = getTimelineMeta(entry.action);
+                const isLatest = index === 0;
+                return (
+                  <div key={entry.id || `${entry.action}-${entry.created_at}-${index}`} className="relative flex gap-3">
+                    {index < timelineEntries.length - 1 ? (
+                      <span className="absolute left-[10px] top-8 h-[calc(100%-8px)] w-px bg-[#BFD4F2]" />
+                    ) : null}
+                    <span className={`z-10 mt-1 h-5 w-5 rounded-full border-4 ${meta.dot}`} />
+                    <div className={`flex-1 rounded-xl border px-4 py-3 ${isLatest ? "border-[#BFD4F2] bg-[#F5F9FF]" : "border-[#E1EAF6] bg-white"}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-lg font-bold text-[#123B6B]">{meta.label}</p>
+                        {isLatest ? (
+                          <span className="rounded-full bg-[#E4EEFF] px-2 py-0.5 text-xs font-bold text-[#1B57E0]">
+                            ATUAL
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-[17px] text-[#405B7E]">
+                        {entry.details || "Movimentação registrada automaticamente pelo sistema."}
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-[#5E7695]">
+                        {formatTimelineDate(entry.created_at)}
+                        {entry.actor_name ? ` • ${entry.actor_name}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => router.push("/historico")}
+            className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#BFD4F2] bg-white text-base font-semibold text-[#1B57E0] hover:bg-[#F3F8FF]"
+          >
+            <ListBullets size={18} />
+            Ver todas as movimentações
+          </button>
+        </section>
       </div>
       <DfdSubmissionAnimation
         open={submissionAnimationOpen}
@@ -886,19 +746,28 @@ function MetaCard({
   label,
   value,
   rightContent,
+  tone = "blue",
 }: {
   icon: any;
   label: string;
   value: string;
   rightContent?: React.ReactNode;
+  tone?: "blue" | "teal" | "violet" | "amber";
 }) {
+  const toneMap: Record<string, string> = {
+    blue: "border-[#CFE0F8] bg-[#F5F9FF] text-[#21508F]",
+    teal: "border-[#CBEAE9] bg-[#F2FBFB] text-[#1F7478]",
+    violet: "border-[#E2D7F7] bg-[#FAF7FF] text-[#6D4CC4]",
+    amber: "border-[#F5E3BC] bg-[#FFF9EE] text-[#A36B16]",
+  };
+
   return (
-    <div className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3">
-      <p className="text-xs font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
+    <div className={`rounded-xl border p-4 ${toneMap[tone] || toneMap.blue}`}>
+      <p className="text-sm font-medium tracking-[0.02em] opacity-85">{label}</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="inline-flex min-w-0 items-center gap-1.5 truncate text-[15px] font-semibold text-[#2F4157]">
-          <Icon size={14} />
-          <span className="truncate">{value}</span>
+        <p className="inline-flex min-w-0 items-start gap-2 text-lg font-semibold leading-tight">
+          <Icon size={20} className="mt-0.5 shrink-0" />
+          <span className="line-clamp-2 break-words">{value}</span>
         </p>
         {rightContent || null}
       </div>
@@ -906,31 +775,67 @@ function MetaCard({
   );
 }
 
-function QuickStat({ label, value }: { label: string; value: string }) {
+function ValueCard({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="rounded-xl border border-[#D6E2EF] bg-white px-3 py-2.5">
-      <p className="text-[11px] font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
-      <p className="mt-1 text-sm font-bold text-[#123B6B]">{value}</p>
+    <div className={`rounded-xl border border-[#79B3F8] bg-gradient-to-r from-[#0F97E7] via-[#33A1F0] to-[#3F6DEB] p-4 text-white ${className || ""}`}>
+      <p className="text-base font-semibold opacity-95">{label}</p>
+      <p className="mt-1 text-3xl font-bold leading-tight">{value}</p>
     </div>
   );
 }
 
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[#E2E8F0] bg-white p-2">
-      <p className="text-[11px] font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-[#2F4157]">{value}</p>
+    <div className="rounded-xl border border-[#D7E2F1] bg-[#F8FBFF] px-3 py-2.5">
+      <p className="text-sm font-medium text-[#60748D]">{label}</p>
+      <p className="mt-1 text-lg font-semibold leading-tight text-[#1E3E6A]">{value}</p>
     </div>
   );
 }
 
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-[#D9E0E8] bg-white px-2.5 py-2 text-center">
-      <p className="text-[10px] font-semibold tracking-[0.04em] text-[#60748D]">{label}</p>
-      <p className="mt-1 break-words text-sm font-semibold leading-tight text-[#164073]">{value}</p>
+    <div className="min-w-0 rounded-xl border border-[#D7E2F1] bg-[#F3F8FF] px-3 py-3 text-center">
+      <p className="text-sm font-semibold text-[#60748D]">{label}</p>
+      <p className="mt-1 break-words text-2xl font-bold leading-tight text-[#124078]">{value}</p>
     </div>
   );
+}
+
+function buildTimelineEntries(logs: any[]) {
+  const seen = new Set<string>();
+  return (logs || []).filter((log) => {
+    const created = String(log?.created_at || "").slice(0, 16);
+    const key = `${String(log?.action || "").toLowerCase()}|${String(log?.details || "")}|${created}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getTimelineMeta(action: string) {
+  const map: Record<string, { label: string; dot: string }> = {
+    rascunho: { label: "Rascunho criado", dot: "border-[#BFD4F2] bg-[#1B57E0]" },
+    triagem: { label: "DFD criada", dot: "border-[#BFE8EB] bg-[#16A0AA]" },
+    aprovada: { label: "DFD aprovada", dot: "border-[#D8E6CB] bg-[#5F9B47]" },
+    devolvida: { label: "DFD devolvida", dot: "border-[#F7D6B7] bg-[#D7812F]" },
+    pactuando: { label: "Em pactuação", dot: "border-[#D9CCFF] bg-[#7650E6]" },
+    concluida: { label: "Processo concluído", dot: "border-[#CFE6DE] bg-[#5F735C]" },
+  };
+  return map[action] || { label: "Início do processo", dot: "border-[#D9CCFF] bg-[#7650E6]" };
+}
+
+function formatTimelineDate(value?: string | null) {
+  if (!value) return "Data não informada";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Data não informada";
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatJustificationForDisplay(value?: string | null) {
@@ -969,8 +874,8 @@ function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | 
   const [broken, setBroken] = useState(false);
 
   if (!avatarUrl || broken) {
-    return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#D9E0E8] bg-[#E8EDF2] text-[10px] font-semibold uppercase text-[#164073]">
+      return (
+      <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D2DEF0] bg-white text-sm font-semibold uppercase text-[#164073]">
         {getInitials(name)}
       </div>
     );
@@ -980,17 +885,8 @@ function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | 
     <img
       src={avatarUrl}
       alt={name}
-      className="h-8 w-8 rounded-full border border-[#D9E0E8] object-cover"
+      className="h-11 w-11 rounded-full border border-[#D2DEF0] object-cover"
       onError={() => setBroken(true)}
     />
-  );
-}
-
-function ReadinessMetric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3">
-      <p className="text-xs font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
-      <p className="mt-1 text-base font-semibold text-[#164073]">{value}</p>
-    </div>
   );
 }
