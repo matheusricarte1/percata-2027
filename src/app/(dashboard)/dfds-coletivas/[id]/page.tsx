@@ -239,6 +239,7 @@ export default function DfdColetivaDetailPage() {
   const [savingCart, setSavingCart] = useState(false);
   const [flyingCartItems, setFlyingCartItems] = useState<FlyingCartItem[]>([]);
   const [cartPulseKey, setCartPulseKey] = useState(0);
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null);
   const cartTargetRef = useRef<HTMLButtonElement | null>(null);
   const roomStatus = detail?.room.status;
 
@@ -259,6 +260,24 @@ export default function DfdColetivaDetailPage() {
   useEffect(() => {
     if (roomId) loadDetail();
   }, [loadDetail, roomId]);
+
+  useEffect(() => {
+    let mounted = true;
+    void supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setViewerUserId(data.user?.id || null);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setViewerUserId(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!roomStatus) return;
@@ -873,6 +892,7 @@ export default function DfdColetivaDetailPage() {
               detail={detail}
               canContribute={canContributeInOpenRoom}
               onRequestContribution={addAggregatedItemToCart}
+              viewerUserId={viewerUserId}
             />
             <ConsolidationSummary
               detail={detail}
@@ -901,6 +921,7 @@ export default function DfdColetivaDetailPage() {
               saveMetadata={saveMetadata}
               savingMeta={savingMeta}
               canEditMetadata={Boolean(detail.room.can_edit_metadata)}
+              viewerUserId={viewerUserId}
             />
             <ApprovalSummary
               detail={detail}
@@ -1961,10 +1982,12 @@ function ConsolidationPanel({
   detail,
   canContribute,
   onRequestContribution,
+  viewerUserId,
 }: {
   detail: RoomDetail;
   canContribute: boolean;
   onRequestContribution: (item: AggregatedItem) => void;
+  viewerUserId: string | null;
 }) {
   return (
     <Panel>
@@ -1980,6 +2003,7 @@ function ConsolidationPanel({
         items={detail.items}
         canContribute={canContribute}
         onRequestContribution={onRequestContribution}
+        viewerUserId={viewerUserId}
       />
     </Panel>
   );
@@ -1989,10 +2013,12 @@ function ConsolidatedItemsTable({
   items,
   canContribute = false,
   onRequestContribution,
+  viewerUserId,
 }: {
   items: AggregatedItem[];
   canContribute?: boolean;
   onRequestContribution?: (item: AggregatedItem) => void;
+  viewerUserId?: string | null;
 }) {
   if (items.length === 0) {
     return (
@@ -2018,6 +2044,7 @@ function ConsolidatedItemsTable({
         <tbody>
           {items.map((item) => {
             const badge = getCatalogExpenseBadge(item.gnd || item.gnd_derivado || item.codigo_natureza_despesa);
+            const myQuantity = getViewerQuantityForItem(item, viewerUserId);
             return (
               <tr key={`${item.codigo_item_efisco || item.codigo_tce}-${item.gnd}`} className="border-b border-[#E2E8F0]">
                 <td className="max-w-[300px] py-4 pr-4 align-top">
@@ -2038,6 +2065,9 @@ function ConsolidatedItemsTable({
                 <td className="px-4 py-4 text-right align-top text-sm font-semibold">{formatCurrency(getItemSubtotal(item))}</td>
                 <td className="px-4 py-4 align-top">
                   <ParticipantDots contributors={item.contributors || []} />
+                  <p className="mt-1 text-[11px] font-semibold text-[#0B4AA2]">
+                    Minha quantidade: {myQuantity}
+                  </p>
                 </td>
                 <td className="py-4 pl-4 text-right align-top">
                   {canContribute ? (
@@ -2118,6 +2148,7 @@ function ReviewPanel({
   saveMetadata,
   savingMeta,
   canEditMetadata,
+  viewerUserId,
 }: {
   detail: RoomDetail;
   reviewTab: ReviewTab;
@@ -2125,6 +2156,7 @@ function ReviewPanel({
   saveMetadata: (event: FormEvent<HTMLFormElement>) => void;
   savingMeta: boolean;
   canEditMetadata: boolean;
+  viewerUserId: string | null;
 }) {
   const tabs: Array<{ id: ReviewTab; label: string }> = [
     { id: "itens", label: "Itens consolidados" },
@@ -2161,7 +2193,7 @@ function ReviewPanel({
         ))}
       </div>
       {reviewTab === "itens" && (
-        <ConsolidatedItemsTable items={detail.items} />
+        <ConsolidatedItemsTable items={detail.items} viewerUserId={viewerUserId} />
       )}
       {reviewTab === "informacoes" && (
         <form onSubmit={saveMetadata} className="mt-5 grid gap-4">
@@ -2467,6 +2499,14 @@ function ParticipantDots({
       )}
     </div>
   );
+}
+
+function getViewerQuantityForItem(item: AggregatedItem, viewerUserId?: string | null) {
+  if (!viewerUserId) return 0;
+  const contributors = item.contributors || [];
+  return contributors
+    .filter((contributor) => String(contributor.user_id || "") === String(viewerUserId))
+    .reduce((acc, contributor) => acc + Number(contributor.quantidade || 0), 0);
 }
 
 function ApprovalStep({ index, title, description }: { index: number; title: string; description: string }) {
