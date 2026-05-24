@@ -152,7 +152,7 @@ export function HumanLandingPage({
   }, []);
 
   return (
-    <main className="bg-white text-[#1E2430]">
+    <main className="bg-white text-[#1E2430]" data-animate-page data-animate-auto>
       <section className="relative overflow-hidden border-b border-[#E8EDF2] bg-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(243,208,190,0.28),transparent_34%),radial-gradient(circle_at_78%_16%,rgba(199,215,234,0.65),transparent_28%),linear-gradient(180deg,#ffffff_0%,#f8fbff_72%,#ffffff_100%)]" />
         <div className="absolute inset-y-0 right-0 hidden w-[56%] md:block">
@@ -222,7 +222,10 @@ export function HumanLandingPage({
             </div>
           </motion.div>
 
-          <div className="mt-14 grid gap-4 md:mt-16 md:max-w-[760px] md:grid-cols-2">
+          <div
+            className="mt-14 grid gap-4 md:mt-16 md:max-w-[760px] md:grid-cols-2"
+            data-animate-stagger
+          >
             <RolePanel
               tone="blue"
               title="Para quem cria a DFD"
@@ -251,7 +254,7 @@ export function HumanLandingPage({
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-6" data-animate-stagger>
             {FLOW_STEPS.map((step, index) => (
               <FlowStep
                 key={step.title}
@@ -278,7 +281,7 @@ export function HumanLandingPage({
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3" data-animate-stagger>
               {PILLARS.map((pillar) => (
                 <div
                   key={pillar.title}
@@ -306,7 +309,7 @@ export function HumanLandingPage({
             </p>
           </div>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4" data-animate-stagger>
             {EXPERIENCES.map((experience) => (
               <ExperienceCard key={experience.title} {...experience} />
             ))}
@@ -400,6 +403,7 @@ function RolePanel({
 }) {
   return (
     <div
+      data-animate-item
       className={
         tone === "warm"
           ? "rounded-[24px] border border-[#F0D3C0] bg-[#FFF7F1] p-5 shadow-sm"
@@ -430,7 +434,10 @@ function FlowStep({
   };
 }) {
   return (
-    <div className={`rounded-[22px] border p-5 shadow-sm transition-colors ${tone.card}`}>
+    <div
+      data-animate-item
+      className={`rounded-[22px] border p-5 shadow-sm transition-colors ${tone.card}`}
+    >
       <div className="flex items-center justify-between">
         <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.icon}`}>
           {icon}
@@ -457,7 +464,10 @@ function ExperienceCard({
   imageSrc: string;
 }) {
   return (
-    <article className="overflow-hidden rounded-[24px] border border-[#E8EDF2] bg-white shadow-sm">
+    <article
+      data-animate-item
+      className="overflow-hidden rounded-[24px] border border-[#E8EDF2] bg-white shadow-sm"
+    >
       <div className="border-b border-[#EEF2F6] bg-[#FBFCFE] p-4">
         <img
           src={imageSrc}
@@ -478,7 +488,10 @@ function ExperienceCard({
 
 function TrustPoint({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 rounded-[20px] border border-[#E8EDF2] bg-[#FBFCFE] px-4 py-4">
+    <div
+      data-animate-item
+      className="flex items-start gap-3 rounded-[20px] border border-[#E8EDF2] bg-[#FBFCFE] px-4 py-4"
+    >
       <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#173B69]">
         <Files size={16} weight="bold" />
       </span>

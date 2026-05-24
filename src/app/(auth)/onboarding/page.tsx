@@ -447,7 +447,11 @@ export default function OnboardingPage() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#EEF3F9]">
+    <div
+      className="relative min-h-screen overflow-x-hidden bg-[#EEF3F9]"
+      data-animate-page
+      data-animate-auto
+    >
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-[#DCEAF0] via-[#E8EDF2] to-[#F4F7FA]" />
         <div className="absolute inset-0">
@@ -571,12 +575,13 @@ export default function OnboardingPage() {
                         ? "Como superadmin, você pode alternar o campus ativo no topo e configurar os locais de ambos."
                         : "Escolha o campus principal para vincular departamentos e laboratórios."}
                     </p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-animate-stagger>
                       {campi.map((campus) => {
                         const selected = activeCampus === campus.id;
                         return (
                           <motion.button
                             key={campus.id}
+                            data-animate-item
                             type="button"
                             onClick={() => setActiveCampus(campus.id)}
                             whileHover={{ y: -2, scale: 1.01 }}
@@ -632,12 +637,13 @@ export default function OnboardingPage() {
                         </span>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-animate-stagger>
                       {filteredDepts.map((dept) => {
                         const selected = selectedDepts.includes(dept.id);
                         return (
                           <motion.button
                             key={dept.id}
+                            data-animate-item
                             type="button"
                             onClick={() => toggleSelection("depts", dept.id)}
                             whileHover={{ y: -2, scale: 1.005 }}
@@ -742,12 +748,13 @@ export default function OnboardingPage() {
                       </div>
                     )}
 
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-animate-stagger>
                       {filteredLabs.map((lab) => {
                         const selected = selectedLabs.includes(lab.id);
                         return (
                           <motion.button
                             key={lab.id}
+                            data-animate-item
                             type="button"
                             onClick={() => toggleSelection("labs", lab.id)}
                             whileHover={{ y: -2, scale: 1.005 }}

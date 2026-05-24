@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NavigationFeedback } from "@/components/feedback/NavigationFeedback";
 import { AnimationRuntime } from "@/components/motion/AnimationRuntime";
+import { GlobalRouteFrame } from "@/components/motion/GlobalRouteFrame";
 import CssBaseline from "@mui/material/CssBaseline";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import { ThemeProvider } from "@mui/material/styles";
@@ -102,7 +103,7 @@ export function AppProviders({ children }: AppProvidersProps) {
       >
         <CssBaseline enableColorScheme />
         <TooltipProvider>
-          {children}
+          <GlobalRouteFrame>{children}</GlobalRouteFrame>
           <AnimationRuntime />
           <NavigationFeedback />
           <Toaster richColors position="top-right" closeButton />
