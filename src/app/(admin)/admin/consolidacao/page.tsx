@@ -1736,7 +1736,8 @@ export default function ConsolidationPage() {
               </div>
             ) : (
               <Virtuoso
-                className="h-full"
+                className="w-full"
+                style={{ minHeight: 420, height: "100%" }}
                 data={displayItems}
                 overscan={320}
                 itemContent={(index, item) => {
