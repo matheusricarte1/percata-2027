@@ -887,7 +887,7 @@ export default function DfdDetailsPage() {
         onClose={() => setSubmissionAnimationOpen(false)}
       />
       <Dialog open={timelineModalOpen} onOpenChange={setTimelineModalOpen}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[80vh] overflow-y-auto border border-[var(--semantic-neutral-border)] bg-white text-[var(--semantic-text)] shadow-2xl sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Caminho completo da DFD</DialogTitle>
           </DialogHeader>
