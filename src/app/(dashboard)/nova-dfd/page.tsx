@@ -770,6 +770,9 @@ export default function NovaDFDPage() {
   const checklistPendingCount = checklistPreview.filter(
     (item) => item.state !== "done",
   ).length;
+  const pendingChecklistLabels = checklistPreview
+    .filter((item) => item.state !== "done")
+    .map((item) => item.label);
 
   const totalGeral = useMemo(
     () =>
@@ -1454,12 +1457,24 @@ export default function NovaDFDPage() {
               </p>
             </div>
             {blockingErrors.length > 0 ? (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {blockingErrors.length} ajuste(s) pendente(s)
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p className="font-semibold">
+                  Faltam {pendingChecklistLabels.length || blockingErrors.length} campo(s):
+                </p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {(pendingChecklistLabels.length > 0
+                    ? pendingChecklistLabels
+                    : ["Revise os campos obrigatórios da DFD"]).map((label) => (
+                    <li key={label}>{label}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-amber-800">
+                  Exemplo: {blockingErrors[0]}
+                </p>
               </div>
             ) : (
               <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                Validação parcial concluída
+                Tudo pronto para concluir ou encaminhar à chefia.
               </div>
             )}
           </div>
