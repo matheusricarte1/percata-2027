@@ -500,11 +500,11 @@ export default function DfdDetailsPage() {
               >
                 <ArrowLeft size={16} />
               </button>
-              <span className="rounded-full bg-[#E8EDF2] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#164073]">
+              <span className="rounded-full bg-[#E8EDF2] px-3 py-1 text-[11px] font-semibold text-[#164073]">
                 {dfd.numero_protocolo || `DFD-${dfd.id.slice(0, 8).toUpperCase()}`}
               </span>
               <span
-                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${status.className}`}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${status.className}`}
               >
                 {status.label}
               </span>
@@ -527,7 +527,7 @@ export default function DfdDetailsPage() {
                 type="button"
                 onClick={handleSendToTriagem}
                 disabled={sendingToChefia}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-white hover:bg-[#1C5A6B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1F6F78] px-4 text-[12px] font-semibold text-white hover:bg-[#1C5A6B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/40 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {sendingToChefia ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -542,7 +542,7 @@ export default function DfdDetailsPage() {
                 type="button"
                 onClick={handleMarkAsKit}
                 disabled={markingKit}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-[#164073] hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#F7FBFF] px-4 text-[12px] font-semibold text-[#164073] hover:bg-[#EAF2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Package size={14} weight="bold" />
                 {markingKit ? "Marcando..." : "Marcar como kit"}
@@ -553,7 +553,7 @@ export default function DfdDetailsPage() {
                 type="button"
                 onClick={handleDeleteDfdAsSuperadmin}
                 disabled={deletingDfd}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-[11px] font-semibold uppercase tracking-[0.11em] text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-[12px] font-semibold text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deletingDfd ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -564,14 +564,14 @@ export default function DfdDetailsPage() {
               </button>
             )}
             {isEditablePhase && !canSendToChefia && (
-              <span className="inline-flex min-h-10 max-w-[260px] items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A6424]">
+              <span className="inline-flex min-h-10 max-w-[260px] items-center rounded-xl border border-[#E8D7B7] bg-[#FFF8EA] px-3 text-[11px] font-semibold text-[#8A6424]">
                 Somente quem criou a DFD pode enviar
               </span>
             )}
             <button
               type="button"
               onClick={() => router.push(`/dfd/${id}/impressao`)}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[12px] font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
               aria-label="Imprimir DFD"
             >
               <Printer size={14} weight="fill" />
@@ -580,7 +580,7 @@ export default function DfdDetailsPage() {
             <button
               type="button"
               onClick={handleDownloadData}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-[12px] font-semibold text-[#3E4C5F] hover:bg-[#F4F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F6F78]/30"
               aria-label="Baixar dados da DFD"
             >
               <DownloadSimple size={14} weight="bold" />
@@ -593,7 +593,7 @@ export default function DfdDetailsPage() {
       <section className="rounded-2xl border border-[#D9E0E8] bg-white p-5 shadow-sm">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+            <p className="text-[11px] font-semibold text-[#47739F]">
               Leitura da etapa atual
             </p>
             <h2 className="mt-2 text-lg font-semibold text-[#164073] md:text-xl">
@@ -603,7 +603,7 @@ export default function DfdDetailsPage() {
               {statusGuide.description}
             </p>
             <div className="mt-4 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#64748B]">
+              <p className="text-[11px] font-semibold text-[#64748B]">
                 O que fazer agora
               </p>
               <ul className="mt-2 space-y-2 text-sm text-[#445164]">
@@ -617,7 +617,7 @@ export default function DfdDetailsPage() {
             </div>
           </div>
           <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4">
-            <p className="text-sm font-semibold text-[#164073]">Pulso desta DFD</p>
+              <p className="text-base font-semibold text-[#164073]">Pulso desta DFD</p>
             <div className="mt-4 grid gap-3">
               <ReadinessMetric label="Itens vinculados" value={items.length} />
               <ReadinessMetric label="Valor estimado" value={formatCurrency(totalGeral)} />
@@ -727,7 +727,7 @@ export default function DfdDetailsPage() {
             ) : null}
 
             <div className="mt-3 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#7D98B8]">
+              <p className="text-xs font-semibold tracking-[0.03em] text-[#5A7596]">
                 Justificativa da DFD
               </p>
               <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#3E4C5F]">
@@ -744,7 +744,7 @@ export default function DfdDetailsPage() {
 
           <section className="rounded-2xl border border-[#D9E0E8] bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-[#E8EDF2] px-4 py-3">
-              <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[#164073] md:text-lg">
+              <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-[#164073]">
                 <Package size={18} weight="fill" />
                 Itens da DFD ({items.length})
               </h2>
@@ -761,7 +761,7 @@ export default function DfdDetailsPage() {
                 <p className="mt-2 text-sm font-medium text-[#5B6675]">Nenhum item vinculado.</p>
               </div>
             ) : (
-              <div className="space-y-2 p-3">
+              <div className="space-y-3 p-4">
                 {items.map((item, index) => {
                   const qtd = Number(item.quantidade || 0);
                   const unit = Number(item.valor_unitario_estimado || 0);
@@ -776,18 +776,18 @@ export default function DfdDetailsPage() {
                       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
                         <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[#E8EDF2] px-2 py-0.5 text-[10px] font-semibold text-[#164073]">
+                            <span className="rounded-full bg-[#E8EDF2] px-2.5 py-1 text-[11px] font-semibold text-[#164073]">
                               Item {index + 1}
                             </span>
                             {item.codigo_tce ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#5B6675]">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#4B5C71]">
                                 <Hash size={11} />
                                 {item.codigo_tce}
                               </span>
                             ) : null}
                           </div>
-                          <h3 className="break-words text-sm font-semibold leading-snug text-[#164073] md:text-[15px]">
-                            {item.descricao || "Descrição não informada"}
+                          <h3 className="break-words text-base font-semibold leading-7 text-[#123B6B] [overflow-wrap:anywhere]">
+                            {formatCatalogDescription(item.descricao)}
                           </h3>
                           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                             <SmallInfo label="Local de uso" value={item.local_uso || "Não informado"} />
@@ -805,7 +805,7 @@ export default function DfdDetailsPage() {
 
                       {justificationText ? (
                         <div className="mt-2 rounded-lg border border-[#D9E0E8] bg-white p-2.5">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+                          <p className="text-xs font-semibold tracking-[0.03em] text-[#5A7596]">
                             Justificativa do item
                           </p>
                           <p className="mt-1 whitespace-pre-wrap break-words text-xs text-[#5B6675]">{justificationText}</p>
@@ -814,7 +814,7 @@ export default function DfdDetailsPage() {
 
                       {dfd.origin_type === "collective" && distributionText ? (
                         <div className="mt-2 rounded-lg border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] p-2.5">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--semantic-collab)]">
+                          <p className="text-xs font-semibold tracking-[0.03em] text-[var(--semantic-collab)]">
                             Distribuição da sala coletiva
                           </p>
                           <p className="mt-1 break-words text-xs font-semibold text-[#3E4C5F]">{distributionText}</p>
@@ -882,9 +882,9 @@ function MetaCard({
 }) {
   return (
     <div className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">{label}</p>
+      <p className="text-xs font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-[#334155]">
+        <p className="inline-flex min-w-0 items-center gap-1.5 truncate text-[15px] font-semibold text-[#2F4157]">
           <Icon size={14} />
           <span className="truncate">{value}</span>
         </p>
@@ -897,8 +897,8 @@ function MetaCard({
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[#E2E8F0] bg-white p-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">{label}</p>
-      <p className="mt-0.5 text-xs font-semibold text-[#334155]">{value}</p>
+      <p className="text-[11px] font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-[#2F4157]">{value}</p>
     </div>
   );
 }
@@ -906,7 +906,7 @@ function SmallInfo({ label, value }: { label: string; value: string }) {
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-[#D9E0E8] bg-white px-2.5 py-2 text-center">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.11em] text-[#64748B]">{label}</p>
+      <p className="text-[10px] font-semibold tracking-[0.04em] text-[#60748D]">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold leading-tight text-[#164073]">{value}</p>
     </div>
   );
@@ -921,6 +921,20 @@ function formatJustificationForDisplay(value?: string | null) {
     .replace(/https?:\/\/localhost:\d+\/\S+/gi, "")
     .trim();
   return withoutPercataLinks;
+}
+
+function formatCatalogDescription(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Descrição não informada.";
+
+  return raw
+    .replace(/\s+/g, " ")
+    .replace(/,\s*/g, ", ")
+    .replace(/;\s*/g, "; ")
+    .replace(/\.\s*/g, ". ")
+    .replace(/:\s*/g, ": ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function extractCollectiveDistribution(value?: string | null) {
@@ -954,7 +968,7 @@ function ProfileAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | 
 function ReadinessMetric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border border-[#E2E8F0] bg-[#FAFBFC] p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">{label}</p>
+      <p className="text-xs font-semibold tracking-[0.03em] text-[#60748D]">{label}</p>
       <p className="mt-1 text-base font-semibold text-[#164073]">{value}</p>
     </div>
   );
