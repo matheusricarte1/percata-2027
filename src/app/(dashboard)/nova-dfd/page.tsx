@@ -61,6 +61,7 @@ import { useDfdDraft } from "@/lib/use-dfd-draft";
 
 type UnitType = "departamento" | "laboratorio";
 type GroupingMode = "grupo" | "classe" | "livre" | "coletiva";
+type FinalizeMode = "draft" | "triagem";
 
 interface DFDGroup {
   key: string;
@@ -381,6 +382,7 @@ export default function NovaDFDPage() {
   const [userUnits, setUserUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showFinalizeFlow, setShowFinalizeFlow] = useState(false);
+  const [finalizeMode, setFinalizeMode] = useState<FinalizeMode>("draft");
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("grupo");
   const [showGuide, setShowGuide] = useState(true);
 
@@ -790,7 +792,19 @@ export default function NovaDFDPage() {
     [dfdGroups],
   );
 
-  const handleFinalize = async () => {
+  const sendDfdToChefia = async (dfdId: string) => {
+    const response = await fetch("/api/dfd/send-to-triagem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: dfdId }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "Não foi possível encaminhar para a chefia.");
+    }
+  };
+
+  const handleFinalize = async (mode: FinalizeMode = "draft") => {
     if (blockingErrors.length > 0) {
       toast.error(
         `Faltam ${blockingErrors.length} ajuste(s) antes de concluir. Exemplo: ${blockingErrors[0]}`,
@@ -983,6 +997,7 @@ export default function NovaDFDPage() {
         }
 
         let createdCount = 0;
+        const createdDfdIds: string[] = [];
         for (const [classKey, rows] of rowsByExpenseClass.entries()) {
           const collectiveItems = aggregateCollectiveContributions(rows);
           if (collectiveItems.length === 0) continue;
@@ -1057,10 +1072,21 @@ export default function NovaDFDPage() {
               .in("id", idsToClose);
             if (closeError) throw closeError;
           }
+          createdDfdIds.push(String(dfd.id));
           createdCount += 1;
         }
 
-        toast.success(`${createdCount} DFD(s) coletiva(s) criada(s). Tudo certo.`);
+        if (mode === "triagem") {
+          for (const dfdId of createdDfdIds) {
+            await sendDfdToChefia(dfdId);
+          }
+        }
+
+        toast.success(
+          mode === "triagem"
+            ? `${createdCount} DFD(s) coletiva(s) criada(s) e encaminhada(s) à chefia.`
+            : `${createdCount} DFD(s) coletiva(s) criada(s). Tudo certo.`,
+        );
         clearCarrinho();
         // Apaga rascunho — DFDs já existem no banco; nada a recuperar.
         await draft.clear();
@@ -1068,6 +1094,7 @@ export default function NovaDFDPage() {
         return;
       }
 
+      const createdDfdIds: string[] = [];
       for (const [groupIndex, group] of dfdGroups.entries()) {
         const selectedUnit = userUnits.find(
           (u) => u.unit_id === group.formData.unidade_id,
@@ -1172,9 +1199,20 @@ export default function NovaDFDPage() {
           await supabase.from("dfds").delete().eq("id", dfd.id);
           throw itemsError;
         }
+        createdDfdIds.push(String(dfd.id));
       }
 
-      toast.success(`${dfdGroups.length} DFD(s) criada(s). Tudo certo.`);
+      if (mode === "triagem") {
+        for (const dfdId of createdDfdIds) {
+          await sendDfdToChefia(dfdId);
+        }
+      }
+
+      toast.success(
+        mode === "triagem"
+          ? `${dfdGroups.length} DFD(s) criada(s) e encaminhada(s) à chefia.`
+          : `${dfdGroups.length} DFD(s) criada(s). Tudo certo.`,
+      );
       clearCarrinho();
       await draft.clear();
       router.push("/minhas-dfds");
@@ -1250,8 +1288,8 @@ export default function NovaDFDPage() {
                 Você não precisa lembrar tudo de uma vez
               </h2>
               <p className="mt-1 max-w-4xl text-sm leading-6 text-[#52627A]">
-                Primeiro complete os dados principais. Depois conclua os rascunhos e envie para a chefia em
-                <b> Minhas DFDs</b>. Você pode revisar tudo antes de enviar.
+                Primeiro complete os dados principais. Ao finalizar, você pode escolher:
+                salvar como rascunho ou já encaminhar para a chefia.
               </p>
             </div>
           </div>
@@ -1974,7 +2012,26 @@ export default function NovaDFDPage() {
               Voltar
             </Button>
             <Button
-              onClick={() => setShowFinalizeFlow(true)}
+              onClick={() => {
+                setFinalizeMode("draft");
+                setShowFinalizeFlow(true);
+              }}
+              disabled={loading || blockingErrors.length > 0}
+              className={cn(
+                "h-10 rounded-lg border border-[#D9E0E8] bg-white px-4 text-[#164073] hover:bg-[#F4F7FA]",
+                loading || blockingErrors.length > 0 ? "opacity-70" : "",
+              )}
+            >
+              <span className="flex items-center gap-2">
+                Concluir rascunhos
+                <ArrowRight size={14} />
+              </span>
+            </Button>
+            <Button
+              onClick={() => {
+                setFinalizeMode("triagem");
+                setShowFinalizeFlow(true);
+              }}
               disabled={loading || blockingErrors.length > 0}
               className={cn(
                 "h-10 rounded-lg px-5 text-white",
@@ -1991,11 +2048,11 @@ export default function NovaDFDPage() {
                   Processando
                 </span>
               ) : (
-                                <span className="flex items-center gap-2">
-                                  Concluir rascunhos
-                                  <ArrowRight size={14} />
-                                </span>
-                              )}
+                <span className="flex items-center gap-2">
+                  Encaminhar à chefia
+                  <ArrowRight size={14} />
+                </span>
+              )}
             </Button>
           </div>
         </div>
@@ -2017,10 +2074,14 @@ export default function NovaDFDPage() {
             >
               <CircleNotch size={28} className="mx-auto animate-spin text-[#164073]" />
               <h3 className="mt-3 text-lg font-semibold text-[#164073]">
-                Criando seus rascunhos
+                {finalizeMode === "triagem"
+                  ? "Criando e encaminhando para a chefia"
+                  : "Criando seus rascunhos"}
               </h3>
               <p className="mt-2 text-sm leading-6 text-[#5B6675]">
-                Estamos salvando itens e informações de análise.
+                {finalizeMode === "triagem"
+                  ? "Estamos salvando os itens e enviando para a fila de análise."
+                  : "Estamos salvando itens e informações de análise."}{" "}
                 Deixe esta tela aberta até terminar.
               </p>
             </motion.div>
@@ -2032,11 +2093,16 @@ export default function NovaDFDPage() {
         <DialogContent className="max-w-[560px] rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
           <DialogHeader className="border-b border-[#E8EDF2] p-5">
             <DialogTitle className="text-xl font-semibold text-[#164073]">
-              Confirmar conclusão dos rascunhos
+              {finalizeMode === "triagem"
+                ? "Confirmar encaminhamento à chefia"
+                : "Confirmar conclusão dos rascunhos"}
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm text-[#5B6675]">
               Ao continuar, vamos criar {dfdGroups.length} rascunho(s) no modo{" "}
-              <b>{GROUPING_OPTIONS.find((option) => option.value === groupingMode)?.title}</b>.
+              <b>{GROUPING_OPTIONS.find((option) => option.value === groupingMode)?.title}</b>
+              {finalizeMode === "triagem"
+                ? " e encaminhar imediatamente para análise da chefia."
+                : "."}
             </DialogDescription>
           </DialogHeader>
 
@@ -2080,9 +2146,19 @@ export default function NovaDFDPage() {
               })}
             </div>
             <p className="font-semibold text-[#164073]">O que acontece depois</p>
-            <p>1. As DFDs ficam em <b>Minhas DFDs</b> para sua revisão final.</p>
-            <p>2. Depois da revisão, você envia para a <b>análise da chefia</b>.</p>
-            <p>3. Se houver campo obrigatório faltando, o envio fica bloqueado até ajuste.</p>
+            {finalizeMode === "triagem" ? (
+              <>
+                <p>1. As DFDs são criadas e enviadas para a fila da chefia.</p>
+                <p>2. Você acompanha o andamento em <b>Minhas DFDs</b>.</p>
+                <p>3. Se houver erro em algum envio, exibimos a mensagem para correção.</p>
+              </>
+            ) : (
+              <>
+                <p>1. As DFDs ficam em <b>Minhas DFDs</b> para sua revisão final.</p>
+                <p>2. Depois da revisão, você envia para a <b>análise da chefia</b>.</p>
+                <p>3. Se houver campo obrigatório faltando, o envio fica bloqueado até ajuste.</p>
+              </>
+            )}
           </div>
 
           <DialogFooter className="border-t border-[#E8EDF2] bg-[#FAFBFC] p-4">
@@ -2097,7 +2173,7 @@ export default function NovaDFDPage() {
             <Button
               onClick={async () => {
                 setShowFinalizeFlow(false);
-                await handleFinalize();
+                await handleFinalize(finalizeMode);
               }}
               disabled={loading}
               className="h-10 rounded-lg bg-[#164073] px-5 text-white hover:bg-[#0F2E57]"
@@ -2109,7 +2185,9 @@ export default function NovaDFDPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Confirmar e concluir
+                  {finalizeMode === "triagem"
+                    ? "Confirmar e encaminhar"
+                    : "Confirmar e concluir"}
                   <ArrowRight size={14} />
                 </span>
               )}
