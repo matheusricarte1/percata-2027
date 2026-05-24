@@ -502,6 +502,51 @@ export default function DfdColetivaDetailPage() {
     });
   }
 
+  function addAggregatedItemToCart(item: AggregatedItem) {
+    if (!canContributeInOpenRoom) {
+      toast.warning("Esta sala não está aberta para novas contribuições.");
+      return;
+    }
+
+    const mappedItem: CatalogItem = {
+      id: String(item.codigo_item_efisco || item.codigo_tce || createClientId("agg")),
+      codigo_efisco: item.codigo_item_efisco || item.codigo_tce || null,
+      codigo_tce: item.codigo_tce || item.codigo_item_efisco || null,
+      descricao: item.descricao || "Item sem descrição",
+      nome_grupo: item.nome_grupo || null,
+      nome_classe: item.nome_classe || null,
+      codigo_natureza_preferencial: item.codigo_natureza_despesa || null,
+      gnd_preferencial: item.gnd || item.gnd_derivado || null,
+      unidade_medida: "UN",
+    };
+
+    const key = getCatalogItemKey(mappedItem);
+    const existing = cartItems.find((cartItem) => getCatalogItemKey(cartItem.item) === key);
+    if (existing) {
+      setActiveCartId(existing.cartId);
+      setSelectionDrawerOpen(true);
+      setCartPulseKey((current) => current + 1);
+      return;
+    }
+
+    const seededDraft: CartDraftItem = {
+      ...createCartDraftItem(mappedItem),
+      quantidade: 1,
+      valor_unitario_estimado:
+        Number(item.valor_unitario_estimado || 0) > 0
+          ? String(item.valor_unitario_estimado)
+          : "",
+      link_referencia: "",
+      justificativa_item:
+        "Complemento de quantidade para item já existente na DFD coletiva.",
+    };
+    setCartItems((current) => [...current, seededDraft]);
+    setActiveCartId(seededDraft.cartId);
+    setSelectionDrawerOpen(true);
+    setCartPulseKey((current) => current + 1);
+    toast.success("Item preparado para você informar sua quantidade.");
+  }
+
   function launchCartAnimation(event: MouseEvent<HTMLButtonElement>, label: string) {
     const source = event.currentTarget.getBoundingClientRect();
     const target = cartTargetRef.current?.getBoundingClientRect();
@@ -824,7 +869,11 @@ export default function DfdColetivaDetailPage() {
 
         {activeStage === "consolidar" && (
           <section className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
-            <ConsolidationPanel detail={detail} />
+            <ConsolidationPanel
+              detail={detail}
+              canContribute={canContributeInOpenRoom}
+              onRequestContribution={addAggregatedItemToCart}
+            />
             <ConsolidationSummary
               detail={detail}
               totalValue={totalValue}
@@ -1910,8 +1959,12 @@ function SelectedItemPanel({
 
 function ConsolidationPanel({
   detail,
+  canContribute,
+  onRequestContribution,
 }: {
   detail: RoomDetail;
+  canContribute: boolean;
+  onRequestContribution: (item: AggregatedItem) => void;
 }) {
   return (
     <Panel>
@@ -1923,12 +1976,24 @@ function ConsolidationPanel({
           </p>
         </div>
       </div>
-      <ConsolidatedItemsTable items={detail.items} />
+      <ConsolidatedItemsTable
+        items={detail.items}
+        canContribute={canContribute}
+        onRequestContribution={onRequestContribution}
+      />
     </Panel>
   );
 }
 
-function ConsolidatedItemsTable({ items }: { items: AggregatedItem[] }) {
+function ConsolidatedItemsTable({
+  items,
+  canContribute = false,
+  onRequestContribution,
+}: {
+  items: AggregatedItem[];
+  canContribute?: boolean;
+  onRequestContribution?: (item: AggregatedItem) => void;
+}) {
   if (items.length === 0) {
     return (
       <div className="mt-5 rounded-md border border-dashed border-[#CBD5E1] bg-[#FBFCFF] p-8 text-center text-sm text-[#667085]">
@@ -1975,9 +2040,21 @@ function ConsolidatedItemsTable({ items }: { items: AggregatedItem[] }) {
                   <ParticipantDots contributors={item.contributors || []} />
                 </td>
                 <td className="py-4 pl-4 text-right align-top">
-                  <button type="button" className="rounded-md p-2 text-[#0B3473] hover:bg-[#F1F5F9]" aria-label="Mais ações">
-                    <DotsThreeVertical size={18} weight="bold" />
-                  </button>
+                  {canContribute ? (
+                    <button
+                      type="button"
+                      onClick={() => onRequestContribution?.(item)}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-[#CBD5E1] bg-white px-3 text-xs font-semibold text-[#0B4AA2] hover:bg-[#F1F5F9]"
+                      aria-label="Solicitar quantidade deste item"
+                    >
+                      <Plus size={14} weight="bold" />
+                      Solicitar
+                    </button>
+                  ) : (
+                    <button type="button" className="rounded-md p-2 text-[#0B3473] hover:bg-[#F1F5F9]" aria-label="Mais ações">
+                      <DotsThreeVertical size={18} weight="bold" />
+                    </button>
+                  )}
                 </td>
               </tr>
             );
