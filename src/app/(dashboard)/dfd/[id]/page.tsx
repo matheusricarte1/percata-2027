@@ -23,7 +23,6 @@ import {
   PencilSimpleLine,
   MapPin,
   ListBullets,
-  UsersThree,
 } from "@phosphor-icons/react";
 import { useRouter, useParams } from "next/navigation";
 import { getSafeUser, supabase } from "@/lib/supabase";
@@ -70,6 +69,7 @@ type CollectiveAuthorSummary = {
   contribution_user_id: string;
   author_name_snapshot?: string | null;
   author_email_snapshot?: string | null;
+  author_avatar_url?: string | null;
   item_count?: number | null;
   quantidade_total?: number | null;
   valor_total_estimado?: number | null;
@@ -246,7 +246,39 @@ export default function DfdDetailsPage() {
           .eq("dfd_id", id)
           .order("valor_total_estimado", { ascending: false });
         if (authorError) throw authorError;
-        setCollectiveAuthors((authorRows || []) as CollectiveAuthorSummary[]);
+        const rawAuthors = (authorRows || []) as CollectiveAuthorSummary[];
+        const profileIds = Array.from(
+          new Set(rawAuthors.map((author) => String(author.contribution_user_id || "").trim()).filter(Boolean)),
+        );
+        let avatarByUserId = new Map<string, { avatar_url?: string | null; full_name?: string | null; email?: string | null }>();
+        if (profileIds.length > 0) {
+          const { data: profileRows, error: profileError } = await supabase
+            .from("profiles")
+            .select("id,avatar_url,full_name,email")
+            .in("id", profileIds);
+          if (profileError) throw profileError;
+          avatarByUserId = new Map(
+            (profileRows || []).map((profile: any) => [String(profile.id), profile]),
+          );
+        }
+
+        setCollectiveAuthors(
+          rawAuthors.map((author) => {
+            const profile = avatarByUserId.get(String(author.contribution_user_id || ""));
+            return {
+              ...author,
+              author_name_snapshot:
+                String(author.author_name_snapshot || "").trim() ||
+                String(profile?.full_name || "").trim() ||
+                null,
+              author_email_snapshot:
+                String(author.author_email_snapshot || "").trim() ||
+                String(profile?.email || "").trim() ||
+                null,
+              author_avatar_url: profile?.avatar_url || null,
+            };
+          }),
+        );
       } else {
         setCollectiveAuthors([]);
       }
@@ -657,20 +689,23 @@ export default function DfdDetailsPage() {
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {collectiveAuthors.map((author) => {
-                const name = String(
-                  author.author_name_snapshot ||
-                    author.author_email_snapshot ||
-                    author.contribution_user_id ||
-                    "Participante",
-                ).trim();
+                const name = getCollectiveAuthorName(author);
                 return (
-                  <span
+                  <div
                     key={author.contribution_user_id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--semantic-action-border)] bg-white px-3 py-1 text-xs font-medium text-[var(--semantic-text)]"
+                    className="inline-flex items-center gap-2 rounded-full border border-[var(--semantic-action-border)] bg-white px-2.5 py-1 text-xs font-medium text-[var(--semantic-text)]"
                   >
-                    <UsersThree size={12} className="text-[var(--semantic-collab)]" />
-                    {name} • {Number(author.quantidade_total || 0)} un.
-                  </span>
+                    <CategoryAvatar
+                      name={name}
+                      avatarUrl={author.author_avatar_url || null}
+                      category="collective"
+                      size="sm"
+                    />
+                    <span className="max-w-[260px] truncate">{name}</span>
+                    <span className="rounded-full bg-[var(--semantic-collab-soft)] px-2 py-0.5 font-semibold text-[var(--semantic-collab)]">
+                      {Number(author.quantidade_total || 0)} un.
+                    </span>
+                  </div>
                 );
               })}
             </div>
@@ -813,7 +848,29 @@ export default function DfdDetailsPage() {
                           <p className="text-sm font-semibold tracking-[0.03em] text-[var(--semantic-collab)]">
                             Distribuição da sala coletiva
                           </p>
-                          <p className="mt-1 break-words text-sm font-semibold text-[#3E4C5F]">{distributionText}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {parseCollectiveDistributionEntries(distributionText).map((entry, idx) => (
+                              <div
+                                key={`${entry.name}-${idx}`}
+                                className="inline-flex items-center gap-2 rounded-full border border-[var(--semantic-collab-border)] bg-white px-2.5 py-1"
+                              >
+                                <CategoryAvatar
+                                  name={entry.name}
+                                  avatarUrl={findCollectiveAuthorAvatar(entry.name, collectiveAuthors)}
+                                  category="collective"
+                                  size="sm"
+                                />
+                                <span className="max-w-[220px] truncate text-xs font-semibold text-[var(--semantic-text)]">
+                                  {entry.name}
+                                </span>
+                                {typeof entry.quantity === "number" ? (
+                                  <span className="rounded-full bg-[var(--semantic-collab-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--semantic-collab)]">
+                                    {entry.quantity} un.
+                                  </span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ) : null}
 
@@ -1037,6 +1094,55 @@ function buildTimelineEntries(logs: any[]) {
     seen.add(key);
     return true;
   });
+}
+
+function getCollectiveAuthorName(author: CollectiveAuthorSummary) {
+  return String(
+    author.author_name_snapshot ||
+      author.author_email_snapshot ||
+      author.contribution_user_id ||
+      "Participante",
+  ).trim();
+}
+
+function normalizeParticipantLabel(value: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findCollectiveAuthorAvatar(name: string, authors: CollectiveAuthorSummary[]) {
+  const target = normalizeParticipantLabel(name);
+  const matched = authors.find(
+    (author) => normalizeParticipantLabel(getCollectiveAuthorName(author)) === target,
+  );
+  return matched?.author_avatar_url || null;
+}
+
+function parseCollectiveDistributionEntries(distribution: string) {
+  const raw = String(distribution || "").trim();
+  if (!raw) return [];
+  const chunks = raw
+    .split(/\s*[;|]\s*|\s*,\s*(?=[^,]+:\s*\d+)/g)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const entries = chunks
+    .map((chunk) => {
+      const match = chunk.match(/^(.*?):\s*(\d+(?:[.,]\d+)?)$/);
+      if (!match) return null;
+      const name = String(match[1] || "").trim();
+      const quantity = Number(String(match[2] || "0").replace(",", "."));
+      if (!name || !Number.isFinite(quantity)) return null;
+      return { name, quantity };
+    })
+    .filter((entry): entry is { name: string; quantity: number } => Boolean(entry));
+
+  if (entries.length > 0) return entries;
+  return [{ name: raw, quantity: null }];
 }
 
 function getTimelineMeta(action: string) {
