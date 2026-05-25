@@ -17,6 +17,7 @@ import {
   ArrowRight,
   UsersThree,
   MagnifyingGlass,
+  ChartLineUp,
 } from "@phosphor-icons/react";
 import { useCarrinhoStore } from "@/store/carrinho";
 
@@ -210,6 +211,15 @@ function buildSections(role: SidebarProps["role"], itemCount: number): NavSectio
         icon: CheckCircle,
         label: "Consolidação de Pedidos",
       },
+      ...(role === "superadmin"
+        ? [
+            {
+              href: "/admin/analytics-superadmin",
+              icon: ChartLineUp,
+              label: "Analytics Avançado",
+            },
+          ]
+        : []),
       {
         href: "/admin/catalogo-busca",
         icon: MagnifyingGlass,

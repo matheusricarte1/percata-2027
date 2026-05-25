@@ -63,7 +63,8 @@ const ONBOARDING_VISUALS: Record<
     src: "/onboarding/onboarding-02.png",
     alt: "Ilustração de seleção de espaços acadêmicos",
     title: "Inclua os laboratórios usados",
-    caption: "Laboratórios podem orientar demandas de ensino, pesquisa, extensão e gestão.",
+    caption:
+      "Laboratórios podem orientar demandas de ensino, pesquisa, extensão e gestão. Esta etapa é opcional.",
   },
 };
 
@@ -689,7 +690,7 @@ export default function OnboardingPage() {
                       </h2>
                     </div>
                     <p className="text-sm text-[#5B6675]">
-                      Selecione os laboratórios aos quais você se vincula.
+                      Selecione os laboratórios aos quais você se vincula, se quiser. Essa escolha é opcional.
                     </p>
                     <div className="relative">
                       <MagnifyingGlass

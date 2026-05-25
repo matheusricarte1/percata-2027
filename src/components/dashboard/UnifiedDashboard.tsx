@@ -385,6 +385,7 @@ export default function UnifiedDashboard() {
   const quickActions = isExecutive
     ? [
         { href: "/admin/consolidacao", label: "Consolidação", detail: "Portfólio e priorização", icon: ChartLineUp, tone: "blue" as const },
+        { href: "/admin/analytics-superadmin", label: "Analytics avançado", detail: "Regressão e anomalias", icon: CrownSimple, tone: "teal" as const },
         { href: "/triagem", label: "Fila estratégica", detail: "Análises pendentes", icon: FunnelSimple, tone: "teal" as const },
         { href: "/admin/usuarios", label: "Usuários", detail: "Perfis e acessos", icon: UsersThree, tone: "warm" as const },
         { href: "/admin/campanhas", label: "Ciclo", detail: "Campanhas e governança", icon: CalendarBlank, tone: "slate" as const },

@@ -97,6 +97,20 @@ function getDescriptionSize(value: unknown): "compact" | "wide" | "full" {
   return "compact";
 }
 
+function mergeUniqueProducts(current: any[], incoming: any[]) {
+  const seen = new Set(
+    current.map((product) => `${String(product.id || "")}::${String(product.siad || "")}`),
+  );
+  const merged = [...current];
+  incoming.forEach((product) => {
+    const key = `${String(product.id || "")}::${String(product.siad || "")}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(product);
+  });
+  return merged;
+}
+
 function toFavoriteItemId(value: unknown): number | null {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
@@ -146,11 +160,7 @@ const categories = [
 
 const UNIT_OPTIONS = ["UN", "CX", "PCT", "KG", "L", "M", "M2", "M3"];
 const MIN_ITEM_JUSTIFICATIVA_CHARS = 12;
-const CATALOG_RANDOM_ID_RANGE: Record<string, { min: number; max: number }> = {
-  all: { min: 471117, max: 645063 },
-  material: { min: 540791, max: 645063 },
-  servico: { min: 471117, max: 540790 },
-};
+const SERVICE_TYPES = ["SERVIÇO", "SERVICO"];
 
 type FlyingParticle = {
   id: string;
@@ -200,12 +210,6 @@ function buildFlightParticles(
   });
 }
 
-function buildRandomCatalogAnchor(category: string, pageSize: number) {
-  const range = CATALOG_RANDOM_ID_RANGE[category] ?? CATALOG_RANDOM_ID_RANGE.all;
-  const maxStart = Math.max(range.min, range.max - pageSize * 2);
-  return Math.floor(Math.random() * (maxStart - range.min + 1)) + range.min;
-}
-
 export default function CatalogoPage() {
   const router = useRouter();
   const [selectedCat, setSelectedCat] = useState("all");
@@ -243,7 +247,7 @@ export default function CatalogoPage() {
   } | null>(null);
   const [flyingParticles, setFlyingParticles] = useState<FlyingParticle[]>([]);
   const cartIconRef = useRef<HTMLDivElement | null>(null);
-  const emptySearchAnchorRef = useRef(CATALOG_RANDOM_ID_RANGE.all.min);
+  const requestTokenRef = useRef(0);
   const { addItem, items, removeItem, updateItem, clearCarrinho } = useCarrinhoStore();
 
   const triggerCartShake = useCallback(() => {
@@ -667,6 +671,7 @@ export default function CatalogoPage() {
 
   const fetchProductsPage = useCallback(
     async (targetPage: number, isNewSearch = false) => {
+      const requestToken = ++requestTokenRef.current;
       if (selectedCat === "kits") {
         setProducts([]);
         setHasMore(false);
@@ -685,16 +690,15 @@ export default function CatalogoPage() {
             let query = supabase
               .from("catalogo")
               .select(catalogColumns)
-              .gte("id", emptySearchAnchorRef.current + targetPage * pageSize)
               .order("id", { ascending: true })
-              .limit(pageSize);
+              .range(targetPage * pageSize, targetPage * pageSize + pageSize - 1);
 
             if (selectedCat === "material") {
               query = query.eq("tipo_objeto", "MATERIAL");
             } else if (selectedCat === "servico") {
-              query = query.eq("tipo_objeto", "SERVIÇO");
+              query = query.in("tipo_objeto", SERVICE_TYPES);
             } else {
-              query = query.in("tipo_objeto", ["MATERIAL", "SERVIÇO"]);
+              query = query.in("tipo_objeto", ["MATERIAL", ...SERVICE_TYPES]);
             }
 
             return query;
@@ -722,10 +726,18 @@ export default function CatalogoPage() {
       const apiHasMore = "hasMore" in result ? Boolean(result.hasMore) : false;
 
       if (error) {
+        if (requestToken !== requestTokenRef.current) return;
         toast.error("Falha ao consultar catálogo inteligente.");
+        if (isNewSearch) {
+          setProducts([]);
+        }
+        setHasMore(false);
+        setLoading(false);
+        return;
       }
 
       if (data) {
+        if (requestToken !== requestTokenRef.current) return;
         const newProducts = data.map((p: any, idx: number) => {
           const normalizedCode =
             normalizeCode(p.codigo_efisco) ??
@@ -776,14 +788,21 @@ export default function CatalogoPage() {
           : rerankCatalogSearchResults(debouncedSearch, newProducts);
 
         setProducts((prev) =>
-          isNewSearch ? rankedProducts : [...prev, ...rankedProducts],
+          isNewSearch ? rankedProducts : mergeUniqueProducts(prev, rankedProducts),
         );
         setHasMore(isEmptySearch ? data.length === pageSize : apiHasMore);
       }
+      if (requestToken !== requestTokenRef.current) return;
       setLoading(false);
     },
     [debouncedSearch, selectedCat],
   );
+
+  const fetchProductsPageRef = useRef(fetchProductsPage);
+
+  useEffect(() => {
+    fetchProductsPageRef.current = fetchProductsPage;
+  }, [fetchProductsPage]);
 
   useEffect(() => {
     setPage(0);
@@ -793,15 +812,14 @@ export default function CatalogoPage() {
       setLoading(false);
       return;
     }
-    emptySearchAnchorRef.current = sanitizeSearchInput(debouncedSearch)
-      ? CATALOG_RANDOM_ID_RANGE.all.min
-      : buildRandomCatalogAnchor(selectedCat, PAGE_SIZE);
+    setProducts([]);
+    setHasMore(true);
     fetchProductsPage(0, true);
   }, [debouncedSearch, selectedCat, fetchProductsPage]);
 
   useEffect(() => {
-    if (page > 0) fetchProductsPage(page, false);
-  }, [page, fetchProductsPage]);
+    if (page > 0) fetchProductsPageRef.current(page, false);
+  }, [page]);
 
   const handleAddProduct = useCallback(
     (product: any, sourceEl?: HTMLElement | null) => {

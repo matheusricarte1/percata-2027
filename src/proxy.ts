@@ -98,6 +98,19 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
+  const historicoSegments = pathname.split("/").filter(Boolean);
+  if (
+    historicoSegments[0] === "historico" &&
+    historicoSegments.length === 2 &&
+    historicoSegments[1] !== "codigo"
+  ) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = `/historico/codigo/${encodeURIComponent(
+      historicoSegments[1],
+    )}`;
+    redirectUrl.search = search;
+    return NextResponse.redirect(redirectUrl);
+  }
   const isAuthRoute = pathname.startsWith("/auth/");
   const isOnboardingRoute = pathname === "/onboarding";
   const isPublicRoute = PUBLIC_PATHS.includes(pathname) || isAuthRoute;

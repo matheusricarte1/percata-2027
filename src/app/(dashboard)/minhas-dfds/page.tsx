@@ -143,6 +143,8 @@ export default function MinhasDFDsPage() {
   const [sendingDfdId, setSendingDfdId] = useState<string | null>(null);
   const [submittedDfd, setSubmittedDfd] = useState<{ id: string; protocol?: string | null } | null>(null);
   const [markingKitId, setMarkingKitId] = useState<string | null>(null);
+  const [finalizingPcaId, setFinalizingPcaId] = useState<string | null>(null);
+  const [movingToHistoryId, setMovingToHistoryId] = useState<string | null>(null);
   const [draftActionModal, setDraftActionModal] = useState<DraftActionModalState>(null);
 
   const fetchActiveDfds = useCallback(async () => {
@@ -168,10 +170,56 @@ export default function MinhasDFDsPage() {
       if (error) throw error;
 
       const rows = (data || []) as DfdRow[];
-      setDfds(rows);
+      const requesterEmail = String(profileData?.email || user.email || "")
+        .trim()
+        .toLowerCase();
+
+      let visibleRows = rows;
+      if (requesterEmail) {
+        const protocolToDfdId = new Map<string, string>();
+        rows.forEach((row) => {
+          const protocol =
+            String(row.numero_protocolo || "").trim() ||
+            `DFD-${row.id.slice(0, 8).toUpperCase()}`;
+          protocolToDfdId.set(protocol, row.id);
+        });
+
+        const { data: movedRows, error: movedError } = await supabase
+          .from("legacy_pa_demandas")
+          .select("demand_code,raw_payload")
+          .eq("requester_email", requesterEmail)
+          .limit(2000);
+
+        if (movedError) {
+          const code = String(movedError.code || "").toUpperCase();
+          const message = String(movedError.message || "").toLowerCase();
+          const isMissingRelation =
+            code === "42P01" ||
+            (message.includes("legacy_pa_demandas") && message.includes("does not exist"));
+          if (!isMissingRelation) {
+            throw movedError;
+          }
+        } else {
+          const movedIds = new Set<string>();
+          (movedRows || []).forEach((row: any) => {
+            const sourceDfdId = String(row?.raw_payload?.source_dfd_id || "").trim();
+            if (sourceDfdId) movedIds.add(sourceDfdId);
+
+            const movedCode = String(row?.demand_code || "").trim();
+            const byCode = protocolToDfdId.get(movedCode);
+            if (byCode) movedIds.add(byCode);
+          });
+
+          visibleRows = rows.filter((row) => !movedIds.has(row.id));
+        }
+      }
+
+      setDfds(visibleRows);
 
       const uniqueCampusIds = Array.from(
-        new Set(rows.map((row) => row.campus_id).filter((id): id is string => Boolean(id))),
+        new Set(
+          visibleRows.map((row) => row.campus_id).filter((id): id is string => Boolean(id)),
+        ),
       );
       if (uniqueCampusIds.length > 0) {
         const { data: campusRows, error: campusError } = await supabase
@@ -191,14 +239,14 @@ export default function MinhasDFDsPage() {
 
       const deptIds = Array.from(
         new Set(
-          rows
+          visibleRows
             .filter((row) => row.tipo_unidade === "departamento" && row.unidade_id)
             .map((row) => String(row.unidade_id)),
         ),
       );
       const labIds = Array.from(
         new Set(
-          rows
+          visibleRows
             .filter((row) => row.tipo_unidade === "laboratorio" && row.unidade_id)
             .map((row) => String(row.unidade_id)),
         ),
@@ -286,6 +334,59 @@ export default function MinhasDFDsPage() {
       toast.error("Erro ao enviar DFD: " + (error?.message || "erro desconhecido"));
     } finally {
       setSendingDfdId(null);
+    }
+  };
+
+  const handleFinalizePca = async (dfdId: string) => {
+    setFinalizingPcaId(dfdId);
+    try {
+      const response = await fetch("/api/dfd/finalize-pca", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: dfdId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || "Falha ao finalizar PCA.");
+      }
+
+      setDfds((prev) =>
+        prev.map((dfd) => (dfd.id === dfdId ? { ...dfd, status: "concluida" } : dfd)),
+      );
+      toast.success(
+        payload?.alreadyFinalized
+          ? "Esta DFD já estava finalizada no PCA."
+          : "DFD finalizada no PCA.",
+      );
+    } catch (error: any) {
+      toast.error("Erro ao finalizar PCA: " + (error?.message || "erro desconhecido"));
+    } finally {
+      setFinalizingPcaId(null);
+    }
+  };
+
+  const handleMoveToHistory = async (dfdId: string) => {
+    setMovingToHistoryId(dfdId);
+    try {
+      const response = await fetch("/api/dfd/move-to-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: dfdId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || "Falha ao mover para histórico.");
+      }
+
+      setDfds((prev) => prev.filter((dfd) => dfd.id !== dfdId));
+      await fetchLegacyDfds();
+      toast.success(
+        `DFD movida para histórico (${payload?.legacyYear || new Date().getFullYear()}).`,
+      );
+    } catch (error: any) {
+      toast.error("Erro ao mover para histórico: " + (error?.message || "erro desconhecido"));
+    } finally {
+      setMovingToHistoryId(null);
     }
   };
 
@@ -656,6 +757,45 @@ export default function MinhasDFDsPage() {
                               {sendingDfdId === dfd.id ? "Encaminhando..." : "Encaminhar à chefia"}
                             </button>
                           </>
+                        )}
+                        {currentRole === "superadmin" &&
+                          (dfd.status === "triagem" ||
+                            dfd.status === "aprovada" ||
+                            dfd.status === "pactuando") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleFinalizePca(dfd.id);
+                            }}
+                            disabled={finalizingPcaId === dfd.id}
+                            className="ux-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {finalizingPcaId === dfd.id ? (
+                              <CircleNotch size={14} className="animate-spin" />
+                            ) : (
+                              <CheckCircle size={14} weight="bold" />
+                            )}
+                            {finalizingPcaId === dfd.id ? "Finalizando..." : "Finalizar PCA"}
+                          </button>
+                        )}
+                        {currentRole === "superadmin" && dfd.status === "concluida" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleMoveToHistory(dfd.id);
+                            }}
+                            disabled={movingToHistoryId === dfd.id}
+                            className="ux-btn-secondary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {movingToHistoryId === dfd.id ? (
+                              <CircleNotch size={14} className="animate-spin" />
+                            ) : (
+                              <Archive size={14} weight="bold" />
+                            )}
+                            {movingToHistoryId === dfd.id
+                              ? "Movendo..."
+                              : "Mover para histórico"}
+                          </button>
                         )}
                         {canCreateKits ? (
                           <button

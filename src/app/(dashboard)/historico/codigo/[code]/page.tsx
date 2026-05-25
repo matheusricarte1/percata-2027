@@ -19,7 +19,7 @@ interface LegacyDemandHeader {
   items_count: number | null;
 }
 
-export default function HistoricoDetailPage() {
+export default function HistoricoDetailByCodePage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const demandCode = decodeURIComponent(params?.code || "");
@@ -208,6 +208,4 @@ export default function HistoricoDetailPage() {
     </div>
   );
 }
-
-
 
