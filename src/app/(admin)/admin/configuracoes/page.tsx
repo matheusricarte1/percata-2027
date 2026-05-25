@@ -385,7 +385,12 @@ export default function ConfiguracoesAdminPage() {
 
       {activeTab === "ajustes" && <SettingsPanel scope="Administração" />}
 
-      {activeTab === "acesso" && isSuperadmin && <SystemAccessLockPanel />}
+      {activeTab === "acesso" && isSuperadmin && (
+        <div className="space-y-5">
+          <SystemAccessLockPanel />
+          <DfdDataGovernancePanel />
+        </div>
+      )}
 
       {activeTab === "estrutura" && isSuperadmin && (
         <StructureSettingsPanel
@@ -431,6 +436,150 @@ function ModuleLoading({ label }: { label: string }) {
     <div className="rounded-2xl border border-[#D2D0CE] bg-white p-6 text-sm font-semibold text-slate-500">
       Carregando módulo de {label}...
     </div>
+  );
+}
+
+function DfdDataGovernancePanel() {
+  const [loadingPreview, setLoadingPreview] = useState(true);
+  const [purging, setPurging] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [preview, setPreview] = useState<{
+    purgeCount: number;
+    legacyCount: number;
+    samplePurgeProtocols: string[];
+    sampleLegacyProtocols: string[];
+  } | null>(null);
+  const [confirmationPhrase, setConfirmationPhrase] = useState("APAGAR BASE DFD");
+
+  async function loadPreview() {
+    setLoadingPreview(true);
+    try {
+      const response = await fetch("/api/superadmin/dfds/purge", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Falha ao carregar prévia.");
+      setPreview(payload?.preview || null);
+      setConfirmationPhrase(String(payload?.confirmationPhrase || "APAGAR BASE DFD"));
+    } catch (error: any) {
+      toast.error(sanitizeUiMessage(error?.message, 220) || "Falha ao carregar prévia da limpeza.");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadPreview();
+  }, []);
+
+  async function purgeNonLegacyDfds() {
+    if (confirm.trim().toUpperCase() !== confirmationPhrase.trim().toUpperCase()) {
+      toast.warning(`Digite exatamente "${confirmationPhrase}" para confirmar.`);
+      return;
+    }
+    setPurging(true);
+    try {
+      const response = await fetch("/api/superadmin/dfds/purge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || "Falha ao limpar base de DFDs.");
+      toast.success(
+        payload?.deletedCount > 0
+          ? `${payload.deletedCount} DFD(s) removida(s) da base atual.`
+          : "Nenhuma DFD não legada encontrada para limpeza.",
+      );
+      setConfirm("");
+      await loadPreview();
+    } catch (error: any) {
+      toast.error(sanitizeUiMessage(error?.message, 220) || "Falha ao limpar base de DFDs.");
+    } finally {
+      setPurging(false);
+    }
+  }
+
+  return (
+    <section className="rounded-[22px] border border-[#F4B7B7] bg-[#FFF8F8] p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A91520]">
+            Governança de dados
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+            Limpeza da base de DFDs
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[#52627A]">
+            Remove todas as DFDs da base atual (incluindo itens e logs vinculados).
+            Os registros legados permanecem preservados.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={loadPreview}
+          disabled={loadingPreview || purging}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E6C0C0] bg-white px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[#A91520] transition hover:bg-[#FFF1F1] disabled:opacity-60"
+        >
+          <ArrowsClockwise size={14} weight="bold" className={loadingPreview ? "animate-spin" : ""} />
+          Atualizar prévia
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-[#F0D1D1] bg-white px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7A8797]">
+            DFDs para remover
+          </p>
+          <p className="mt-1 text-2xl font-bold text-[#A91520]">
+            {loadingPreview ? "..." : String(preview?.purgeCount ?? 0)}
+          </p>
+          {preview?.samplePurgeProtocols?.length ? (
+            <p className="mt-1 text-xs text-[#5B6675]">
+              Exemplos: {preview.samplePurgeProtocols.join(", ")}
+            </p>
+          ) : null}
+        </div>
+        <div className="rounded-xl border border-[#D9E0E8] bg-white px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7A8797]">
+            Registros legados preservados
+          </p>
+          <p className="mt-1 text-2xl font-bold text-[#164073]">
+            {loadingPreview ? "..." : String(preview?.legacyCount ?? 0)}
+          </p>
+          {preview?.sampleLegacyProtocols?.length ? (
+            <p className="mt-1 text-xs text-[#5B6675]">
+              Exemplos: {preview.sampleLegacyProtocols.join(", ")}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-[#F0D1D1] bg-white px-4 py-3">
+        <p className="text-xs font-semibold text-[#A91520]">
+          Ação destrutiva irreversível. Confirme digitando:
+        </p>
+        <p className="mt-1 font-mono text-sm font-bold text-[#17233C]">{confirmationPhrase}</p>
+        <input
+          value={confirm}
+          onChange={(event) => setConfirm(sanitizePlainText(event.target.value, 64))}
+          className="mt-3 h-11 w-full rounded-xl border border-[#E6C0C0] bg-[#FFFDFD] px-3 text-sm font-semibold text-[#2E3A4A] outline-none transition focus:border-[#A91520] focus:ring-2 focus:ring-[#F4B7B7]"
+          placeholder={confirmationPhrase}
+          disabled={purging}
+        />
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            onClick={purgeNonLegacyDfds}
+            disabled={purging || loadingPreview}
+            className="h-10 rounded-lg bg-[#A91520] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#7F1018]"
+          >
+            {purging ? "Limpando base..." : "Apagar base de DFDs"}
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
