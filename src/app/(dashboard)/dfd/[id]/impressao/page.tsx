@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Printer, DownloadSimple, SealCheck } from "@phosphor-icons/react";
-import { useParams } from "next/navigation";
+import { Printer, DownloadSimple, SealCheck, X } from "@phosphor-icons/react";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { resolveCampusBranding } from "@/lib/campus-branding";
@@ -40,6 +40,7 @@ interface PrintData {
 }
 
 export default function DFDPrintPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id || "";
 
@@ -247,6 +248,14 @@ export default function DFDPrintPage() {
     [data],
   );
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/minhas-dfds");
+  };
+
   const exportData = () => {
     if (!data) return;
     const csv = buildDfdPrintExportCsv(data);
@@ -287,6 +296,14 @@ export default function DFDPrintPage() {
   return (
     <div className="flex min-h-screen flex-col items-center gap-6 bg-[#F4F7FA] p-8 print:bg-white print:p-0">
       <div className="print:hidden flex gap-3">
+        <button
+          onClick={handleBack}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-4 text-sm font-semibold text-[#3E4C5F] transition hover:bg-[#F4F7FA]"
+          aria-label="Voltar para a tela anterior"
+        >
+          <X size={16} weight="bold" />
+          Voltar
+        </button>
         <button
           onClick={() => window.print()}
           className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#164073] px-5 text-sm font-semibold text-white transition hover:bg-[#0F2E57]"
