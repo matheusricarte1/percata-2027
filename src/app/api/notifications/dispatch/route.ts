@@ -6,6 +6,42 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DEFAULT_BATCH_SIZE = 20;
 
+type NotificationEnvelope = {
+  kind?: string;
+  body?: string;
+  cta_label?: string;
+  cta_url?: string;
+  template_key?:
+    | "welcome"
+    | "dfd_submitted"
+    | "dfd_approved"
+    | "dfd_returned"
+    | "dfd_pending"
+    | "admin_summary"
+    | "test"
+    | "generic";
+  heading?: string;
+  context_label?: string;
+  status_label?: string;
+  status_tone?: "info" | "success" | "warning" | "danger" | "neutral";
+  facts?: Array<{ label: string; value: string | number | null }>;
+  details?: string[];
+};
+
+function parseNotificationEnvelope(raw: string): NotificationEnvelope | null {
+  const text = String(raw || "").trim();
+  if (!text.startsWith("{")) return null;
+  try {
+    const payload = JSON.parse(text) as NotificationEnvelope;
+    if (!payload || (payload.kind !== "rich_notification" && payload.kind !== "email_payload")) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 function isMissingEmailQueueError(error: any): boolean {
   const text = String(error?.message || error || "").toLowerCase();
   return (
@@ -92,16 +128,39 @@ export const POST = withAuthorizedRole(
       // do worker reenvia com mesma key — Resend deduplica server-side.
       const idempotencyKey = `email-queue:${item.id}`;
 
+      const envelope = parseNotificationEnvelope(String(item.body || ""));
+      const textBody = String(envelope?.body || item.body || "").trim();
       const result = await sendSystemEmail({
         to: item.email_to,
         subject: item.subject,
-        text: item.body,
-        contextLabel: "Notificação institucional",
-        actionLabel: "Abrir PERCATA",
-        actionUrl: toPublicSiteUrl(
-          "/dashboard",
-          request.nextUrl.origin,
-        ).toString(),
+        text: textBody || "Você recebeu uma atualização no PERCATA.",
+        templateKey: envelope?.template_key || undefined,
+        heading: String(envelope?.heading || "").trim() || undefined,
+        contextLabel:
+          String(envelope?.context_label || "").trim() ||
+          "Notificação institucional",
+        statusLabel: String(envelope?.status_label || "").trim() || undefined,
+        statusTone: envelope?.status_tone || undefined,
+        facts: Array.isArray(envelope?.facts)
+          ? envelope!.facts
+              .filter((fact) => fact && String(fact.label || "").trim())
+              .slice(0, 10)
+              .map((fact) => ({
+                label: String(fact.label).trim(),
+                value: fact.value,
+              }))
+          : undefined,
+        details: Array.isArray(envelope?.details)
+          ? envelope!.details
+              .map((detail) => String(detail || "").trim())
+              .filter(Boolean)
+              .slice(0, 8)
+          : undefined,
+        actionLabel:
+          String(envelope?.cta_label || "").trim() || "Abrir PERCATA",
+        actionUrl:
+          String(envelope?.cta_url || "").trim() ||
+          toPublicSiteUrl("/dashboard", request.nextUrl.origin).toString(),
         idempotencyKey,
       });
 

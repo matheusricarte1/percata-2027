@@ -71,7 +71,15 @@ type EmailTemplatePreset = {
   statusLabel: string;
   statusTone: EmailTone;
   intro: string;
-  imageSlot?: "welcome" | "dfd-submitted" | "dfd-approved" | "dfd-returned" | "dfd-status";
+  imageSlot?:
+    | "welcome"
+    | "dfd-submitted"
+    | "dfd-approved"
+    | "dfd-returned"
+    | "dfd-status"
+    | "admin-summary"
+    | "test"
+    | "generic";
 };
 
 const TEMPLATE_PRESETS: Record<EmailTemplateKey, EmailTemplatePreset> = {
@@ -121,6 +129,7 @@ const TEMPLATE_PRESETS: Record<EmailTemplateKey, EmailTemplatePreset> = {
     statusLabel: "Resumo",
     statusTone: "neutral",
     intro: "Resumo consolidado para acompanhamento de filas, pendências e decisões.",
+    imageSlot: "admin-summary",
   },
   test: {
     heading: "Teste de e-mail",
@@ -128,6 +137,7 @@ const TEMPLATE_PRESETS: Record<EmailTemplateKey, EmailTemplatePreset> = {
     statusLabel: "Canal ativo",
     statusTone: "success",
     intro: "Este e-mail confirma que o canal de envio do PERCATA está operacional.",
+    imageSlot: "test",
   },
   generic: {
     heading: "Notificação do PERCATA",
@@ -135,6 +145,7 @@ const TEMPLATE_PRESETS: Record<EmailTemplateKey, EmailTemplatePreset> = {
     statusLabel: "Informativo",
     statusTone: "info",
     intro: "Você recebeu uma atualização do sistema PERCATA.",
+    imageSlot: "generic",
   },
 };
 
@@ -255,6 +266,9 @@ function renderFlatImageSlot(slot: EmailTemplatePreset["imageSlot"]) {
     "dfd-approved": "Ilustração de aprovação e conclusão",
     "dfd-returned": "Ilustração de DFD devolvida para ajustes",
     "dfd-status": "Ilustração de atualização de status da DFD",
+    "admin-summary": "Ilustração de resumo administrativo",
+    test: "Ilustração de teste de e-mail",
+    generic: "Ilustração de notificação institucional",
   };
   const label = labelBySlot[slot] || "Ilustração institucional";
 

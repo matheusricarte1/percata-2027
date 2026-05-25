@@ -531,6 +531,50 @@ export default function TriagemPage() {
   const getHighlightLimit = (totalItems: number) =>
     totalItems > 0 ? Math.max(1, Math.ceil(totalItems * 0.2)) : 0;
 
+  const buildApprovalNotificationMessage = ({
+    dfdId,
+    protocolo,
+    total,
+    requesterName,
+    approverName,
+  }: {
+    dfdId: string;
+    protocolo: string;
+    total: number;
+    requesterName: string;
+    approverName: string;
+  }) => {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "https://percata.vercel.app";
+    const printUrl = `${origin}/dfd/${encodeURIComponent(dfdId)}/impressao`;
+    const pdfUrl = `${origin}/minhas-dfds/${encodeURIComponent(dfdId)}/pdf`;
+
+    return JSON.stringify({
+      kind: "rich_notification",
+      template_key: "dfd_approved",
+      heading: `DFD ${protocolo} homologada`,
+      context_label: "Homologação da chefia",
+      status_label: "Homologada",
+      status_tone: "success",
+      body:
+        `A DFD ${protocolo} foi aprovada pela chefia e segue para consolidação.` +
+        ` Total homologado: R$ ${Number(total || 0).toLocaleString("pt-BR")}.`,
+      cta_label: "Abrir DFD (HTML + PDF)",
+      cta_url: printUrl,
+      facts: [
+        { label: "Protocolo", value: protocolo },
+        { label: "Solicitante", value: requesterName },
+        { label: "Homologado por", value: approverName },
+        { label: "Total", value: `R$ ${Number(total || 0).toLocaleString("pt-BR")}` },
+      ],
+      details: [
+        "O e-mail foi emitido em HTML com resumo da aprovação.",
+        `Versão HTML para leitura/impressão: ${printUrl}`,
+        `Versão PDF direta: ${pdfUrl}`,
+      ],
+    });
+  };
+
   const fetchDfds = useCallback(async () => {
     setLoading(true);
     try {
@@ -1017,11 +1061,12 @@ export default function TriagemPage() {
       byDfd.set(dfdId, prev);
     }
 
-    const dfdIds = Array.from(byDfd.keys());
-    if (dfdIds.length === 0) {
-      toast.error("Não foi possível mapear DFDs para homologação em lote.");
-      return;
-    }
+      const dfdIds = Array.from(byDfd.keys());
+      const dfdById = new Map(dfds.map((row) => [row.id, row]));
+      if (dfdIds.length === 0) {
+        toast.error("Não foi possível mapear DFDs para homologação em lote.");
+        return;
+      }
 
     setGlobalApproving(true);
     try {
@@ -1067,6 +1112,51 @@ export default function TriagemPage() {
         const { error: logError } = await supabase.from("dfd_logs").insert(logsPayload);
         if (logError) throw logError;
       }
+
+      const approverName =
+        String(currentUserRef.current?.full_name || "").trim() ||
+        String(currentUserRef.current?.email || "").trim() ||
+        "Chefia da unidade";
+      const notificationRows: Array<{
+        user_id: string;
+        title: string;
+        message: string;
+        type: "success";
+      }> = [];
+      for (const dfdId of appliedIds) {
+        const dfdRow = dfdById.get(dfdId);
+        if (!dfdRow) continue;
+        const protocol = String(dfdRow.numero_protocolo || `DFD-${dfdId.slice(0, 8).toUpperCase()}`).trim();
+        const totals = byDfd.get(dfdId);
+        const homologatedTotal = Number(totals?.total || 0);
+        const requesterName = resolveRequesterName(dfdRow, currentUserRef.current);
+        const message = buildApprovalNotificationMessage({
+          dfdId,
+          protocolo: protocol,
+          total: homologatedTotal,
+          requesterName,
+          approverName,
+        });
+
+        const recipients = new Set<string>();
+        if (dfdRow.solicitante_id) recipients.add(String(dfdRow.solicitante_id));
+        if (user.id) recipients.add(String(user.id));
+        for (const recipientId of recipients) {
+          notificationRows.push({
+            user_id: recipientId,
+            title: `DFD ${protocol} homologada`,
+            message,
+            type: "success",
+          });
+        }
+      }
+      if (notificationRows.length > 0) {
+        const { error: notificationError } = await supabase
+          .from("notifications")
+          .insert(notificationRows);
+        if (notificationError) throw notificationError;
+      }
+
       if (skippedIds.length > 0) {
         toast.warning(
           `${appliedIds.size} DFD(s) homologadas; ${skippedIds.length} foram ignoradas porque mudaram de status durante o lote.`,
@@ -1163,6 +1253,37 @@ export default function TriagemPage() {
         details: `Demanda homologada pela chefia da unidade. Total homologado: R$ ${novoTotal.toLocaleString("pt-BR")}.`,
       });
       if (logError) throw logError;
+
+      const protocol = String(
+        selectedDfd.numero_protocolo || `DFD-${selectedDfd.id.slice(0, 8).toUpperCase()}`,
+      ).trim();
+      const requesterName = resolveRequesterName(selectedDfd, currentUserRef.current);
+      const approverName =
+        String(currentUserRef.current?.full_name || "").trim() ||
+        String(currentUserRef.current?.email || "").trim() ||
+        "Chefia da unidade";
+      const message = buildApprovalNotificationMessage({
+        dfdId: selectedDfd.id,
+        protocolo: protocol,
+        total: novoTotal,
+        requesterName,
+        approverName,
+      });
+      const recipients = new Set<string>();
+      if (selectedDfd.solicitante_id) recipients.add(String(selectedDfd.solicitante_id));
+      recipients.add(String(user.id));
+      const notificationRows = Array.from(recipients).map((recipientId) => ({
+        user_id: recipientId,
+        title: `DFD ${protocol} homologada`,
+        message,
+        type: "success" as const,
+      }));
+      if (notificationRows.length > 0) {
+        const { error: notificationError } = await supabase
+          .from("notifications")
+          .insert(notificationRows);
+        if (notificationError) throw notificationError;
+      }
 
       toast.success("Demanda aprovada e homologada!");
       resetDialogState();
@@ -3254,7 +3375,5 @@ export default function TriagemPage() {
     </div>
   );
 }
-
-
 
 
