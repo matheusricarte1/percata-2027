@@ -137,6 +137,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (typeof patch.status === "string") {
       const roomTitle = String(updated.title || room.title || "DFD coletiva").trim();
       const roomUrl = toPublicSiteUrl(`/dfds-coletivas/${room.id}`, request.nextUrl.origin).toString();
+      const coauthorshipOpenedImage = toPublicSiteUrl(
+        "/email/events/coauthorship-opened.png",
+        request.nextUrl.origin,
+      ).toString();
+      const coauthorshipClosedImage = toPublicSiteUrl(
+        "/email/events/coauthorship-closed.png",
+        request.nextUrl.origin,
+      ).toString();
 
       if (room.status === "proposta" && patch.status === "aberta") {
         const unitMemberIds = await loadUnitRecipientUserIds(admin, {
@@ -150,7 +158,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             .map((userId) => ({
               user_id: userId,
               title: "DFD coletiva publicada",
-              message: `A chefia publicou a sala "${roomTitle}" para contribuições do setor. Acesse: ${roomUrl}`,
+              message: JSON.stringify({
+                kind: "rich_notification",
+                template_key: "coauthorship_opened",
+                heading: `Sala coletiva publicada: ${roomTitle}`,
+                context_label: "DFD coletiva",
+                status_label: "Aberta para contribuição",
+                status_tone: "info",
+                body: `A chefia publicou a sala "${roomTitle}" para contribuições do setor.`,
+                cta_label: "Abrir sala coletiva",
+                cta_url: roomUrl,
+                image_url: coauthorshipOpenedImage,
+                facts: [{ label: "Sala", value: roomTitle }],
+              }),
               type: "info" as const,
             })),
         );
@@ -165,7 +185,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             .map((userId) => ({
               user_id: userId,
               title: "Coautoria encerrada pela chefia",
-              message: `A chefia encerrou a fase colaborativa da sala "${roomTitle}" e assumiu a consolidação. Acompanhe: ${roomUrl}`,
+              message: JSON.stringify({
+                kind: "rich_notification",
+                template_key: "coauthorship_closed",
+                heading: `Coautoria encerrada: ${roomTitle}`,
+                context_label: "DFD coletiva",
+                status_label: "Em consolidação",
+                status_tone: "warning",
+                body: `A chefia encerrou a fase colaborativa da sala "${roomTitle}" e assumiu a consolidação.`,
+                cta_label: "Acompanhar sala",
+                cta_url: roomUrl,
+                image_url: coauthorshipClosedImage,
+                facts: [{ label: "Sala", value: roomTitle }],
+              }),
               type: "warning" as const,
             })),
         );

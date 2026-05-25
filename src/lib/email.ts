@@ -6,6 +6,7 @@ type SendEmailInput = {
   subject: string;
   text: string;
   html?: string;
+  imageUrl?: string;
   templateKey?: EmailTemplateKey;
   heading?: string;
   contextLabel?: string;
@@ -57,6 +58,36 @@ type EmailTemplateKey =
   | "dfd_returned"
   | "dfd_pending"
   | "admin_summary"
+  | "dfd_sent_to_chefia"
+  | "dfd_consolidated"
+  | "coauthorship_opened"
+  | "coauthorship_closed"
+  | "contribution_submitted"
+  | "contribution_locked"
+  | "dfd_rejected_or_archived"
+  | "triage_conflict"
+  | "sla_reminder"
+  | "broadcast_announcement"
+  | "test"
+  | "generic";
+
+type EmailImageSlot =
+  | "welcome"
+  | "dfd-submitted"
+  | "dfd-approved"
+  | "dfd-returned"
+  | "dfd-status"
+  | "admin-summary"
+  | "dfd-sent-to-chefia"
+  | "dfd-consolidated"
+  | "coauthorship-opened"
+  | "coauthorship-closed"
+  | "contribution-submitted"
+  | "contribution-locked"
+  | "dfd-rejected-or-archived"
+  | "triage-conflict"
+  | "sla-reminder"
+  | "broadcast-announcement"
   | "test"
   | "generic";
 
@@ -71,15 +102,7 @@ type EmailTemplatePreset = {
   statusLabel: string;
   statusTone: EmailTone;
   intro: string;
-  imageSlot?:
-    | "welcome"
-    | "dfd-submitted"
-    | "dfd-approved"
-    | "dfd-returned"
-    | "dfd-status"
-    | "admin-summary"
-    | "test"
-    | "generic";
+  imageSlot?: EmailImageSlot;
 };
 
 const TEMPLATE_PRESETS: Record<EmailTemplateKey, EmailTemplatePreset> = {
@@ -130,6 +153,86 @@ const TEMPLATE_PRESETS: Record<EmailTemplateKey, EmailTemplatePreset> = {
     statusTone: "neutral",
     intro: "Resumo consolidado para acompanhamento de filas, pendências e decisões.",
     imageSlot: "admin-summary",
+  },
+  dfd_sent_to_chefia: {
+    heading: "DFD encaminhada para chefia",
+    contextLabel: "Triagem da chefia",
+    statusLabel: "Encaminhada",
+    statusTone: "info",
+    intro: "A solicitação foi enviada para a fila de análise da chefia.",
+    imageSlot: "dfd-sent-to-chefia",
+  },
+  dfd_consolidated: {
+    heading: "DFD coletiva consolidada",
+    contextLabel: "Consolidação coletiva",
+    statusLabel: "Consolidada",
+    statusTone: "success",
+    intro: "A sala coletiva foi convertida em DFD(s) oficial(is).",
+    imageSlot: "dfd-consolidated",
+  },
+  coauthorship_opened: {
+    heading: "Coautoria aberta",
+    contextLabel: "Sala coletiva",
+    statusLabel: "Aberta",
+    statusTone: "info",
+    intro: "A sala coletiva foi publicada e está disponível para contribuições.",
+    imageSlot: "coauthorship-opened",
+  },
+  coauthorship_closed: {
+    heading: "Coautoria encerrada",
+    contextLabel: "Sala coletiva",
+    statusLabel: "Em consolidação",
+    statusTone: "warning",
+    intro: "A chefia encerrou a fase colaborativa e assumiu a consolidação.",
+    imageSlot: "coauthorship-closed",
+  },
+  contribution_submitted: {
+    heading: "Contribuição registrada",
+    contextLabel: "Sala coletiva",
+    statusLabel: "Contribuição salva",
+    statusTone: "success",
+    intro: "Sua contribuição foi registrada na sala coletiva.",
+    imageSlot: "contribution-submitted",
+  },
+  contribution_locked: {
+    heading: "Item bloqueado",
+    contextLabel: "Sala coletiva",
+    statusLabel: "Bloqueado",
+    statusTone: "warning",
+    intro: "Esse item foi bloqueado para edição/remoção por usuários comuns.",
+    imageSlot: "contribution-locked",
+  },
+  dfd_rejected_or_archived: {
+    heading: "DFD arquivada/devolvida",
+    contextLabel: "Fluxo de DFD",
+    statusLabel: "Ação necessária",
+    statusTone: "danger",
+    intro: "A solicitação foi arquivada ou devolvida e exige revisão.",
+    imageSlot: "dfd-rejected-or-archived",
+  },
+  triage_conflict: {
+    heading: "Conflito de triagem",
+    contextLabel: "Concorrência de aprovação",
+    statusLabel: "Conflito detectado",
+    statusTone: "warning",
+    intro: "A DFD já foi processada por outra chefia durante a sua ação.",
+    imageSlot: "triage-conflict",
+  },
+  sla_reminder: {
+    heading: "Lembrete de prazo",
+    contextLabel: "SLA de tramitação",
+    statusLabel: "Prazo em atenção",
+    statusTone: "warning",
+    intro: "Existe uma pendência próxima do prazo para análise ou consolidação.",
+    imageSlot: "sla-reminder",
+  },
+  broadcast_announcement: {
+    heading: "Comunicado institucional",
+    contextLabel: "Comunicados",
+    statusLabel: "Informe",
+    statusTone: "info",
+    intro: "Confira o informe enviado pela administração do sistema.",
+    imageSlot: "broadcast-announcement",
   },
   test: {
     heading: "Teste de e-mail",
@@ -209,6 +312,13 @@ function detectTemplateKey(input: SendEmailInput): EmailTemplateKey {
     return "dfd_submitted";
   }
   if (haystack.includes("pendência") || haystack.includes("pendencia")) return "dfd_pending";
+  if (haystack.includes("coautoria") && haystack.includes("encerr")) return "coauthorship_closed";
+  if (haystack.includes("coautoria") || haystack.includes("publicada")) return "coauthorship_opened";
+  if (haystack.includes("consolid")) return "dfd_consolidated";
+  if (haystack.includes("encaminhad") && haystack.includes("chefia")) return "dfd_sent_to_chefia";
+  if (haystack.includes("conflito") || haystack.includes("já foi processada")) return "triage_conflict";
+  if (haystack.includes("sla") || haystack.includes("prazo")) return "sla_reminder";
+  if (haystack.includes("comunicado") || haystack.includes("informe")) return "broadcast_announcement";
   if (haystack.includes("resumo")) return "admin_summary";
   return "generic";
 }
@@ -254,12 +364,28 @@ function getFlatImageUrl(slot: EmailTemplatePreset["imageSlot"]): string | null 
   if (configured) return configured;
   const assetBase = getAssetBaseUrl();
   if (!assetBase) return null;
-  return `${assetBase}/email/${slot}.png`;
+  const eventSlots = new Set<EmailImageSlot>([
+    "dfd-sent-to-chefia",
+    "dfd-consolidated",
+    "coauthorship-opened",
+    "coauthorship-closed",
+    "contribution-submitted",
+    "contribution-locked",
+    "dfd-rejected-or-archived",
+    "triage-conflict",
+    "sla-reminder",
+    "broadcast-announcement",
+  ]);
+  const path = eventSlots.has(slot) ? `/email/events/${slot}.png` : `/email/${slot}.png`;
+  return `${assetBase}${path}`;
 }
 
-function renderFlatImageSlot(slot: EmailTemplatePreset["imageSlot"]) {
-  if (!slot) return "";
-  const imageUrl = getFlatImageUrl(slot);
+function renderFlatImageSlot(
+  slot: EmailTemplatePreset["imageSlot"],
+  imageUrlOverride?: string,
+) {
+  if (!slot && !imageUrlOverride) return "";
+  const imageUrl = imageUrlOverride?.trim() || getFlatImageUrl(slot);
   const labelBySlot: Record<string, string> = {
     welcome: "Ilustração institucional de boas-vindas",
     "dfd-submitted": "Ilustração de documento encaminhado",
@@ -267,10 +393,20 @@ function renderFlatImageSlot(slot: EmailTemplatePreset["imageSlot"]) {
     "dfd-returned": "Ilustração de DFD devolvida para ajustes",
     "dfd-status": "Ilustração de atualização de status da DFD",
     "admin-summary": "Ilustração de resumo administrativo",
+    "dfd-sent-to-chefia": "Ilustração de DFD encaminhada para chefia",
+    "dfd-consolidated": "Ilustração de DFD coletiva consolidada",
+    "coauthorship-opened": "Ilustração de coautoria aberta",
+    "coauthorship-closed": "Ilustração de coautoria encerrada",
+    "contribution-submitted": "Ilustração de contribuição registrada",
+    "contribution-locked": "Ilustração de item bloqueado",
+    "dfd-rejected-or-archived": "Ilustração de DFD arquivada ou devolvida",
+    "triage-conflict": "Ilustração de conflito de triagem",
+    "sla-reminder": "Ilustração de lembrete de SLA",
+    "broadcast-announcement": "Ilustração de comunicado institucional",
     test: "Ilustração de teste de e-mail",
     generic: "Ilustração de notificação institucional",
   };
-  const label = labelBySlot[slot] || "Ilustração institucional";
+  const label = (slot ? labelBySlot[slot] : null) || "Ilustração institucional";
 
   if (imageUrl) {
     return `
@@ -399,7 +535,7 @@ function buildMasterEmail(input: SendEmailInput): { html: string; text: string }
                 </table>
               </td>
             </tr>
-            ${renderFlatImageSlot(preset.imageSlot)}
+            ${renderFlatImageSlot(preset.imageSlot, input.imageUrl)}
             <tr>
               <td style="padding:20px 22px 6px 22px;">
                 <p style="margin:0 0 14px 0;display:inline-block;padding:6px 10px;border-radius:999px;background:#E8EDF2;color:#164073;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">

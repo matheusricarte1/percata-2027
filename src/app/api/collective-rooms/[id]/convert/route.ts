@@ -33,6 +33,10 @@ export async function POST(_request: NextRequest, context: RouteContext) {
 
     const dfds = await convertRoomToOfficialDfds({ admin, actor, room });
     const participantIds = await loadRoomParticipantUserIds(admin, room.id);
+    const consolidatedImage = toPublicSiteUrl(
+      "/email/events/dfd-consolidated.png",
+      _request.nextUrl.origin,
+    ).toString();
     const dfdLinks = dfds
       .map((dfd) => {
         const url = toPublicSiteUrl(`/dfd/${dfd.id}`, _request.nextUrl.origin).toString();
@@ -47,7 +51,23 @@ export async function POST(_request: NextRequest, context: RouteContext) {
         .map((userId) => ({
           user_id: userId,
           title: "DFDs oficiais geradas a partir da sala coletiva",
-          message: `A sala "${room.title}" foi convertida em ${dfds.length} DFD(s) oficial(is).\n${dfdLinks}`,
+          message: JSON.stringify({
+            kind: "rich_notification",
+            template_key: "dfd_consolidated",
+            heading: `Sala convertida em DFD(s): ${room.title}`,
+            context_label: "Consolidação coletiva",
+            status_label: "Consolidada",
+            status_tone: "success",
+            body: `A sala "${room.title}" foi convertida em ${dfds.length} DFD(s) oficial(is).`,
+            cta_label: "Abrir sala consolidada",
+            cta_url: toPublicSiteUrl(`/dfds-coletivas/${room.id}`, _request.nextUrl.origin).toString(),
+            image_url: consolidatedImage,
+            details: dfdLinks ? dfdLinks.split("\n") : [],
+            facts: [
+              { label: "Sala", value: room.title },
+              { label: "DFDs geradas", value: dfds.length },
+            ],
+          }),
           type: "success" as const,
         })),
     );

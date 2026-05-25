@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuthorizedRole } from "@/lib/api-auth";
+import { toPublicSiteUrl } from "@/lib/site-url";
 import {
   sanitizeLongText,
   sanitizePlainText,
@@ -134,10 +135,16 @@ export const POST = withAuthorizedRole(
       );
     }
 
+    const defaultBroadcastImageUrl = toPublicSiteUrl(
+      "/email/events/broadcast-announcement.png",
+      request.nextUrl.origin,
+    ).toString();
+
     const richMessage = JSON.stringify({
       kind: "rich_notification",
+      template_key: "broadcast_announcement",
       body: messageBody,
-      image_url: imageUrl || undefined,
+      image_url: imageUrl || defaultBroadcastImageUrl,
       cta_label: ctaLabel || undefined,
       cta_url: ctaUrl || undefined,
       sender_name: sanitizePlainText(
@@ -166,4 +173,3 @@ export const POST = withAuthorizedRole(
   },
   { requireAdminClient: true },
 );
-

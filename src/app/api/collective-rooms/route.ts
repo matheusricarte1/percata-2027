@@ -111,6 +111,10 @@ export async function POST(request: NextRequest) {
     });
 
     const roomUrl = toPublicSiteUrl(`/dfds-coletivas/${room.id}`, request.nextUrl.origin).toString();
+    const coauthorshipOpenedImage = toPublicSiteUrl(
+      "/email/events/coauthorship-opened.png",
+      request.nextUrl.origin,
+    ).toString();
     if (isChefia) {
       const unitMemberIds = await loadUnitRecipientUserIds(admin, {
         unitId,
@@ -123,7 +127,22 @@ export async function POST(request: NextRequest) {
           .map((userId) => ({
             user_id: userId,
             title: "DFD coletiva publicada",
-            message: `A sala coletiva "${title}" foi publicada para contribuições do setor. Acesse: ${roomUrl}`,
+            message: JSON.stringify({
+              kind: "rich_notification",
+              template_key: "coauthorship_opened",
+              heading: `Sala coletiva publicada: ${title}`,
+              context_label: "DFD coletiva",
+              status_label: "Aberta para contribuição",
+              status_tone: "info",
+              body: `A sala coletiva "${title}" foi publicada para contribuições do setor.`,
+              cta_label: "Abrir sala coletiva",
+              cta_url: roomUrl,
+              image_url: coauthorshipOpenedImage,
+              facts: [
+                { label: "Sala", value: title },
+                { label: "Status", value: "Aberta" },
+              ],
+            }),
             type: "info" as const,
           })),
       );
@@ -140,7 +159,21 @@ export async function POST(request: NextRequest) {
           .map((userId) => ({
             user_id: userId,
             title: "Nova proposta de DFD coletiva",
-            message: `${actor.full_name || "Um membro da unidade"} propôs a sala "${title}" e aguarda publicação da chefia. Acesse: ${roomUrl}`,
+            message: JSON.stringify({
+              kind: "rich_notification",
+              template_key: "generic",
+              heading: `Nova proposta de sala: ${title}`,
+              context_label: "DFD coletiva",
+              status_label: "Aguardando publicação",
+              status_tone: "info",
+              body: `${actor.full_name || "Um membro da unidade"} propôs a sala "${title}" e aguarda publicação da chefia.`,
+              cta_label: "Revisar proposta",
+              cta_url: roomUrl,
+              facts: [
+                { label: "Sala", value: title },
+                { label: "Proponente", value: actor.full_name || actor.email || "Usuário" },
+              ],
+            }),
             type: "info" as const,
           })),
       );

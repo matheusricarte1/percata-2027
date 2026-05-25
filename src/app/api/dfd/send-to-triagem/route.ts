@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { createClient } from "@/utils/supabase/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { toPublicSiteUrl } from "@/lib/site-url";
 
 type DfdForTriagem = {
   id: string;
@@ -124,12 +125,29 @@ export async function POST(request: NextRequest) {
 
     const protocolLabel =
       target.numero_protocolo || `DFD-${String(target.id || "").slice(0, 8).toUpperCase()}`;
+    const dfdUrl = toPublicSiteUrl(`/dfd/${target.id}`, request.nextUrl.origin).toString();
+    const sentImageUrl = toPublicSiteUrl(
+      "/email/events/dfd-sent-to-chefia.png",
+      request.nextUrl.origin,
+    ).toString();
     const notifications = Array.from(reviewerIds)
       .filter((reviewerId) => reviewerId !== target.solicitante_id)
       .map((reviewerId) => ({
         user_id: reviewerId,
         title: "Nova DFD na fila de análise",
-        message: `${protocolLabel} foi enviada para análise da chefia.`,
+        message: JSON.stringify({
+          kind: "rich_notification",
+          template_key: "dfd_sent_to_chefia",
+          heading: `DFD ${protocolLabel} encaminhada para análise`,
+          context_label: "Triagem da chefia",
+          status_label: "Encaminhada",
+          status_tone: "info",
+          body: `${protocolLabel} foi enviada para análise da chefia.`,
+          cta_label: "Abrir DFD",
+          cta_url: dfdUrl,
+          image_url: sentImageUrl,
+          facts: [{ label: "Protocolo", value: protocolLabel }],
+        }),
         type: "info",
       }));
 

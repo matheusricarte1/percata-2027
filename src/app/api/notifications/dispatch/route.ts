@@ -9,6 +9,7 @@ const DEFAULT_BATCH_SIZE = 20;
 type NotificationEnvelope = {
   kind?: string;
   body?: string;
+  image_url?: string;
   cta_label?: string;
   cta_url?: string;
   template_key?:
@@ -18,6 +19,16 @@ type NotificationEnvelope = {
     | "dfd_returned"
     | "dfd_pending"
     | "admin_summary"
+    | "dfd_sent_to_chefia"
+    | "dfd_consolidated"
+    | "coauthorship_opened"
+    | "coauthorship_closed"
+    | "contribution_submitted"
+    | "contribution_locked"
+    | "dfd_rejected_or_archived"
+    | "triage_conflict"
+    | "sla_reminder"
+    | "broadcast_announcement"
     | "test"
     | "generic";
   heading?: string;
@@ -134,6 +145,7 @@ export const POST = withAuthorizedRole(
         to: item.email_to,
         subject: item.subject,
         text: textBody || "Você recebeu uma atualização no PERCATA.",
+        imageUrl: String(envelope?.image_url || "").trim() || undefined,
         templateKey: envelope?.template_key || undefined,
         heading: String(envelope?.heading || "").trim() || undefined,
         contextLabel:
