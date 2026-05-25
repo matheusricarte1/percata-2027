@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ArrowLeft, Files, Hash, CurrencyCircleDollar } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { ProductSkeleton } from "@/components/ui/skeleton";
@@ -19,10 +19,10 @@ interface LegacyDemandHeader {
   items_count: number | null;
 }
 
-export default function HistoricoDetailPage() {
-  const params = useParams<{ code: string }>();
-  const router = useRouter();
+export default function HistoricoDetailByYearPage() {
+  const params = useParams<{ year: string; code: string }>();
   const demandCode = decodeURIComponent(params?.code || "");
+  const demandYear = Number(params?.year || 0);
 
   const [loading, setLoading] = useState(true);
   const [demand, setDemand] = useState<LegacyDemandHeader | null>(null);
@@ -30,7 +30,7 @@ export default function HistoricoDetailPage() {
 
   useEffect(() => {
     const fetchDetail = async () => {
-      if (!demandCode) return;
+      if (!demandCode || !Number.isFinite(demandYear) || demandYear <= 0) return;
       setLoading(true);
       try {
         const { data: demandRows, error: demandError } =
@@ -40,7 +40,7 @@ export default function HistoricoDetailPage() {
                 .from(viewName)
                 .select("*")
                 .eq("demand_code", demandCode)
-                .order("legacy_year", { ascending: false })
+                .eq("legacy_year", demandYear)
                 .limit(1),
           );
         if (demandError) throw demandError;
@@ -51,9 +51,6 @@ export default function HistoricoDetailPage() {
           setItems([]);
           return;
         }
-        router.replace(
-          `/historico/${encodeURIComponent(String(selected.legacy_year))}/${encodeURIComponent(selected.demand_code)}`,
-        );
         setDemand(selected);
 
         const { data: itemRows, error: itemError } = await supabase
@@ -74,7 +71,7 @@ export default function HistoricoDetailPage() {
     };
 
     fetchDetail();
-  }, [demandCode, router]);
+  }, [demandCode, demandYear]);
 
   const totalItens = useMemo(
     () =>
@@ -208,6 +205,3 @@ export default function HistoricoDetailPage() {
     </div>
   );
 }
-
-
-

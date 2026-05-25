@@ -31,6 +31,7 @@ import { normalizeRole, type UserRole } from "@/lib/access";
 import { getDfdProcessStage } from "@/lib/dfd-process-guide";
 import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { withLegacyHistoryViewFallback } from "@/lib/legacy-history";
 
 type DfdStatus =
   | "rascunho"
@@ -230,13 +231,16 @@ export default function MinhasDFDsPage() {
   const fetchLegacyDfds = useCallback(async () => {
     setLegacyLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("legacy_pa_minhas_demandas_v2")
-        .select(
-          "legacy_year,demand_code,campus,status,object,total_estimated,items_count",
-        )
-        .order("legacy_year", { ascending: false })
-        .order("demand_code", { ascending: false });
+      const { data, error } = await withLegacyHistoryViewFallback<LegacyDemandSummary>(
+        async (viewName) =>
+          await supabase
+            .from(viewName)
+            .select(
+              "legacy_year,demand_code,campus,status,object,total_estimated,items_count",
+            )
+            .order("legacy_year", { ascending: false })
+            .order("demand_code", { ascending: false }),
+      );
 
       if (error) throw error;
       setLegacyRecords((data || []) as LegacyDemandSummary[]);
@@ -770,7 +774,7 @@ export default function MinhasDFDsPage() {
                       </p>
                     </div>
                     <Link
-                      href={`/historico/${encodeURIComponent(legacy.demand_code)}`}
+                      href={`/historico/${encodeURIComponent(String(legacy.legacy_year))}/${encodeURIComponent(legacy.demand_code)}`}
                       className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#E8EDF2] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073] hover:bg-[#DCEAF0]"
                     >
                       Ver detalhe

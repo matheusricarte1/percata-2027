@@ -19,6 +19,7 @@ import { twMerge } from "tailwind-merge";
 import { supabase } from "@/lib/supabase";
 import { ProductSkeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { withLegacyHistoryViewFallback } from "@/lib/legacy-history";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -58,13 +59,16 @@ export default function HistoricoPage() {
     const fetchLegacy = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("legacy_pa_minhas_demandas_v2")
-          .select(
-            "legacy_year,demand_code,campus,status,object,total_estimated,items_count",
-          )
-          .order("legacy_year", { ascending: false })
-          .order("demand_code", { ascending: false });
+        const { data, error } = await withLegacyHistoryViewFallback<LegacyDemand>(
+          async (viewName) =>
+            await supabase
+              .from(viewName)
+              .select(
+                "legacy_year,demand_code,campus,status,object,total_estimated,items_count",
+              )
+              .order("legacy_year", { ascending: false })
+              .order("demand_code", { ascending: false }),
+        );
 
         if (error) throw error;
         setRecords((data || []) as LegacyDemand[]);
