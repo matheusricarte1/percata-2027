@@ -808,6 +808,10 @@ html[data-route-pending="1"] {
     animation: slide-in-right 260ms var(--motion-ease-emphasized) both;
   }
 
+  .attention-pulse-soft {
+    animation: attention-pulse-soft 2.2s var(--motion-ease-standard) infinite;
+  }
+
   .skeleton-shimmer::after {
     content: "";
     position: absolute;
@@ -871,6 +875,18 @@ html[data-route-pending="1"] {
   @keyframes skeleton-shimmer {
     to {
       transform: translateX(120%);
+    }
+  }
+
+  @keyframes attention-pulse-soft {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+      box-shadow: 0 0 0 0 rgba(22, 64, 115, 0.22);
+    }
+    50% {
+      transform: translateY(-1px) scale(1.01);
+      box-shadow: 0 0 0 8px rgba(22, 64, 115, 0);
     }
   }
 }

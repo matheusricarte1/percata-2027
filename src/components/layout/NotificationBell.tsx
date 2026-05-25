@@ -20,12 +20,58 @@ type NotificationRow = {
   created_at: string;
 };
 
+type ParsedNotificationMessage = {
+  body: string;
+  imageUrl: string | null;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+  senderName: string | null;
+};
+
 const TYPE_STYLE_MAP: Record<string, string> = {
   info: "border-[#DCEAF0] bg-[#F4F7FA] text-[#1C5A6B]",
   success: "border-[#CFE6DE] bg-[#E7F0EA] text-[#5F735C]",
   warning: "border-[#F3D0BE] bg-[#FFF3E6] text-[#B9895A]",
   error: "border-[#F5A3A3] bg-[#FEEFF0] text-[#A91520]",
 };
+
+function sanitizeUrl(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  try {
+    const parsed = new URL(text);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function parseNotificationMessage(raw: string): ParsedNotificationMessage {
+  const fallback: ParsedNotificationMessage = {
+    body: String(raw || "").trim(),
+    imageUrl: null,
+    ctaLabel: null,
+    ctaUrl: null,
+    senderName: null,
+  };
+  const value = String(raw || "").trim();
+  if (!value.startsWith("{")) return fallback;
+
+  try {
+    const payload = JSON.parse(value);
+    if (!payload || payload.kind !== "rich_notification") return fallback;
+    return {
+      body: String(payload.body || payload.message || "").trim() || fallback.body,
+      imageUrl: sanitizeUrl(payload.image_url || payload.imageUrl),
+      ctaLabel: String(payload.cta_label || payload.ctaLabel || "").trim() || null,
+      ctaUrl: sanitizeUrl(payload.cta_url || payload.ctaUrl),
+      senderName: String(payload.sender_name || payload.senderName || "").trim() || null,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 export function NotificationBell({
   showUnreadCount = false,
@@ -169,7 +215,18 @@ export function NotificationBell({
 
             <div className="max-h-[380px] overflow-y-auto">
               {loading ? (
-                <div className="px-4 py-6 text-xs text-[#7D98B8]">Carregando notificações...</div>
+                <div className="space-y-3 px-4 py-4">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={`notif-skeleton-${index}`}
+                      className="rounded-xl border border-[#E8EDF2] bg-white px-3 py-3"
+                    >
+                      <div className="h-2.5 w-24 rounded-full bg-[#E8EDF2] skeleton-shimmer" />
+                      <div className="mt-2 h-3 w-4/5 rounded-full bg-[#E8EDF2] skeleton-shimmer" />
+                      <div className="mt-1.5 h-2.5 w-2/3 rounded-full bg-[#E8EDF2] skeleton-shimmer" />
+                    </div>
+                  ))}
+                </div>
               ) : notifications.length === 0 ? (
                 <div className="px-5 py-6 text-center text-xs text-[#7D98B8]">
                   <img
@@ -182,12 +239,15 @@ export function NotificationBell({
                 </div>
               ) : (
                 <div className="divide-y divide-[#E8EDF2]">
-                  {notifications.map((notification) => (
+                  {notifications.map((notification) => {
+                    const parsedMessage = parseNotificationMessage(notification.message);
+                    return (
                     <motion.div
                       key={notification.id}
                       layout
                       initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                       animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                      whileHover={reduceMotion ? undefined : { y: -1 }}
                       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className={cn(
                         "px-4 py-3 transition",
@@ -213,8 +273,34 @@ export function NotificationBell({
                             {notification.title}
                           </p>
                           <p className="mt-1 text-xs leading-relaxed text-[#5B6675]">
-                            {notification.message}
+                            {parsedMessage.body || "Você recebeu uma atualização no sistema."}
                           </p>
+                          {parsedMessage.imageUrl ? (
+                            <motion.img
+                              initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                              animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                              src={parsedMessage.imageUrl}
+                              alt={notification.title}
+                              className="mt-2 max-h-40 w-full rounded-lg border border-[#D9E0E8] object-cover"
+                              loading="lazy"
+                            />
+                          ) : null}
+                          {parsedMessage.senderName ? (
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7D98B8]">
+                              Enviado por {parsedMessage.senderName}
+                            </p>
+                          ) : null}
+                          {parsedMessage.ctaLabel && parsedMessage.ctaUrl ? (
+                            <a
+                              href={parsedMessage.ctaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex h-8 items-center rounded-lg border border-[#C7D7EA] bg-white px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#164073] transition hover:-translate-y-0.5 hover:bg-[#F4F7FA]"
+                            >
+                              {parsedMessage.ctaLabel}
+                            </a>
+                          ) : null}
                           <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.1em] text-[#A7B1BD]">
                             <Clock size={12} />
                             {formatTimeLabel(notification.created_at)}
@@ -233,7 +319,7 @@ export function NotificationBell({
                         )}
                       </div>
                     </motion.div>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>

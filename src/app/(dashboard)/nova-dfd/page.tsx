@@ -2054,7 +2054,7 @@ export default function NovaDFDPage() {
                   ? "bg-[#2D5D94]"
                   : blockingErrors.length > 0
                     ? "cursor-not-allowed bg-[#7D98B8]"
-                    : "bg-[#164073] hover:bg-[#0F2E57]",
+                    : "attention-pulse-soft bg-[#164073] hover:bg-[#0F2E57]",
               )}
             >
               {loading ? (

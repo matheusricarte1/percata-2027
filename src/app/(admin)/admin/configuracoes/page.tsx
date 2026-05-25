@@ -6,10 +6,12 @@ import {
   ArrowsClockwise,
   Buildings,
   CalendarBlank,
+  ChatCenteredDots,
   CheckCircle,
   Files,
   Flask,
   Gear,
+  MegaphoneSimple,
   Package,
   Plus,
   ShieldCheck,
@@ -22,10 +24,12 @@ import { Button } from "@/components/ui/button";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { CategoryAvatar } from "@/components/user/CategoryAvatar";
 import {
   sanitizeLongText,
   sanitizePlainText,
   sanitizeUiMessage,
+  sanitizeUuid,
 } from "@/lib/settings-sanitize";
 
 const UsuariosModule = dynamic(() => import("@/app/(admin)/admin/usuarios/page"), {
@@ -70,12 +74,14 @@ type ChefiaOption = {
   email: string | null;
   role: string | null;
   campus_id: string | null;
+  avatar_url?: string | null;
 };
 
 type AdminTab =
   | "ajustes"
   | "acesso"
   | "estrutura"
+  | "mensagens"
   | "usuarios"
   | "exportacao"
   | "kits"
@@ -92,6 +98,7 @@ const TABS: TabItem[] = [
   { key: "ajustes", label: "Ajustes", icon: Gear },
   { key: "acesso", label: "Acesso", icon: ShieldCheck, superadminOnly: true },
   { key: "estrutura", label: "Estrutura", icon: Buildings, superadminOnly: true },
+  { key: "mensagens", label: "Mensagens", icon: MegaphoneSimple, superadminOnly: true },
   { key: "usuarios", label: "Usuários", icon: Users },
   { key: "exportacao", label: "Exportação", icon: Files },
   { key: "kits", label: "Modelos DFD", icon: Package },
@@ -407,6 +414,9 @@ export default function ConfiguracoesAdminPage() {
           handleAddLaboratorio={handleAddLaboratorio}
         />
       )}
+      {activeTab === "mensagens" && isSuperadmin && (
+        <BroadcastMessagesPanel campi={campi} />
+      )}
 
       {activeTab === "usuarios" && <UsuariosModule />}
       {activeTab === "exportacao" && <ExportacaoModule />}
@@ -421,6 +431,229 @@ function ModuleLoading({ label }: { label: string }) {
     <div className="rounded-2xl border border-[#D2D0CE] bg-white p-6 text-sm font-semibold text-slate-500">
       Carregando módulo de {label}...
     </div>
+  );
+}
+
+function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [type, setType] = useState<"info" | "success" | "warning" | "error">("info");
+  const [scope, setScope] = useState<"all" | "campus" | "role" | "user">("all");
+  const [targetCampusId, setTargetCampusId] = useState("");
+  const [targetRole, setTargetRole] = useState("solicitante");
+  const [targetUserId, setTargetUserId] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function sendBroadcast() {
+    const safeTitle = sanitizePlainText(title, 120);
+    const safeBody = sanitizeLongText(body, 1200);
+    if (!safeTitle || !safeBody) {
+      toast.warning("Preencha título e mensagem.");
+      return;
+    }
+
+    setSending(true);
+    try {
+      const response = await fetch("/api/admin/notifications/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: safeTitle,
+          body: safeBody,
+          type,
+          targetScope: scope,
+          targetCampusId: scope === "campus" ? sanitizeUuid(targetCampusId) : null,
+          targetRole: scope === "role" ? sanitizePlainText(targetRole, 32) : null,
+          targetUserId: scope === "user" ? sanitizeUuid(targetUserId) : null,
+          imageUrl: sanitizePlainText(imageUrl, 600) || null,
+          ctaLabel: sanitizePlainText(ctaLabel, 60) || null,
+          ctaUrl: sanitizePlainText(ctaUrl, 600) || null,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || "Falha ao enviar mensagem.");
+      }
+      toast.success(`Mensagem enviada para ${Number(payload?.recipients || 0)} usuário(s).`);
+      setBody("");
+      setImageUrl("");
+      setCtaLabel("");
+      setCtaUrl("");
+      if (scope === "user") setTargetUserId("");
+    } catch (error: any) {
+      toast.error(sanitizeUiMessage(error?.message, 220) || "Falha ao enviar mensagem.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <section className="rounded-[22px] border border-[#E1E8F0] bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+            Comunicação administrativa
+          </p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+            Mensagens com imagem
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[#52627A]">
+            Envie avisos para usuários do sistema e inclua foto (URL) e botão de ação opcional.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#F7FBFF] px-3 py-2 text-xs font-semibold text-[#164073]">
+          <ChatCenteredDots size={16} weight="duotone" />
+          Campainha + painel do usuário
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <label className="block">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Título</span>
+          <input
+            value={title}
+            onChange={(event) => setTitle(sanitizePlainText(event.target.value, 120))}
+            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            placeholder="Ex.: Janela de envio encerra hoje às 18h"
+            maxLength={120}
+          />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Tipo</span>
+          <select
+            value={type}
+            onChange={(event) => setType((event.target.value as any) || "info")}
+            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          >
+            <option value="info">Informação</option>
+            <option value="success">Sucesso</option>
+            <option value="warning">Atenção</option>
+            <option value="error">Crítico</option>
+          </select>
+        </label>
+      </div>
+
+      <label className="mt-4 block">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Mensagem</span>
+        <textarea
+          value={body}
+          onChange={(event) => setBody(sanitizeLongText(event.target.value, 1200))}
+          className="mt-2 min-h-[120px] w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 py-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          maxLength={1200}
+          placeholder="Explique em linguagem direta o que muda e o que o usuário precisa fazer."
+        />
+      </label>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <label className="block">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Alvo</span>
+          <select
+            value={scope}
+            onChange={(event) => setScope((event.target.value as any) || "all")}
+            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          >
+            <option value="all">Todos os usuários</option>
+            <option value="campus">Campus específico</option>
+            <option value="role">Papel específico</option>
+            <option value="user">Usuário específico (ID)</option>
+          </select>
+        </label>
+
+        {scope === "campus" ? (
+          <label className="block">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Campus</span>
+            <select
+              value={targetCampusId}
+              onChange={(event) => setTargetCampusId(event.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            >
+              <option value="">Selecione o campus</option>
+              {campi.map((campus) => (
+                <option key={campus.id} value={campus.id}>
+                  {(campus.sigla || "").trim() ? `${campus.sigla} - ${campus.nome}` : campus.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {scope === "role" ? (
+          <label className="block">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Papel</span>
+            <select
+              value={targetRole}
+              onChange={(event) => setTargetRole(event.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            >
+              <option value="solicitante">Solicitante</option>
+              <option value="chefia">Chefia</option>
+              <option value="admin">Admin</option>
+              <option value="superadmin">Superadmin</option>
+            </select>
+          </label>
+        ) : null}
+
+        {scope === "user" ? (
+          <label className="block">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">ID do usuário</span>
+            <input
+              value={targetUserId}
+              onChange={(event) => setTargetUserId(sanitizePlainText(event.target.value, 80))}
+              className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+              placeholder="UUID do perfil"
+            />
+          </label>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <label className="block lg:col-span-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">URL da imagem (opcional)</span>
+          <input
+            value={imageUrl}
+            onChange={(event) => setImageUrl(sanitizePlainText(event.target.value, 600))}
+            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            placeholder="https://..."
+          />
+        </label>
+        <label className="block">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Texto do botão</span>
+          <input
+            value={ctaLabel}
+            onChange={(event) => setCtaLabel(sanitizePlainText(event.target.value, 60))}
+            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            placeholder="Abrir documento"
+          />
+        </label>
+      </div>
+
+      <label className="mt-4 block">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">URL do botão (opcional)</span>
+        <input
+          value={ctaUrl}
+          onChange={(event) => setCtaUrl(sanitizePlainText(event.target.value, 600))}
+          className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          placeholder="https://..."
+        />
+      </label>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4">
+        <p className="text-xs font-medium text-[#52627A]">
+          A mensagem aparece na campainha do usuário e pode incluir foto e botão.
+        </p>
+        <Button
+          type="button"
+          onClick={sendBroadcast}
+          disabled={sending}
+          className="h-10 rounded-lg bg-[#164073] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#0F2E57]"
+        >
+          {sending ? "Enviando..." : "Enviar mensagem"}
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -926,17 +1159,35 @@ function UnitChefiaSelector({
   runAction: (body: Record<string, any>, successMessage?: string) => Promise<any>;
 }) {
   const currentChefiaId = unit.chefia?.user_id || "__none__";
+  const currentOption = chefiaOptions.find((option) => option.id === currentChefiaId) || null;
+  const currentChefiaName =
+    unit.chefia?.full_name ||
+    currentOption?.full_name ||
+    unit.chefia?.email ||
+    currentOption?.email ||
+    "Sem chefia definida";
+  const currentChefiaAvatar =
+    currentOption?.avatar_url ||
+    null;
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-[#C7D7EA] hover:bg-[#F8FBFF]">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-            Chefia do espaço
-          </p>
-          <p className="mt-0.5 text-xs font-semibold text-[#164073]">
-            {unit.chefia?.full_name || unit.chefia?.email || "Sem chefia definida"}
-          </p>
+        <div className="flex items-center gap-2.5">
+          <CategoryAvatar
+            name={currentChefiaName}
+            avatarUrl={currentChefiaAvatar}
+            category="chefia"
+            size="sm"
+          />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              Chefia do espaço
+            </p>
+            <p className="mt-0.5 text-xs font-semibold text-[#164073]">
+              {currentChefiaName}
+            </p>
+          </div>
         </div>
         <select
           value={currentChefiaId}
@@ -964,6 +1215,9 @@ function UnitChefiaSelector({
           ))}
         </select>
       </div>
+      {currentOption?.email ? (
+        <p className="mt-1 text-[11px] text-slate-500">{currentOption.email}</p>
+      ) : null}
       <p className="mt-2 text-[11px] leading-5 text-slate-500">
         Ao escolher alguém aqui, essa pessoa passa a receber/analisar as DFDs deste
         setor ou laboratório como chefia.

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
+  ArrowRight,
   Printer,
   XCircle,
   CircleNotch,
@@ -879,10 +880,11 @@ export default function DfdDetailsPage() {
                           href={item.link_referencia}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-3 inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white px-4 text-sm font-semibold text-[var(--semantic-action)] hover:bg-[var(--semantic-action-soft)]"
+                          className="group mt-3 inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--semantic-action-border)] bg-white px-4 text-sm font-semibold text-[var(--semantic-action)] transition duration-200 hover:-translate-y-0.5 hover:bg-[var(--semantic-action-soft)] hover:shadow-[0_8px_16px_rgba(23,35,60,0.12)]"
                         >
-                          <Paperclip size={16} />
+                          <Paperclip size={16} className="transition-transform duration-200 group-hover:rotate-6" />
                           Abrir referência técnica
+                          <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-1" />
                         </a>
                       ) : null}
                     </motion.article>
@@ -936,10 +938,20 @@ export default function DfdDetailsPage() {
                       <p className="mt-1 text-sm text-[var(--semantic-text-muted)]">
                         {entry.details || "Movimentação registrada automaticamente pelo sistema."}
                       </p>
-                      <p className="mt-2 text-sm font-medium text-[var(--semantic-text-muted)]">
-                        {formatTimelineDate(entry.created_at)}
-                        {entry.actor_name ? ` • ${entry.actor_name}` : ""}
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--semantic-text-muted)]">
+                        <span>{formatTimelineDate(entry.created_at)}</span>
+                        {entry.actor_name ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--semantic-neutral-border)] bg-white px-2 py-0.5">
+                            <CategoryAvatar
+                              name={String(entry.actor_name)}
+                              avatarUrl={String(entry.actor_avatar_url || "") || null}
+                              category={String(entry.actor_role || "").toLowerCase() === "chefia" ? "chefia" : "usuario"}
+                              size="sm"
+                            />
+                            <span className="text-xs font-semibold text-[var(--semantic-text)]">{entry.actor_name}</span>
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );
@@ -987,10 +999,20 @@ export default function DfdDetailsPage() {
                       <p className="mt-1 text-sm text-[var(--semantic-text-muted)]">
                         {entry.details || "Movimentação registrada automaticamente pelo sistema."}
                       </p>
-                      <p className="mt-1 text-xs font-medium text-[var(--semantic-text-muted)]">
-                        {formatTimelineDate(entry.created_at)}
-                        {entry.actor_name ? ` • ${entry.actor_name}` : ""}
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-[var(--semantic-text-muted)]">
+                        <span>{formatTimelineDate(entry.created_at)}</span>
+                        {entry.actor_name ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--semantic-neutral-border)] bg-white px-2 py-0.5">
+                            <CategoryAvatar
+                              name={String(entry.actor_name)}
+                              avatarUrl={String(entry.actor_avatar_url || "") || null}
+                              category={String(entry.actor_role || "").toLowerCase() === "chefia" ? "chefia" : "usuario"}
+                              size="sm"
+                            />
+                            <span className="text-[11px] font-semibold text-[var(--semantic-text)]">{entry.actor_name}</span>
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );

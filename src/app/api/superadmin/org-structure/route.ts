@@ -198,7 +198,7 @@ async function fetchChefiaOptions(
 ) {
   let query = service
     .from("profiles")
-    .select("id, full_name, email, role, campus_id")
+    .select("id, full_name, email, role, campus_id, avatar_url")
     .order("full_name", { ascending: true });
 
   if (campusId) {
