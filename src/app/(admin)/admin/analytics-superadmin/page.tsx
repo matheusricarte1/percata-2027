@@ -328,7 +328,7 @@ export default function SuperadminAnalyticsPage() {
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-[#C7D7EA] bg-[#F4F8FC] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#164073]">
               <ShieldCheck size={14} weight="bold" />
-              Superadmin only
+              Somente superadmin
             </p>
             <h1 className="mt-3 text-2xl font-semibold text-[#0F2A4A]">
               Analytics dialético de demanda
@@ -903,6 +903,13 @@ function IntermittencyDonut({
 }: {
   distribution: Record<IntermittencyClass, number>;
 }) {
+  const labelMap: Record<IntermittencyClass, string> = {
+    smooth: "Suave",
+    intermittent: "Intermitente",
+    erratic: "Errática",
+    lumpy: "Lumpy",
+    insufficient: "Insuficiente",
+  };
   const entries: Array<{ label: IntermittencyClass; value: number; color: string }> = [
     { label: "smooth", value: distribution.smooth || 0, color: "#0F7B54" },
     { label: "intermittent", value: distribution.intermittent || 0, color: "#0EA5E9" },
@@ -935,7 +942,7 @@ function IntermittencyDonut({
         {entries.map((entry) => (
           <p key={`donut-${entry.label}`} className="flex items-center gap-2 text-[#5A6E86]">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="uppercase">{entry.label}</span>
+            <span className="uppercase">{labelMap[entry.label]}</span>
             <span className="font-semibold text-[#16345C]">{formatNumber(entry.value)}</span>
           </p>
         ))}
