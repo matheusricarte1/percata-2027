@@ -51,6 +51,65 @@ type OutlierRow = {
   mes: string;
 };
 
+type SegmentInsight = {
+  level: "info" | "warning" | "critical";
+  title: string;
+  detail: string;
+};
+
+type SegmentGuide = {
+  title: string;
+  action: string;
+};
+
+type SegmentMonthlyPoint = {
+  month: string;
+  dfd_count: number;
+  total_quantity: number;
+  total_value: number;
+};
+
+type SegmentCodePoint = {
+  codigoEfisco: string;
+  descricao: string;
+  observations: number;
+  activeMonths: number;
+  totalQuantity: number;
+  withPriceObservations: number;
+};
+
+type SegmentAnalytics = {
+  segment: "legacy" | "current" | "combined";
+  scope: {
+    price_signals_enabled: boolean;
+  };
+  dataset: {
+    dfds: number;
+    items: number;
+    unique_codes: number;
+    months_covered: number;
+    code_coverage_pct: number;
+    quantity_coverage_pct: number;
+    price_coverage_pct: number;
+    repeated_codes: number;
+    peak_month: string;
+    peak_month_dfd_count: number;
+    month_concentration_pct: number;
+  };
+  regression: {
+    dfd_volume: RegressionSummary;
+    total_quantity: RegressionSummary;
+    total_value: RegressionSummary;
+  };
+  charts: {
+    monthly: SegmentMonthlyPoint[];
+    top_codes_by_quantity: SegmentCodePoint[];
+    top_codes_by_frequency: SegmentCodePoint[];
+  };
+  insights: SegmentInsight[];
+  guides: SegmentGuide[];
+};
+
 type AnalyticsPayload = {
   generated_at: string;
   window_months: number;
@@ -72,7 +131,14 @@ type AnalyticsPayload = {
   };
   top_forecasts: ForecastRow[];
   price_outliers: OutlierRow[];
+  segments?: {
+    legacy: SegmentAnalytics;
+    current: SegmentAnalytics;
+    combined: SegmentAnalytics;
+  };
 };
+
+type SegmentKey = "current" | "legacy" | "combined";
 
 function formatCurrency(value: number) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -83,6 +149,22 @@ function formatCurrency(value: number) {
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("pt-BR");
+}
+
+function formatPercent(value: number) {
+  return `${Number(value || 0).toLocaleString("pt-BR", {
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function formatMonthLabel(month: string) {
+  const date = new Date(`${month}-01T00:00:00.000Z`);
+  if (!Number.isFinite(date.getTime())) return month;
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function trendLabel(trend: RegressionSummary["trend"]) {
@@ -98,6 +180,7 @@ export default function SuperadminAnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [windowMonths, setWindowMonths] = useState(18);
   const [payload, setPayload] = useState<AnalyticsPayload | null>(null);
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>("current");
 
   const isSuperadmin = role === "superadmin";
 
@@ -155,6 +238,20 @@ export default function SuperadminAnalyticsPage() {
     };
   }, [loadAnalytics, resolveRole, windowMonths]);
 
+  const segments = payload?.segments;
+
+  useEffect(() => {
+    if (!segments) return;
+    if (activeSegment === "current" && segments.current.dataset.dfds === 0) {
+      setActiveSegment("combined");
+    }
+  }, [activeSegment, segments]);
+
+  const segment = useMemo(() => {
+    if (!segments) return null;
+    return segments[activeSegment];
+  }, [activeSegment, segments]);
+
   const outliersCritical = useMemo(
     () => (payload?.price_outliers || []).filter((row) => Math.abs(row.zScore) >= 3).length,
     [payload],
@@ -185,8 +282,6 @@ export default function SuperadminAnalyticsPage() {
     );
   }
 
-  const regression = payload?.regression;
-
   return (
     <div className="space-y-5">
       <div className="rounded-3xl border border-[#D2D0CE] bg-white p-6 shadow-sm">
@@ -197,10 +292,10 @@ export default function SuperadminAnalyticsPage() {
               Superadmin only
             </p>
             <h1 className="mt-3 text-2xl font-semibold text-[#0F2A4A]">
-              Analytics avançado de demanda
+              Analytics dialético de demanda
             </h1>
             <p className="mt-1 text-sm text-[#466188]">
-              Tendências por regressão linear, previsão por item e outliers de preço para apoio à governança.
+              Legado sem preço para padrões de volume e recorrência. Corrente com leitura completa para governança financeira.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -228,121 +323,161 @@ export default function SuperadminAnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="DFDs elegíveis" value={formatNumber(payload?.dataset.dfds || 0)} />
+        <MetricCard label="DFDs analisadas" value={formatNumber(payload?.dataset.dfds || 0)} />
         <MetricCard label="Itens analisados" value={formatNumber(payload?.dataset.items || 0)} />
         <MetricCard label="Códigos únicos" value={formatNumber(payload?.dataset.unique_codes || 0)} />
-        <MetricCard label="Outliers críticos" value={formatNumber(outliersCritical)} tone="warn" />
+        <MetricCard label="Outliers críticos (corrente)" value={formatNumber(outliersCritical)} tone="warn" />
       </div>
 
       <div className="rounded-2xl border border-[#D2D0CE] bg-white p-4 text-xs text-[#4F6785]">
-        Base utilizada:{" "}
-        <b>{formatNumber(payload?.dataset.current_dfds || 0)} DFDs atuais</b> +{" "}
-        <b>{formatNumber(payload?.dataset.legacy_dfds || 0)} DFDs legadas</b>
+        Base utilizada: <b>{formatNumber(payload?.dataset.current_dfds || 0)} DFDs correntes</b> + <b>{formatNumber(payload?.dataset.legacy_dfds || 0)} DFDs legadas</b>
         {" · "}
-        <b>{formatNumber(payload?.dataset.current_items || 0)} itens atuais</b> +{" "}
-        <b>{formatNumber(payload?.dataset.legacy_items || 0)} itens legados</b>
+        <b>{formatNumber(payload?.dataset.current_items || 0)} itens correntes</b> + <b>{formatNumber(payload?.dataset.legacy_items || 0)} itens legados</b>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <RegressionCard
-          title="Volume de DFD"
-          summary={regression?.dfd_volume || null}
-          formatter={formatNumber}
+      <div className="flex flex-wrap gap-2">
+        <SegmentButton
+          active={activeSegment === "current"}
+          onClick={() => setActiveSegment("current")}
+          title="Corrente (completo)"
+          subtitle="Preço + quantidade + risco"
         />
-        <RegressionCard
-          title="Quantidade total"
-          summary={regression?.total_quantity || null}
-          formatter={formatNumber}
+        <SegmentButton
+          active={activeSegment === "legacy"}
+          onClick={() => setActiveSegment("legacy")}
+          title="Legado (sem preço)"
+          subtitle="Volume + recorrência + distribuição"
         />
-        <RegressionCard
-          title="Valor total"
-          summary={regression?.total_value || null}
-          formatter={formatCurrency}
+        <SegmentButton
+          active={activeSegment === "combined"}
+          onClick={() => setActiveSegment("combined")}
+          title="Consolidado"
+          subtitle="Visão geral institucional"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-[#0F2A4A]">Top previsões de quantidade</h2>
-            <span className="text-xs text-[#5A6E86]">{payload?.top_forecasts.length || 0} itens</span>
+      {segment ? (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <MetricCard label="DFDs" value={formatNumber(segment.dataset.dfds)} />
+            <MetricCard label="Itens" value={formatNumber(segment.dataset.items)} />
+            <MetricCard label="Meses com dados" value={formatNumber(segment.dataset.months_covered)} />
+            <MetricCard label="Códigos repetidos" value={formatNumber(segment.dataset.repeated_codes)} />
+            <MetricCard label="Cobertura de código" value={formatPercent(segment.dataset.code_coverage_pct)} />
+            <MetricCard label="Cobertura de preço" value={formatPercent(segment.dataset.price_coverage_pct)} tone={segment.scope.price_signals_enabled ? "default" : "muted"} />
           </div>
-          <div className="max-h-[420px] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
-                  <th className="pb-2">Código</th>
-                  <th className="pb-2 text-right">Atual</th>
-                  <th className="pb-2 text-right">Prev. próxima</th>
-                  <th className="pb-2 text-right">R²</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(payload?.top_forecasts || []).map((row) => (
-                  <tr key={row.codigoEfisco} className="border-t border-[#EEF2F7]">
-                    <td className="py-2 pr-2">
-                      <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
-                      <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
-                    </td>
-                    <td className="py-2 text-right font-medium text-[#16345C]">
-                      {formatNumber(row.latestQuantity)}
-                    </td>
-                    <td className="py-2 text-right font-semibold text-[#0B5E3F]">
-                      {formatNumber(row.predictedNextQuantity)}
-                    </td>
-                    <td className="py-2 text-right text-xs text-[#5A6E86]">
-                      {Math.round((row.r2 || 0) * 100)}%
-                    </td>
-                  </tr>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <RegressionCard
+              title="Volume de DFD"
+              summary={segment.regression.dfd_volume}
+              formatter={formatNumber}
+            />
+            <RegressionCard
+              title="Quantidade total"
+              summary={segment.regression.total_quantity}
+              formatter={formatNumber}
+            />
+            <RegressionCard
+              title={segment.scope.price_signals_enabled ? "Valor total" : "Valor total (leitura limitada)"}
+              summary={segment.regression.total_value}
+              formatter={formatCurrency}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <ChartCard title="DFDs por mês" subtitle="Evolução mensal de volume">
+              <MonthlyBars rows={segment.charts.monthly} accessor="dfd_count" formatter={formatNumber} colorClass="bg-[#2B6CB0]" />
+            </ChartCard>
+            <ChartCard title="Quantidade por mês" subtitle="Carga operacional por período">
+              <MonthlyBars rows={segment.charts.monthly} accessor="total_quantity" formatter={formatNumber} colorClass="bg-[#0F7B54]" />
+            </ChartCard>
+            <ChartCard title="Top códigos por recorrência" subtitle="Mais frequentes no período">
+              <TopCodesBars rows={segment.charts.top_codes_by_frequency} valueKey="observations" formatter={formatNumber} />
+            </ChartCard>
+            <ChartCard title="Top códigos por quantidade" subtitle="Maior peso de consumo">
+              <TopCodesBars rows={segment.charts.top_codes_by_quantity} valueKey="totalQuantity" formatter={formatNumber} />
+            </ChartCard>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-[#0F2A4A]">Análises automáticas</h2>
+              <div className="mt-3 space-y-2">
+                {segment.insights.length === 0 && (
+                  <p className="text-sm text-[#5A6E86]">Sem alertas para a janela atual.</p>
+                )}
+                {segment.insights.map((insight, index) => (
+                  <div
+                    key={`${insight.title}-${index}`}
+                    className={
+                      insight.level === "critical"
+                        ? "rounded-xl border border-[#F1BBC2] bg-[#FFF3F5] p-3"
+                        : insight.level === "warning"
+                          ? "rounded-xl border border-[#F4D5A8] bg-[#FFF9EE] p-3"
+                          : "rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3"
+                    }
+                  >
+                    <p className="text-sm font-semibold text-[#16345C]">{insight.title}</p>
+                    <p className="mt-1 text-xs text-[#5A6E86]">{insight.detail}</p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </div>
+            </div>
 
-        <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-[#0F2A4A]">Outliers de preço unitário</h2>
-            <span className="text-xs text-[#5A6E86]">{payload?.price_outliers.length || 0} sinais</span>
-          </div>
-          <div className="max-h-[420px] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
-                  <th className="pb-2">Código</th>
-                  <th className="pb-2 text-right">Preço</th>
-                  <th className="pb-2 text-right">Média</th>
-                  <th className="pb-2 text-right">Z-score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(payload?.price_outliers || []).map((row, index) => (
-                  <tr key={`${row.dfdId}-${row.codigoEfisco}-${index}`} className="border-t border-[#EEF2F7]">
-                    <td className="py-2 pr-2">
-                      <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
-                      <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
-                      <p className="text-[11px] text-[#7C8DA2]">{row.protocolo || row.dfdId}</p>
-                    </td>
-                    <td className="py-2 text-right font-semibold text-[#8A1E2A]">
-                      {formatCurrency(row.unitPrice)}
-                    </td>
-                    <td className="py-2 text-right text-[#2B4C6F]">
-                      {formatCurrency(row.mediaHistorica)}
-                    </td>
-                    <td className="py-2 text-right">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[#F4CDD0] bg-[#FFF3F4] px-2 py-0.5 text-xs font-semibold text-[#8A1E2A]">
-                        <WarningCircle size={12} weight="fill" />
-                        {row.zScore.toFixed(2)}
-                      </span>
-                    </td>
-                  </tr>
+            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-[#0F2A4A]">Guia de decisão</h2>
+              <div className="mt-3 space-y-2">
+                {segment.guides.map((guide, index) => (
+                  <div key={`${guide.title}-${index}`} className="rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3">
+                    <p className="text-sm font-semibold text-[#16345C]">{guide.title}</p>
+                    <p className="mt-1 text-xs text-[#5A6E86]">{guide.action}</p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
+
+          {activeSegment === "current" && (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <DataTableForecast rows={payload?.top_forecasts || []} />
+              <DataTableOutliers rows={payload?.price_outliers || []} />
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="rounded-3xl border border-[#D2D0CE] bg-white p-8 text-sm text-[#466188]">
+          Sem dados de segmento no momento.
         </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+function SegmentButton({
+  active,
+  onClick,
+  title,
+  subtitle,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        active
+          ? "rounded-xl border border-[#9DC0E7] bg-[#EAF3FF] px-4 py-2 text-left"
+          : "rounded-xl border border-[#D2D0CE] bg-white px-4 py-2 text-left hover:bg-[#F8FBFF]"
+      }
+    >
+      <p className="text-sm font-semibold text-[#16345C]">{title}</p>
+      <p className="text-[11px] text-[#5A6E86]">{subtitle}</p>
+    </button>
   );
 }
 
@@ -353,16 +488,17 @@ function MetricCard({
 }: {
   label: string;
   value: string;
-  tone?: "default" | "warn";
+  tone?: "default" | "warn" | "muted";
 }) {
+  const classes =
+    tone === "warn"
+      ? "rounded-2xl border border-[#F4CDD0] bg-[#FFF6F7] p-4"
+      : tone === "muted"
+        ? "rounded-2xl border border-[#DCE5EF] bg-[#F9FBFD] p-4"
+        : "rounded-2xl border border-[#D2D0CE] bg-white p-4";
+
   return (
-    <div
-      className={
-        tone === "warn"
-          ? "rounded-2xl border border-[#F4CDD0] bg-[#FFF6F7] p-4"
-          : "rounded-2xl border border-[#D2D0CE] bg-white p-4"
-      }
-    >
+    <div className={classes}>
       <p className="text-xs uppercase tracking-[0.12em] text-[#6A7E95]">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-[#0F2A4A]">{value}</p>
     </div>
@@ -375,7 +511,7 @@ function RegressionCard({
   formatter,
 }: {
   title: string;
-  summary: RegressionSummary | null;
+  summary: RegressionSummary;
   formatter: (value: number) => string;
 }) {
   const trend = summary?.trend || "insufficient_data";
@@ -391,20 +527,16 @@ function RegressionCard({
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-xl border border-[#E7ECF3] bg-[#FAFCFF] p-3">
           <p className="text-[11px] uppercase tracking-[0.12em] text-[#6A7E95]">Atual</p>
-          <p className="mt-1 font-semibold text-[#0F2A4A]">
-            {summary ? formatter(summary.currentValue) : "--"}
-          </p>
+          <p className="mt-1 font-semibold text-[#0F2A4A]">{formatter(summary.currentValue)}</p>
         </div>
         <div className="rounded-xl border border-[#E7ECF3] bg-[#FAFCFF] p-3">
           <p className="text-[11px] uppercase tracking-[0.12em] text-[#6A7E95]">Próximo ciclo</p>
-          <p className="mt-1 font-semibold text-[#0F2A4A]">
-            {summary ? formatter(summary.predictedNextValue) : "--"}
-          </p>
+          <p className="mt-1 font-semibold text-[#0F2A4A]">{formatter(summary.predictedNextValue)}</p>
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-[#5A6E86]">
-        <span>R²: {summary ? `${Math.round(summary.r2 * 100)}%` : "--"}</span>
-        <span>Amostras: {summary?.sampleSize || 0}</span>
+        <span>R²: {Math.round(summary.r2 * 100)}%</span>
+        <span>Amostras: {summary.sampleSize}</span>
         <span className="inline-flex items-center gap-1">
           {trend === "up" ? (
             <TrendUp size={13} className="text-[#0F7B54]" />
@@ -413,8 +545,183 @@ function RegressionCard({
           ) : (
             <ChartLineUp size={13} className="text-[#406A92]" />
           )}
-          inclinação {summary ? summary.slope.toFixed(2) : "--"}
+          inclinação {summary.slope.toFixed(2)}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-[#0F2A4A]">{title}</h2>
+      <p className="text-xs text-[#5A6E86]">{subtitle}</p>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function MonthlyBars({
+  rows,
+  accessor,
+  formatter,
+  colorClass,
+}: {
+  rows: SegmentMonthlyPoint[];
+  accessor: "dfd_count" | "total_quantity";
+  formatter: (value: number) => string;
+  colorClass: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-[#5A6E86]">Sem série para exibir.</p>;
+  }
+
+  const maxValue = Math.max(
+    ...rows.map((row) => Number(row[accessor] || 0)),
+    1,
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex h-48 items-end gap-2">
+        {rows.map((row) => {
+          const value = Number(row[accessor] || 0);
+          const heightPct = Math.max(4, Math.round((value / maxValue) * 100));
+          return (
+            <div key={`${accessor}-${row.month}`} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+              <div className="text-[10px] text-[#5A6E86]">{formatter(value)}</div>
+              <div className="flex w-full items-end rounded-t-md bg-[#EEF2F7]" style={{ height: "140px" }}>
+                <div className={`w-full rounded-t-md ${colorClass}`} style={{ height: `${heightPct}%` }} />
+              </div>
+              <div className="truncate text-[10px] text-[#6B7D92]">{formatMonthLabel(row.month)}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TopCodesBars({
+  rows,
+  valueKey,
+  formatter,
+}: {
+  rows: SegmentCodePoint[];
+  valueKey: "observations" | "totalQuantity";
+  formatter: (value: number) => string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-[#5A6E86]">Sem códigos suficientes para ranking.</p>;
+  }
+
+  const maxValue = Math.max(...rows.map((row) => Number(row[valueKey] || 0)), 1);
+
+  return (
+    <div className="space-y-2">
+      {rows.slice(0, 8).map((row) => {
+        const value = Number(row[valueKey] || 0);
+        const widthPct = Math.max(6, Math.round((value / maxValue) * 100));
+        return (
+          <div key={`${row.codigoEfisco}-${valueKey}`}>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-semibold text-[#16345C]">
+                {row.codigoEfisco}
+              </p>
+              <p className="text-xs text-[#5A6E86]">{formatter(value)}</p>
+            </div>
+            <div className="h-2 rounded-full bg-[#EEF2F7]">
+              <div className="h-2 rounded-full bg-[#2B6CB0]" style={{ width: `${widthPct}%` }} />
+            </div>
+            <p className="mt-1 truncate text-[11px] text-[#7C8DA2]">{row.descricao}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DataTableForecast({ rows }: { rows: ForecastRow[] }) {
+  return (
+    <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-[#0F2A4A]">Previsões de quantidade (corrente)</h2>
+        <span className="text-xs text-[#5A6E86]">{rows.length} itens</span>
+      </div>
+      <div className="max-h-[360px] overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-white">
+            <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+              <th className="pb-2">Código</th>
+              <th className="pb-2 text-right">Atual</th>
+              <th className="pb-2 text-right">Próxima</th>
+              <th className="pb-2 text-right">R²</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.codigoEfisco} className="border-t border-[#EEF2F7]">
+                <td className="py-2 pr-2">
+                  <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
+                  <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
+                </td>
+                <td className="py-2 text-right font-medium text-[#16345C]">{formatNumber(row.latestQuantity)}</td>
+                <td className="py-2 text-right font-semibold text-[#0B5E3F]">{formatNumber(row.predictedNextQuantity)}</td>
+                <td className="py-2 text-right text-xs text-[#5A6E86]">{Math.round((row.r2 || 0) * 100)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function DataTableOutliers({ rows }: { rows: OutlierRow[] }) {
+  return (
+    <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-[#0F2A4A]">Outliers de preço (corrente)</h2>
+        <span className="text-xs text-[#5A6E86]">{rows.length} sinais</span>
+      </div>
+      <div className="max-h-[360px] overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-white">
+            <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+              <th className="pb-2">Código</th>
+              <th className="pb-2 text-right">Preço</th>
+              <th className="pb-2 text-right">Média</th>
+              <th className="pb-2 text-right">Z-score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.dfdId}-${row.codigoEfisco}-${index}`} className="border-t border-[#EEF2F7]">
+                <td className="py-2 pr-2">
+                  <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
+                  <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
+                </td>
+                <td className="py-2 text-right font-semibold text-[#8A1E2A]">{formatCurrency(row.unitPrice)}</td>
+                <td className="py-2 text-right text-[#2B4C6F]">{formatCurrency(row.mediaHistorica)}</td>
+                <td className="py-2 text-right">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#F4CDD0] bg-[#FFF3F4] px-2 py-0.5 text-xs font-semibold text-[#8A1E2A]">
+                    <WarningCircle size={12} weight="fill" />
+                    {row.zScore.toFixed(2)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

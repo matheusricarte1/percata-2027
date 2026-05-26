@@ -7,6 +7,7 @@ import {
   normalizeCurrency,
   toYearMonth,
   type PriceObservation,
+  type RegressionSummary,
 } from "@/lib/superadmin-analytics";
 
 const ELIGIBLE_STATUSES = ["aprovada", "pactuando", "concluida", "homologada"];
@@ -55,6 +56,79 @@ type LegacyDemandRef = {
   unifiedId: string;
   legacyYear: number;
   demandCode: string;
+};
+
+type SegmentInsight = {
+  level: "info" | "warning" | "critical";
+  title: string;
+  detail: string;
+};
+
+type SegmentGuide = {
+  title: string;
+  action: string;
+};
+
+type SegmentMonthlyPoint = {
+  month: string;
+  dfd_count: number;
+  total_quantity: number;
+  total_value: number;
+};
+
+type SegmentCodePoint = {
+  codigoEfisco: string;
+  descricao: string;
+  observations: number;
+  activeMonths: number;
+  totalQuantity: number;
+  withPriceObservations: number;
+};
+
+type SegmentAnalytics = {
+  segment: "legacy" | "current" | "combined";
+  scope: {
+    price_signals_enabled: boolean;
+  };
+  dataset: {
+    dfds: number;
+    items: number;
+    unique_codes: number;
+    months_covered: number;
+    code_coverage_pct: number;
+    quantity_coverage_pct: number;
+    price_coverage_pct: number;
+    repeated_codes: number;
+    peak_month: string;
+    peak_month_dfd_count: number;
+    month_concentration_pct: number;
+  };
+  regression: {
+    dfd_volume: RegressionSummary;
+    total_quantity: RegressionSummary;
+    total_value: RegressionSummary;
+  };
+  charts: {
+    monthly: SegmentMonthlyPoint[];
+    top_codes_by_quantity: SegmentCodePoint[];
+    top_codes_by_frequency: SegmentCodePoint[];
+  };
+  insights: SegmentInsight[];
+  guides: SegmentGuide[];
+};
+
+type ForecastRow = {
+  codigoEfisco: string;
+  descricao: string;
+  observations: number;
+  sampleMonths: number;
+  latestMonth: string;
+  latestQuantity: number;
+  averageLast3Months: number;
+  predictedNextQuantity: number;
+  slope: number;
+  r2: number;
+  trend: "up" | "down" | "flat" | "insufficient_data";
 };
 
 function parseWindowMonths(raw: string | null) {
@@ -115,6 +189,11 @@ function normalizeLegacyCreatedAt(row: LegacyDemandRow) {
     return `${year}-01-01T00:00:00.000Z`;
   }
   return null;
+}
+
+function percentage(part: number, total: number) {
+  if (total <= 0) return 0;
+  return normalizeCurrency((part / total) * 100);
 }
 
 async function fetchEligibleDfds(
@@ -288,42 +367,6 @@ async function fetchLegacyItems(
   return items;
 }
 
-function buildMonthlyAnalytics(dfds: DfdRow[], items: ItemRow[]) {
-  const dfdMonthById = new Map<string, string>();
-  const itemMonthMap = new Map<string, number>();
-  const itemValueMap = new Map<string, number>();
-  const dfdVolumeMap = new Map<string, number>();
-
-  for (const dfd of dfds) {
-    const month = toYearMonth(String(dfd.created_at || ""));
-    if (!month) continue;
-    dfdMonthById.set(String(dfd.id), month);
-    dfdVolumeMap.set(month, (dfdVolumeMap.get(month) || 0) + 1);
-  }
-
-  for (const item of items) {
-    const month = dfdMonthById.get(String(item.dfd_id));
-    if (!month) continue;
-    const quantidade = Math.max(0, Number(item.quantidade || 0));
-    const unitPrice = Math.max(0, Number(item.valor_unitario_estimado || 0));
-    itemMonthMap.set(month, (itemMonthMap.get(month) || 0) + quantidade);
-    itemValueMap.set(month, (itemValueMap.get(month) || 0) + quantidade * unitPrice);
-  }
-
-  const quantitySeries = buildMonthSeries(itemMonthMap);
-  const valueSeries = buildMonthSeries(itemValueMap);
-  const dfdSeries = buildMonthSeries(dfdVolumeMap);
-
-  return {
-    months: Array.from(
-      new Set([...quantitySeries.months, ...valueSeries.months, ...dfdSeries.months]),
-    ).sort((a, b) => a.localeCompare(b)),
-    quantityRegression: linearRegression(quantitySeries.points),
-    valueRegression: linearRegression(valueSeries.points),
-    dfdRegression: linearRegression(dfdSeries.points),
-  };
-}
-
 function buildTopForecasts(dfds: DfdRow[], items: ItemRow[]) {
   const dfdMonthById = new Map<string, string>();
   for (const dfd of dfds) {
@@ -361,7 +404,7 @@ function buildTopForecasts(dfds: DfdRow[], items: ItemRow[]) {
     }
   }
 
-  const forecasts = Array.from(byCode.entries())
+  return Array.from(byCode.entries())
     .map(([codigoEfisco, entry]) => {
       const { points } = buildMonthSeries(entry.monthQty);
       const regression = linearRegression(points);
@@ -389,7 +432,7 @@ function buildTopForecasts(dfds: DfdRow[], items: ItemRow[]) {
         slope: regression.slope,
         r2: regression.r2,
         trend: regression.trend,
-      };
+      } as ForecastRow;
     })
     .filter((row) => row.sampleMonths >= 4)
     .sort((a, b) => {
@@ -398,8 +441,6 @@ function buildTopForecasts(dfds: DfdRow[], items: ItemRow[]) {
       return b.observations - a.observations;
     })
     .slice(0, 25);
-
-  return forecasts;
 }
 
 function buildPriceObservationRows(dfds: DfdRow[], items: ItemRow[]) {
@@ -435,6 +476,268 @@ function buildPriceObservationRows(dfds: DfdRow[], items: ItemRow[]) {
   return observations;
 }
 
+function buildSegmentAnalytics(
+  segment: "legacy" | "current" | "combined",
+  dfds: DfdRow[],
+  items: ItemRow[],
+  options: { priceSignalsEnabled: boolean },
+): SegmentAnalytics {
+  const dfdMonthById = new Map<string, string>();
+  const dfdVolumeMap = new Map<string, number>();
+  const itemQuantityMap = new Map<string, number>();
+  const itemValueMap = new Map<string, number>();
+
+  for (const dfd of dfds) {
+    const month = toYearMonth(String(dfd.created_at || ""));
+    if (!month) continue;
+    dfdMonthById.set(String(dfd.id), month);
+    dfdVolumeMap.set(month, (dfdVolumeMap.get(month) || 0) + 1);
+  }
+
+  let codedItems = 0;
+  let quantityItems = 0;
+  let pricedItems = 0;
+
+  const byCode = new Map<
+    string,
+    {
+      descricao: string;
+      observations: number;
+      totalQuantity: number;
+      activeMonths: Set<string>;
+      withPriceObservations: number;
+    }
+  >();
+
+  for (const item of items) {
+    const month = dfdMonthById.get(String(item.dfd_id));
+    if (!month) continue;
+
+    const quantity = Math.max(0, Number(item.quantidade || 0));
+    const unitPrice = Math.max(0, Number(item.valor_unitario_estimado || 0));
+    const code = resolveCodigoEfisco(item);
+
+    if (code) codedItems += 1;
+    if (quantity > 0) quantityItems += 1;
+    if (unitPrice > 0) pricedItems += 1;
+
+    itemQuantityMap.set(month, (itemQuantityMap.get(month) || 0) + quantity);
+    itemValueMap.set(month, (itemValueMap.get(month) || 0) + quantity * unitPrice);
+
+    if (!code) continue;
+    if (!byCode.has(code)) {
+      byCode.set(code, {
+        descricao: String(item.descricao || "Descrição não informada"),
+        observations: 0,
+        totalQuantity: 0,
+        activeMonths: new Set<string>(),
+        withPriceObservations: 0,
+      });
+    }
+
+    const entry = byCode.get(code)!;
+    entry.observations += 1;
+    entry.totalQuantity += quantity;
+    entry.activeMonths.add(month);
+    if (unitPrice > 0) entry.withPriceObservations += 1;
+    if (!entry.descricao || entry.descricao === "Descrição não informada") {
+      entry.descricao = String(item.descricao || entry.descricao);
+    }
+  }
+
+  const dfdSeries = buildMonthSeries(dfdVolumeMap);
+  const quantitySeries = buildMonthSeries(itemQuantityMap);
+  const valueSeries = buildMonthSeries(itemValueMap);
+
+  const allMonths = Array.from(
+    new Set([...dfdSeries.months, ...quantitySeries.months, ...valueSeries.months]),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const monthly: SegmentMonthlyPoint[] = allMonths.map((month) => ({
+    month,
+    dfd_count: Number(dfdVolumeMap.get(month) || 0),
+    total_quantity: normalizeCurrency(Number(itemQuantityMap.get(month) || 0)),
+    total_value: normalizeCurrency(Number(itemValueMap.get(month) || 0)),
+  }));
+
+  const topCodes = Array.from(byCode.entries()).map(([codigoEfisco, entry]) => ({
+    codigoEfisco,
+    descricao: entry.descricao,
+    observations: entry.observations,
+    activeMonths: entry.activeMonths.size,
+    totalQuantity: normalizeCurrency(entry.totalQuantity),
+    withPriceObservations: entry.withPriceObservations,
+  }));
+
+  const topCodesByQuantity = [...topCodes]
+    .sort((a, b) => {
+      const quantityDiff = b.totalQuantity - a.totalQuantity;
+      if (quantityDiff !== 0) return quantityDiff;
+      return b.observations - a.observations;
+    })
+    .slice(0, 12);
+
+  const topCodesByFrequency = [...topCodes]
+    .sort((a, b) => {
+      const obsDiff = b.observations - a.observations;
+      if (obsDiff !== 0) return obsDiff;
+      return b.totalQuantity - a.totalQuantity;
+    })
+    .slice(0, 12);
+
+  const peak = monthly.reduce(
+    (acc, row) => (row.dfd_count > acc.dfd_count ? row : acc),
+    { month: "-", dfd_count: 0, total_quantity: 0, total_value: 0 } as SegmentMonthlyPoint,
+  );
+
+  const codeCoveragePct = percentage(codedItems, items.length);
+  const quantityCoveragePct = percentage(quantityItems, items.length);
+  const priceCoveragePct = percentage(pricedItems, items.length);
+  const monthConcentrationPct = percentage(peak.dfd_count, Math.max(dfds.length, 1));
+
+  const dfdRegression = linearRegression(dfdSeries.points);
+  const quantityRegression = linearRegression(quantitySeries.points);
+  const valueRegression = linearRegression(valueSeries.points);
+
+  const repeatedCodes = topCodes.filter((row) => row.observations >= 2).length;
+
+  const insights: SegmentInsight[] = [];
+
+  if (dfds.length === 0) {
+    insights.push({
+      level: "critical",
+      title: "Sem dados para esta visão",
+      detail: "Não há DFDs suficientes na janela escolhida para produzir indicadores.",
+    });
+  }
+
+  if (allMonths.length > 0 && allMonths.length < 6) {
+    insights.push({
+      level: "warning",
+      title: "Série temporal curta",
+      detail: `A visão tem apenas ${allMonths.length} mês(es) com dados; tendência e previsão ficam menos confiáveis.`,
+    });
+  }
+
+  if (monthConcentrationPct >= 60 && dfds.length > 0) {
+    insights.push({
+      level: "warning",
+      title: "Concentração mensal elevada",
+      detail: `${normalizeCurrency(monthConcentrationPct)}% das DFDs estão no mês ${peak.month}.`,
+    });
+  }
+
+  if (codeCoveragePct < 90 && items.length > 0) {
+    insights.push({
+      level: "warning",
+      title: "Cobertura de código incompleta",
+      detail: `${normalizeCurrency(100 - codeCoveragePct)}% dos itens estão sem código padronizado.`,
+    });
+  }
+
+  if (!options.priceSignalsEnabled) {
+    insights.push({
+      level: "info",
+      title: "Preço indisponível no legado",
+      detail: "Esta visão prioriza volume, recorrência e distribuição. Sinais de preço foram desativados.",
+    });
+  } else if (priceCoveragePct < 50 && items.length > 0) {
+    insights.push({
+      level: "warning",
+      title: "Cobertura de preço baixa",
+      detail: `Apenas ${priceCoveragePct}% dos itens possuem preço unitário válido para análise financeira robusta.`,
+    });
+  }
+
+  if (dfdRegression.sampleSize >= 3 && dfdRegression.r2 < 0.2) {
+    insights.push({
+      level: "info",
+      title: "Tendência de volume fraca",
+      detail: "O R² do volume é baixo; trate a inclinação como sinal exploratório, não como previsão determinística.",
+    });
+  }
+
+  if (topCodesByFrequency.length > 0) {
+    const leader = topCodesByFrequency[0];
+    insights.push({
+      level: "info",
+      title: "Item líder de recorrência",
+      detail: `Código ${leader.codigoEfisco} aparece em ${leader.observations} observações e ${leader.activeMonths} mês(es).`,
+    });
+  }
+
+  const guides: SegmentGuide[] = [];
+
+  if (segment === "legacy") {
+    guides.push({
+      title: "Padronize o catálogo histórico",
+      action: "Priorize itens recorrentes para vincular código e unidade padronizada antes da próxima rodada.",
+    });
+    guides.push({
+      title: "Conduza planejamento por volume",
+      action: "Use top recorrência + top quantidade para definir itens estruturantes por campus/setor.",
+    });
+    guides.push({
+      title: "Não derive orçamento por preço legado",
+      action: "Preço histórico legado deve ser tratado como não confiável; use referência do ano corrente.",
+    });
+  } else if (segment === "current") {
+    guides.push({
+      title: "Use outliers como triagem",
+      action: "Itens com z-score alto devem entrar em revisão manual de preço e justificativa.",
+    });
+    guides.push({
+      title: "Consolide demanda recorrente",
+      action: "Converta códigos mais repetidos em kits ou compras centralizadas quando fizer sentido.",
+    });
+    guides.push({
+      title: "Aumente densidade temporal",
+      action: "Com poucos meses, atualize o painel quinzenalmente e reavalie previsões após 6+ meses.",
+    });
+  } else {
+    guides.push({
+      title: "Leia legado e corrente separadamente",
+      action: "Use o legado para pressão de demanda e o corrente para análise financeira e risco de preço.",
+    });
+    guides.push({
+      title: "Formalize ciclo de revisão",
+      action: "Institua revisão mensal com registro de decisões por item crítico e por centro de custo.",
+    });
+  }
+
+  return {
+    segment,
+    scope: {
+      price_signals_enabled: options.priceSignalsEnabled,
+    },
+    dataset: {
+      dfds: dfds.length,
+      items: items.length,
+      unique_codes: byCode.size,
+      months_covered: allMonths.length,
+      code_coverage_pct: codeCoveragePct,
+      quantity_coverage_pct: quantityCoveragePct,
+      price_coverage_pct: priceCoveragePct,
+      repeated_codes: repeatedCodes,
+      peak_month: peak.month,
+      peak_month_dfd_count: peak.dfd_count,
+      month_concentration_pct: monthConcentrationPct,
+    },
+    regression: {
+      dfd_volume: dfdRegression,
+      total_quantity: quantityRegression,
+      total_value: valueRegression,
+    },
+    charts: {
+      monthly,
+      top_codes_by_quantity: topCodesByQuantity,
+      top_codes_by_frequency: topCodesByFrequency,
+    },
+    insights,
+    guides,
+  };
+}
+
 export const GET = withAuthorizedRole(
   ["superadmin"],
   async ({ request, supabaseAdmin }) => {
@@ -466,13 +769,31 @@ export const GET = withAuthorizedRole(
       legacyItems = await fetchLegacyItems(admin, legacyBundle.refs);
     }
 
-    const dfds = [...currentDfds, ...legacyDfds];
-    const items = [...currentItems, ...legacyItems];
+    const combinedDfds = [...currentDfds, ...legacyDfds];
+    const combinedItems = [...currentItems, ...legacyItems];
 
-    const monthly = buildMonthlyAnalytics(dfds, items);
-    const forecasts = buildTopForecasts(dfds, items);
+    const currentYear = now.getUTCFullYear();
+    const currentYearDfdsRaw = currentDfds.filter((row) => {
+      const date = new Date(String(row.created_at || ""));
+      return Number.isFinite(date.getTime()) && date.getUTCFullYear() >= currentYear;
+    });
+    const currentYearDfds = currentYearDfdsRaw.length > 0 ? currentYearDfdsRaw : currentDfds;
+    const currentYearIdSet = new Set(currentYearDfds.map((row) => String(row.id)));
+    const currentYearItems = currentItems.filter((row) => currentYearIdSet.has(String(row.dfd_id)));
 
-    const priceObservations = buildPriceObservationRows(dfds, items);
+    const legacySegment = buildSegmentAnalytics("legacy", legacyDfds, legacyItems, {
+      priceSignalsEnabled: false,
+    });
+    const currentSegment = buildSegmentAnalytics("current", currentYearDfds, currentYearItems, {
+      priceSignalsEnabled: true,
+    });
+    const combinedSegment = buildSegmentAnalytics("combined", combinedDfds, combinedItems, {
+      priceSignalsEnabled: true,
+    });
+
+    const forecasts = buildTopForecasts(currentYearDfds, currentYearItems);
+
+    const priceObservations = buildPriceObservationRows(currentYearDfds, currentYearItems);
     const priceOutliers = detectPriceOutliers(priceObservations)
       .slice(0, 40)
       .map((row) => ({
@@ -492,23 +813,32 @@ export const GET = withAuthorizedRole(
         include_legacy: includeLegacy,
       },
       dataset: {
-        dfds: dfds.length,
-        items: items.length,
-        current_dfds: currentDfds.length,
-        current_items: currentItems.length,
-        legacy_dfds: legacyDfds.length,
-        legacy_items: legacyItems.length,
-        unique_codes: new Set(items.map((item) => resolveCodigoEfisco(item)).filter(Boolean))
-          .size,
-        months_covered: monthly.months.length,
+        dfds: combinedDfds.length,
+        items: combinedItems.length,
+        current_dfds: currentSegment.dataset.dfds,
+        current_items: currentSegment.dataset.items,
+        legacy_dfds: legacySegment.dataset.dfds,
+        legacy_items: legacySegment.dataset.items,
+        unique_codes: combinedSegment.dataset.unique_codes,
+        months_covered: combinedSegment.dataset.months_covered,
       },
       regression: {
-        total_quantity: monthly.quantityRegression,
-        total_value: monthly.valueRegression,
-        dfd_volume: monthly.dfdRegression,
+        total_quantity: combinedSegment.regression.total_quantity,
+        total_value: combinedSegment.regression.total_value,
+        dfd_volume: combinedSegment.regression.dfd_volume,
       },
       top_forecasts: forecasts,
       price_outliers: priceOutliers,
+      segments: {
+        legacy: legacySegment,
+        current: currentSegment,
+        combined: combinedSegment,
+      },
+      guides: {
+        legacy: legacySegment.guides,
+        current: currentSegment.guides,
+        combined: combinedSegment.guides,
+      },
     });
   },
   { requireAdminClient: true },
