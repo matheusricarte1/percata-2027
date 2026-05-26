@@ -477,6 +477,37 @@ export default function SuperadminAnalyticsPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <ChartCard title="Trajetória visual da série" subtitle="Sparkline de volume e quantidade por mês">
+              <DualSparkline rows={segment.charts.monthly} />
+            </ChartCard>
+            <ChartCard title="Mapa de calor temporal" subtitle="Concentração mensal de DFDs">
+              <SeasonalityHeatmap rows={segment.charts.monthly} />
+            </ChartCard>
+            <ChartCard title="Rosca de intermitência" subtitle="Distribuição ADI/CV² por classe">
+              <IntermittencyDonut distribution={segment.statistics.intermittency.class_distribution} />
+            </ChartCard>
+          </div>
+
+          <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#0F2A4A]">Cobertura de dados e confiabilidade</h2>
+            <p className="text-xs text-[#5A6E86]">
+              Quanto maior a cobertura e menor a concentração, mais robusta a decisão.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <CoverageBars
+                codeCoverage={segment.dataset.code_coverage_pct}
+                quantityCoverage={segment.dataset.quantity_coverage_pct}
+                priceCoverage={segment.dataset.price_coverage_pct}
+              />
+              <ReliabilityMeters
+                r2={segment.regression.total_quantity.r2}
+                pValue={segment.statistics.quantity_series.mann_kendall_p_value}
+                concentration={segment.statistics.quantity_series.top1_share_pct}
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <ChartCard title="DFDs por mês" subtitle="Evolução mensal de volume">
               <MonthlyBars rows={segment.charts.monthly} accessor="dfd_count" formatter={formatNumber} colorClass="bg-[#2B6CB0]" />
@@ -771,6 +802,247 @@ function TopCodesBars({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function normalizeSeries(values: number[]) {
+  if (values.length === 0) return [] as number[];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(1e-9, max - min);
+  return values.map((value) => (value - min) / range);
+}
+
+function polylinePoints(values: number[], width: number, height: number, pad = 8) {
+  if (values.length === 0) return "";
+  if (values.length === 1) {
+    const x = width / 2;
+    const y = height / 2;
+    return `${x},${y}`;
+  }
+
+  const normalized = normalizeSeries(values);
+  return normalized
+    .map((value, index) => {
+      const x = pad + (index * (width - pad * 2)) / (values.length - 1);
+      const y = height - pad - value * (height - pad * 2);
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
+function DualSparkline({ rows }: { rows: SegmentMonthlyPoint[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-[#5A6E86]">Sem dados para sparkline.</p>;
+  }
+
+  const width = 520;
+  const height = 150;
+  const dfdValues = rows.map((row) => Number(row.dfd_count || 0));
+  const qtyValues = rows.map((row) => Number(row.total_quantity || 0));
+  const dfdPath = polylinePoints(dfdValues, width, height);
+  const qtyPath = polylinePoints(qtyValues, width, height);
+
+  return (
+    <div className="space-y-2">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-36 w-full rounded-xl border border-[#E4ECF5] bg-[#FAFCFF]">
+        <defs>
+          <linearGradient id="sparkQty" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#0EA5E9" />
+            <stop offset="100%" stopColor="#0F7B54" />
+          </linearGradient>
+        </defs>
+        <polyline fill="none" stroke="#2B6CB0" strokeWidth="3" points={dfdPath} strokeLinecap="round" />
+        <polyline fill="none" stroke="url(#sparkQty)" strokeWidth="3" points={qtyPath} strokeLinecap="round" />
+      </svg>
+      <div className="flex items-center gap-4 text-xs text-[#5A6E86]">
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#2B6CB0]" /> Volume DFD</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#0F7B54]" /> Quantidade</span>
+      </div>
+    </div>
+  );
+}
+
+function heatColor(intensity: number) {
+  const clamped = Math.max(0, Math.min(1, intensity));
+  const blue = Math.round(244 - clamped * 120);
+  const green = Math.round(248 - clamped * 70);
+  return `rgb(${164 - clamped * 40}, ${green}, ${blue})`;
+}
+
+function SeasonalityHeatmap({ rows }: { rows: SegmentMonthlyPoint[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-[#5A6E86]">Sem dados para heatmap.</p>;
+  }
+
+  const maxDfd = Math.max(...rows.map((row) => Number(row.dfd_count || 0)), 1);
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 xl:grid-cols-8">
+      {rows.map((row) => {
+        const value = Number(row.dfd_count || 0);
+        const intensity = value / maxDfd;
+        return (
+          <div
+            key={`hm-${row.month}`}
+            className="rounded-lg border border-[#E2EAF4] p-2 text-center"
+            style={{ backgroundColor: heatColor(intensity) }}
+            title={`${formatMonthLabel(row.month)} · ${formatNumber(value)} DFDs`}
+          >
+            <p className="text-[10px] text-[#5A6E86]">{formatMonthLabel(row.month)}</p>
+            <p className="text-sm font-semibold text-[#16345C]">{formatNumber(value)}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function IntermittencyDonut({
+  distribution,
+}: {
+  distribution: Record<IntermittencyClass, number>;
+}) {
+  const entries: Array<{ label: IntermittencyClass; value: number; color: string }> = [
+    { label: "smooth", value: distribution.smooth || 0, color: "#0F7B54" },
+    { label: "intermittent", value: distribution.intermittent || 0, color: "#0EA5E9" },
+    { label: "erratic", value: distribution.erratic || 0, color: "#F59E0B" },
+    { label: "lumpy", value: distribution.lumpy || 0, color: "#A32933" },
+    { label: "insufficient", value: distribution.insufficient || 0, color: "#94A3B8" },
+  ];
+  const total = Math.max(1, entries.reduce((acc, entry) => acc + entry.value, 0));
+
+  let cumulative = 0;
+  const segments = entries.map((entry) => {
+    const start = cumulative;
+    const portion = (entry.value / total) * 100;
+    cumulative += portion;
+    return `${entry.color} ${start.toFixed(2)}% ${cumulative.toFixed(2)}%`;
+  });
+
+  return (
+    <div className="flex flex-col items-center gap-4 sm:flex-row">
+      <div
+        className="relative h-36 w-36 rounded-full"
+        style={{ background: `conic-gradient(${segments.join(", ")})` }}
+      >
+        <div className="absolute inset-[18%] grid place-items-center rounded-full bg-white text-center shadow-inner">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-[#6A7E95]">Séries</p>
+          <p className="text-xl font-semibold text-[#16345C]">{formatNumber(total)}</p>
+        </div>
+      </div>
+      <div className="space-y-1 text-xs">
+        {entries.map((entry) => (
+          <p key={`donut-${entry.label}`} className="flex items-center gap-2 text-[#5A6E86]">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="uppercase">{entry.label}</span>
+            <span className="font-semibold text-[#16345C]">{formatNumber(entry.value)}</span>
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CoverageBars({
+  codeCoverage,
+  quantityCoverage,
+  priceCoverage,
+}: {
+  codeCoverage: number;
+  quantityCoverage: number;
+  priceCoverage: number;
+}) {
+  const rows = [
+    { label: "Código", value: codeCoverage, color: "from-[#2563EB] to-[#38BDF8]" },
+    { label: "Quantidade", value: quantityCoverage, color: "from-[#0F7B54] to-[#22C55E]" },
+    { label: "Preço", value: priceCoverage, color: "from-[#7C3AED] to-[#A855F7]" },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => (
+        <div key={`coverage-${row.label}`}>
+          <div className="mb-1 flex items-center justify-between text-xs text-[#5A6E86]">
+            <span>{row.label}</span>
+            <span className="font-semibold text-[#16345C]">{formatPercent(row.value)}</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-[#E8EEF6]">
+            <div
+              className={`h-2.5 rounded-full bg-gradient-to-r ${row.color}`}
+              style={{ width: `${Math.max(0, Math.min(100, row.value))}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReliabilityMeters({
+  r2,
+  pValue,
+  concentration,
+}: {
+  r2: number;
+  pValue: number;
+  concentration: number;
+}) {
+  const reliability = Math.max(0, Math.min(100, Math.round((r2 * 100) * (1 - Math.min(1, pValue)))));
+  const concentrationRisk = Math.max(0, Math.min(100, concentration));
+
+  return (
+    <div className="space-y-3">
+      <ReliabilityBar
+        label="Confiabilidade global"
+        value={reliability}
+        goodWhenHigh
+      />
+      <ReliabilityBar
+        label="Significância de tendência"
+        value={Math.max(0, Math.min(100, Math.round((1 - Math.min(1, pValue)) * 100)))}
+        goodWhenHigh
+      />
+      <ReliabilityBar
+        label="Risco de concentração"
+        value={concentrationRisk}
+        goodWhenHigh={false}
+      />
+    </div>
+  );
+}
+
+function ReliabilityBar({
+  label,
+  value,
+  goodWhenHigh,
+}: {
+  label: string;
+  value: number;
+  goodWhenHigh: boolean;
+}) {
+  const clamped = Math.max(0, Math.min(100, value));
+  const tone = goodWhenHigh
+    ? clamped >= 70
+      ? "bg-[#0F7B54]"
+      : clamped >= 40
+        ? "bg-[#F59E0B]"
+        : "bg-[#A32933]"
+    : clamped <= 35
+      ? "bg-[#0F7B54]"
+      : clamped <= 60
+        ? "bg-[#F59E0B]"
+        : "bg-[#A32933]";
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs text-[#5A6E86]">
+        <span>{label}</span>
+        <span className="font-semibold text-[#16345C]">{clamped}%</span>
+      </div>
+      <div className="h-2.5 rounded-full bg-[#E8EEF6]">
+        <div className={`h-2.5 rounded-full ${tone}`} style={{ width: `${clamped}%` }} />
+      </div>
     </div>
   );
 }
