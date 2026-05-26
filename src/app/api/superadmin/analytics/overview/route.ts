@@ -85,6 +85,39 @@ type SegmentCodePoint = {
   withPriceObservations: number;
 };
 
+type IntermittencyClass = "smooth" | "intermittent" | "erratic" | "lumpy" | "insufficient";
+
+type SegmentDeepSeriesStats = {
+  mean: number;
+  std_dev: number;
+  cv: number;
+  median: number;
+  mad: number;
+  iqr: number;
+  skewness: number;
+  theil_sen_slope: number;
+  mann_kendall_s: number;
+  mann_kendall_z: number;
+  mann_kendall_p_value: number;
+  mann_kendall_trend: "up" | "down" | "flat";
+  hhi: number;
+  effective_periods: number;
+  top1_share_pct: number;
+};
+
+type SegmentIntermittencyStats = {
+  series_count: number;
+  class_distribution: Record<IntermittencyClass, number>;
+  median_adi: number;
+  median_cv2: number;
+  top_lumpy: Array<{
+    codigoEfisco: string;
+    adi: number;
+    cv2: number;
+    observations: number;
+  }>;
+};
+
 type SegmentAnalytics = {
   segment: "legacy" | "current" | "combined";
   scope: {
@@ -107,6 +140,12 @@ type SegmentAnalytics = {
     dfd_volume: RegressionSummary;
     total_quantity: RegressionSummary;
     total_value: RegressionSummary;
+  };
+  statistics: {
+    dfd_series: SegmentDeepSeriesStats;
+    quantity_series: SegmentDeepSeriesStats;
+    value_series: SegmentDeepSeriesStats;
+    intermittency: SegmentIntermittencyStats;
   };
   charts: {
     monthly: SegmentMonthlyPoint[];
@@ -156,6 +195,31 @@ function shiftMonths(date: Date, offset: number) {
   return next;
 }
 
+function monthToDate(month: string) {
+  const [yearText, monthText] = String(month || "").split("-");
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex)) return null;
+  if (year < 1900 || monthIndex < 0 || monthIndex > 11) return null;
+  return new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+}
+
+function buildContiguousMonths(months: string[]) {
+  if (months.length === 0) return [] as string[];
+  const sorted = [...months].sort((a, b) => a.localeCompare(b));
+  const start = monthToDate(sorted[0]);
+  const end = monthToDate(sorted[sorted.length - 1]);
+  if (!start || !end) return sorted;
+
+  const values: string[] = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    values.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return values;
+}
+
 function resolveCodigoEfisco(item: ItemRow) {
   return String(item.codigo_tce || item.codigo_item_efisco || "").trim();
 }
@@ -194,6 +258,203 @@ function normalizeLegacyCreatedAt(row: LegacyDemandRow) {
 function percentage(part: number, total: number) {
   if (total <= 0) return 0;
   return normalizeCurrency((part / total) * 100);
+}
+
+function mean(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((acc, value) => acc + value, 0) / values.length;
+}
+
+function sampleStdDev(values: number[], avg: number) {
+  if (values.length < 2) return 0;
+  const variance =
+    values.reduce((acc, value) => acc + Math.pow(value - avg, 2), 0) /
+    (values.length - 1);
+  return Math.sqrt(Math.max(variance, 0));
+}
+
+function median(values: number[]) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
+function quantile(values: number[], q: number) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const clampedQ = Math.max(0, Math.min(1, q));
+  const index = (sorted.length - 1) * clampedQ;
+  const base = Math.floor(index);
+  const rest = index - base;
+  const left = sorted[base];
+  const right = sorted[Math.min(base + 1, sorted.length - 1)];
+  return left + rest * (right - left);
+}
+
+function mad(values: number[]) {
+  if (values.length === 0) return 0;
+  const med = median(values);
+  const deviations = values.map((value) => Math.abs(value - med));
+  return median(deviations);
+}
+
+function skewness(values: number[]) {
+  if (values.length < 3) return 0;
+  const avg = mean(values);
+  const sd = sampleStdDev(values, avg);
+  if (sd <= 0) return 0;
+  const n = values.length;
+  const m3 =
+    values.reduce((acc, value) => acc + Math.pow((value - avg) / sd, 3), 0) / n;
+  return Number.isFinite(m3) ? m3 : 0;
+}
+
+function erf(value: number) {
+  const sign = value >= 0 ? 1 : -1;
+  const x = Math.abs(value);
+  const t = 1 / (1 + 0.3275911 * x);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const y =
+    1 -
+    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x));
+  return sign * y;
+}
+
+function normalCdf(value: number) {
+  return 0.5 * (1 + erf(value / Math.sqrt(2)));
+}
+
+function theilSenSlope(values: number[]) {
+  if (values.length < 2) return 0;
+  const slopes: number[] = [];
+  for (let i = 0; i < values.length - 1; i += 1) {
+    for (let j = i + 1; j < values.length; j += 1) {
+      slopes.push((values[j] - values[i]) / (j - i));
+    }
+  }
+  return median(slopes);
+}
+
+function mannKendall(values: number[]): {
+  s: number;
+  z: number;
+  pValue: number;
+  trend: "up" | "down" | "flat";
+} {
+  const n = values.length;
+  if (n < 3) {
+    return { s: 0, z: 0, pValue: 1, trend: "flat" as const };
+  }
+
+  let s = 0;
+  for (let i = 0; i < n - 1; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      if (values[j] > values[i]) s += 1;
+      else if (values[j] < values[i]) s -= 1;
+    }
+  }
+
+  const tieMap = new Map<number, number>();
+  for (const value of values) {
+    tieMap.set(value, (tieMap.get(value) || 0) + 1);
+  }
+
+  const tieCorrection = Array.from(tieMap.values())
+    .filter((count) => count > 1)
+    .reduce((acc, count) => acc + count * (count - 1) * (2 * count + 5), 0);
+
+  const varianceS = (n * (n - 1) * (2 * n + 5) - tieCorrection) / 18;
+  if (varianceS <= 0) {
+    return { s, z: 0, pValue: 1, trend: "flat" as const };
+  }
+
+  const stdS = Math.sqrt(varianceS);
+  let z = 0;
+  if (s > 0) z = (s - 1) / stdS;
+  else if (s < 0) z = (s + 1) / stdS;
+
+  const pValue = Math.max(0, Math.min(1, 2 * (1 - normalCdf(Math.abs(z)))));
+  const trend: "up" | "down" | "flat" =
+    pValue < 0.05 ? (z > 0 ? "up" : "down") : "flat";
+
+  return { s, z, pValue, trend };
+}
+
+function hhi(values: number[]) {
+  const total = values.reduce((acc, value) => acc + Math.max(0, value), 0);
+  if (total <= 0) return 0;
+  return values.reduce((acc, value) => {
+    const share = Math.max(0, value) / total;
+    return acc + share * share;
+  }, 0);
+}
+
+function computeSeriesDeepStats(points: Array<{ x: number; y: number }>): SegmentDeepSeriesStats {
+  const values = points.map((point) => Number(point.y || 0));
+  const avg = mean(values);
+  const std = sampleStdDev(values, avg);
+  const cv = avg !== 0 ? std / Math.abs(avg) : 0;
+  const med = median(values);
+  const iqr = quantile(values, 0.75) - quantile(values, 0.25);
+  const mk = mannKendall(values);
+  const hhiValue = hhi(values);
+  const top1 = values.length > 0 ? Math.max(...values) : 0;
+  const top1Share = percentage(top1, values.reduce((acc, value) => acc + Math.max(0, value), 0));
+
+  return {
+    mean: normalizeCurrency(avg),
+    std_dev: normalizeCurrency(std),
+    cv: normalizeCurrency(cv),
+    median: normalizeCurrency(med),
+    mad: normalizeCurrency(mad(values)),
+    iqr: normalizeCurrency(iqr),
+    skewness: normalizeCurrency(skewness(values)),
+    theil_sen_slope: normalizeCurrency(theilSenSlope(values)),
+    mann_kendall_s: mk.s,
+    mann_kendall_z: normalizeCurrency(mk.z),
+    mann_kendall_p_value: normalizeCurrency(mk.pValue),
+    mann_kendall_trend: mk.trend,
+    hhi: normalizeCurrency(hhiValue),
+    effective_periods: hhiValue > 0 ? normalizeCurrency(1 / hhiValue) : 0,
+    top1_share_pct: normalizeCurrency(top1Share),
+  };
+}
+
+function classifyIntermittency(monthlyQuantities: number[]) {
+  const n = monthlyQuantities.length;
+  if (n < 2) {
+    return { className: "insufficient" as IntermittencyClass, adi: 0, cv2: 0 };
+  }
+
+  const nonZero = monthlyQuantities.filter((value) => value > 0);
+  if (nonZero.length < 2) {
+    return { className: "insufficient" as IntermittencyClass, adi: 0, cv2: 0 };
+  }
+
+  const adi = n / nonZero.length;
+  const avg = mean(nonZero);
+  const std = sampleStdDev(nonZero, avg);
+  const cv2 = avg !== 0 ? Math.pow(std / Math.abs(avg), 2) : 0;
+
+  let className: IntermittencyClass;
+  if (adi <= 1.32 && cv2 <= 0.49) className = "smooth";
+  else if (adi > 1.32 && cv2 <= 0.49) className = "intermittent";
+  else if (adi <= 1.32 && cv2 > 0.49) className = "erratic";
+  else className = "lumpy";
+
+  return {
+    className,
+    adi: normalizeCurrency(adi),
+    cv2: normalizeCurrency(cv2),
+  };
 }
 
 async function fetchEligibleDfds(
@@ -506,6 +767,7 @@ function buildSegmentAnalytics(
       totalQuantity: number;
       activeMonths: Set<string>;
       withPriceObservations: number;
+      monthQty: Map<string, number>;
     }
   >();
 
@@ -532,6 +794,7 @@ function buildSegmentAnalytics(
         totalQuantity: 0,
         activeMonths: new Set<string>(),
         withPriceObservations: 0,
+        monthQty: new Map<string, number>(),
       });
     }
 
@@ -540,6 +803,7 @@ function buildSegmentAnalytics(
     entry.totalQuantity += quantity;
     entry.activeMonths.add(month);
     if (unitPrice > 0) entry.withPriceObservations += 1;
+    entry.monthQty.set(month, (entry.monthQty.get(month) || 0) + quantity);
     if (!entry.descricao || entry.descricao === "Descrição não informada") {
       entry.descricao = String(item.descricao || entry.descricao);
     }
@@ -549,9 +813,10 @@ function buildSegmentAnalytics(
   const quantitySeries = buildMonthSeries(itemQuantityMap);
   const valueSeries = buildMonthSeries(itemValueMap);
 
-  const allMonths = Array.from(
+  const sparseMonths = Array.from(
     new Set([...dfdSeries.months, ...quantitySeries.months, ...valueSeries.months]),
   ).sort((a, b) => a.localeCompare(b));
+  const allMonths = buildContiguousMonths(sparseMonths);
 
   const monthly: SegmentMonthlyPoint[] = allMonths.map((month) => ({
     month,
@@ -585,6 +850,66 @@ function buildSegmentAnalytics(
     })
     .slice(0, 12);
 
+  const intermittencyList: Array<{
+    codigoEfisco: string;
+    adi: number;
+    cv2: number;
+    className: IntermittencyClass;
+    observations: number;
+  }> = [];
+  for (const [codigoEfisco, entry] of byCode.entries()) {
+    const quantitySeriesByCode = allMonths.map((month) =>
+      Number(entry.monthQty.get(month) || 0),
+    );
+    const classification = classifyIntermittency(quantitySeriesByCode);
+    intermittencyList.push({
+      codigoEfisco,
+      adi: classification.adi,
+      cv2: classification.cv2,
+      className: classification.className,
+      observations: entry.observations,
+    });
+  }
+
+  const classDistribution: Record<IntermittencyClass, number> = {
+    smooth: 0,
+    intermittent: 0,
+    erratic: 0,
+    lumpy: 0,
+    insufficient: 0,
+  };
+  for (const row of intermittencyList) {
+    classDistribution[row.className] += 1;
+  }
+
+  const validAdi = intermittencyList
+    .filter((row) => row.className !== "insufficient")
+    .map((row) => row.adi);
+  const validCv2 = intermittencyList
+    .filter((row) => row.className !== "insufficient")
+    .map((row) => row.cv2);
+
+  const intermittencyStats: SegmentIntermittencyStats = {
+    series_count: intermittencyList.length,
+    class_distribution: classDistribution,
+    median_adi: normalizeCurrency(median(validAdi)),
+    median_cv2: normalizeCurrency(median(validCv2)),
+    top_lumpy: intermittencyList
+      .filter((row) => row.className === "lumpy")
+      .sort((a, b) => {
+        const cv2Diff = b.cv2 - a.cv2;
+        if (cv2Diff !== 0) return cv2Diff;
+        return b.adi - a.adi;
+      })
+      .slice(0, 8)
+      .map((row) => ({
+        codigoEfisco: row.codigoEfisco,
+        adi: row.adi,
+        cv2: row.cv2,
+        observations: row.observations,
+      })),
+  };
+
   const peak = monthly.reduce(
     (acc, row) => (row.dfd_count > acc.dfd_count ? row : acc),
     { month: "-", dfd_count: 0, total_quantity: 0, total_value: 0 } as SegmentMonthlyPoint,
@@ -598,6 +923,24 @@ function buildSegmentAnalytics(
   const dfdRegression = linearRegression(dfdSeries.points);
   const quantityRegression = linearRegression(quantitySeries.points);
   const valueRegression = linearRegression(valueSeries.points);
+  const dfdDeepStats = computeSeriesDeepStats(
+    allMonths.map((month, index) => ({
+      x: index,
+      y: Number(dfdVolumeMap.get(month) || 0),
+    })),
+  );
+  const quantityDeepStats = computeSeriesDeepStats(
+    allMonths.map((month, index) => ({
+      x: index,
+      y: Number(itemQuantityMap.get(month) || 0),
+    })),
+  );
+  const valueDeepStats = computeSeriesDeepStats(
+    allMonths.map((month, index) => ({
+      x: index,
+      y: Number(itemValueMap.get(month) || 0),
+    })),
+  );
 
   const repeatedCodes = topCodes.filter((row) => row.observations >= 2).length;
 
@@ -666,6 +1009,23 @@ function buildSegmentAnalytics(
     });
   }
 
+  const lumpyShare = percentage(classDistribution.lumpy, Math.max(intermittencyStats.series_count, 1));
+  if (lumpyShare >= 25 && intermittencyStats.series_count > 0) {
+    insights.push({
+      level: "warning",
+      title: "Alta presença de demanda lumpy",
+      detail: `${normalizeCurrency(lumpyShare)}% das séries por código apresentam intermitência e variabilidade elevadas (ADI/CV²).`,
+    });
+  }
+
+  if (quantityDeepStats.mann_kendall_p_value <= 0.05) {
+    insights.push({
+      level: "info",
+      title: "Tendência monotônica estatisticamente detectada",
+      detail: `Teste Mann-Kendall para quantidade aponta tendência ${quantityDeepStats.mann_kendall_trend} (p=${quantityDeepStats.mann_kendall_p_value}).`,
+    });
+  }
+
   const guides: SegmentGuide[] = [];
 
   if (segment === "legacy") {
@@ -727,6 +1087,12 @@ function buildSegmentAnalytics(
       dfd_volume: dfdRegression,
       total_quantity: quantityRegression,
       total_value: valueRegression,
+    },
+    statistics: {
+      dfd_series: dfdDeepStats,
+      quantity_series: quantityDeepStats,
+      value_series: valueDeepStats,
+      intermittency: intermittencyStats,
     },
     charts: {
       monthly,

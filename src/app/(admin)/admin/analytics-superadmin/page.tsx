@@ -78,6 +78,39 @@ type SegmentCodePoint = {
   withPriceObservations: number;
 };
 
+type IntermittencyClass = "smooth" | "intermittent" | "erratic" | "lumpy" | "insufficient";
+
+type SegmentDeepSeriesStats = {
+  mean: number;
+  std_dev: number;
+  cv: number;
+  median: number;
+  mad: number;
+  iqr: number;
+  skewness: number;
+  theil_sen_slope: number;
+  mann_kendall_s: number;
+  mann_kendall_z: number;
+  mann_kendall_p_value: number;
+  mann_kendall_trend: "up" | "down" | "flat";
+  hhi: number;
+  effective_periods: number;
+  top1_share_pct: number;
+};
+
+type SegmentIntermittencyStats = {
+  series_count: number;
+  class_distribution: Record<IntermittencyClass, number>;
+  median_adi: number;
+  median_cv2: number;
+  top_lumpy: Array<{
+    codigoEfisco: string;
+    adi: number;
+    cv2: number;
+    observations: number;
+  }>;
+};
+
 type SegmentAnalytics = {
   segment: "legacy" | "current" | "combined";
   scope: {
@@ -100,6 +133,12 @@ type SegmentAnalytics = {
     dfd_volume: RegressionSummary;
     total_quantity: RegressionSummary;
     total_value: RegressionSummary;
+  };
+  statistics: {
+    dfd_series: SegmentDeepSeriesStats;
+    quantity_series: SegmentDeepSeriesStats;
+    value_series: SegmentDeepSeriesStats;
+    intermittency: SegmentIntermittencyStats;
   };
   charts: {
     monthly: SegmentMonthlyPoint[];
@@ -386,6 +425,59 @@ export default function SuperadminAnalyticsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-[#0F2A4A]">Estatística robusta de tendência</h2>
+              <p className="text-xs text-[#5A6E86]">
+                Theil-Sen + Mann-Kendall para evitar leituras frágeis em séries irregulares.
+              </p>
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                <DeepStatPill
+                  label="Theil-Sen (quantidade)"
+                  value={formatNumber(segment.statistics.quantity_series.theil_sen_slope)}
+                />
+                <DeepStatPill
+                  label="Mann-Kendall p-valor"
+                  value={segment.statistics.quantity_series.mann_kendall_p_value.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}
+                />
+                <DeepStatPill
+                  label="Mann-Kendall tendência"
+                  value={trendLabel(segment.statistics.quantity_series.mann_kendall_trend)}
+                />
+                <DeepStatPill
+                  label="CV (quantidade)"
+                  value={segment.statistics.quantity_series.cv.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                />
+                <DeepStatPill
+                  label="HHI (quantidade)"
+                  value={segment.statistics.quantity_series.hhi.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}
+                />
+                <DeepStatPill
+                  label="Meses efetivos"
+                  value={segment.statistics.quantity_series.effective_periods.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-[#0F2A4A]">Demanda intermitente (ADI/CV²)</h2>
+              <p className="text-xs text-[#5A6E86]">
+                Classificação em smooth, intermittent, erratic e lumpy por série de código.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+                <DeepStatPill label="Smooth" value={formatNumber(segment.statistics.intermittency.class_distribution.smooth)} />
+                <DeepStatPill label="Intermittent" value={formatNumber(segment.statistics.intermittency.class_distribution.intermittent)} />
+                <DeepStatPill label="Erratic" value={formatNumber(segment.statistics.intermittency.class_distribution.erratic)} />
+                <DeepStatPill label="Lumpy" value={formatNumber(segment.statistics.intermittency.class_distribution.lumpy)} />
+                <DeepStatPill label="Insuficiente" value={formatNumber(segment.statistics.intermittency.class_distribution.insufficient)} />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <DeepStatPill label="ADI mediano" value={segment.statistics.intermittency.median_adi.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
+                <DeepStatPill label="CV² mediano" value={segment.statistics.intermittency.median_cv2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <ChartCard title="DFDs por mês" subtitle="Evolução mensal de volume">
               <MonthlyBars rows={segment.charts.monthly} accessor="dfd_count" formatter={formatNumber} colorClass="bg-[#2B6CB0]" />
             </ChartCard>
@@ -437,6 +529,39 @@ export default function SuperadminAnalyticsPage() {
               </div>
             </div>
           </div>
+
+          {segment.statistics.intermittency.top_lumpy.length > 0 && (
+            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-[#0F2A4A]">Séries lumpy prioritárias</h2>
+                <span className="text-xs text-[#5A6E86]">
+                  {segment.statistics.intermittency.top_lumpy.length} códigos
+                </span>
+              </div>
+              <div className="max-h-[280px] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+                      <th className="pb-2">Código</th>
+                      <th className="pb-2 text-right">ADI</th>
+                      <th className="pb-2 text-right">CV²</th>
+                      <th className="pb-2 text-right">Obs.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {segment.statistics.intermittency.top_lumpy.map((row) => (
+                      <tr key={`lumpy-${row.codigoEfisco}`} className="border-t border-[#EEF2F7]">
+                        <td className="py-2 pr-2 font-semibold text-[#16345C]">{row.codigoEfisco}</td>
+                        <td className="py-2 text-right text-[#5A6E86]">{row.adi.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+                        <td className="py-2 text-right text-[#5A6E86]">{row.cv2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+                        <td className="py-2 text-right text-[#5A6E86]">{formatNumber(row.observations)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {activeSegment === "current" && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -646,6 +771,15 @@ function TopCodesBars({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function DeepStatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#E3EAF3] bg-[#F9FBFE] p-3">
+      <p className="text-[10px] uppercase tracking-[0.12em] text-[#6A7E95]">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-[#16345C]">{value}</p>
     </div>
   );
 }
