@@ -44,6 +44,71 @@ function sanitizeLikePattern(value: string) {
     .slice(0, 120);
 }
 
+function normalizeQueryTerms(value: string) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+}
+
+function isLikelyCodeQuery(value: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return false;
+  const compact = normalized.replace(/[^a-zA-Z0-9]/g, "");
+  if (compact.length < 6) return false;
+  return /^[0-9][0-9A-Za-z._/-]*$/.test(normalized);
+}
+
+function isGenericShortQuery(value: string) {
+  const terms = normalizeQueryTerms(value);
+  if (terms.length === 0 || terms.length > 3) return false;
+  const generic = new Set([
+    "material",
+    "materiais",
+    "servico",
+    "servicos",
+    "manutencao",
+    "fornecido",
+    "fornecimento",
+    "baixo",
+    "alto",
+    "item",
+    "itens",
+    "equipamento",
+    "equipamentos",
+  ]);
+  return terms.some((term) => generic.has(term));
+}
+
+function isLowSignalQuery(value: string) {
+  const terms = normalizeQueryTerms(value);
+  if (terms.length === 0) return false;
+  if (terms.length === 1 && terms[0].length <= 5) return true;
+  const broad = new Set([
+    "tipo",
+    "forma",
+    "conforme",
+    "interna",
+    "externa",
+    "altura",
+    "diametro",
+    "resistente",
+    "material",
+    "equipamento",
+    "item",
+    "itens",
+    "baixo",
+    "alto",
+    "para",
+  ]);
+  return terms.length <= 3 && terms.every((term) => broad.has(term));
+}
+
 function applyCategoryFilter(builder: any, category: string) {
   if (category === "material") return builder.eq("tipo_objeto", "MATERIAL");
   if (category === "servico") return builder.eq("tipo_objeto", "SERVIÇO");
@@ -83,24 +148,39 @@ async function searchCatalogWithSqlFallback(
     console.error("Catalog SQL fallback (FTS) failed.", error);
   }
 
-  // 2) fallback final: match textual em descricao
+  return [] as any[];
+}
+
+async function searchCatalogByCodeQuick(
+  supabaseLike: Pick<Awaited<ReturnType<typeof createClient>>, "from">,
+  query: string,
+  category: string,
+  limit: number,
+  offset: number,
+) {
+  const raw = String(query || "").trim();
+  if (!raw) return [] as any[];
+  const safeLimit = Math.max(1, Math.min(SQL_FALLBACK_LIMIT, limit));
+  const from = Math.max(0, offset);
+  const to = from + safeLimit - 1;
+
+  // 1) match exato (rápido e preciso para código e-Fisco)
   try {
-    const likeBuilder = applyCategoryFilter(
+    const exactBuilder = applyCategoryFilter(
       supabaseLike
         .from("catalogo")
         .select(CATALOG_SELECT_COLUMNS),
       category,
     );
-    const pattern = `%${normalized}%`;
-    const { data, error } = await likeBuilder
-      .ilike("descricao", pattern)
+    const { data, error } = await exactBuilder
+      .eq("codigo_efisco", raw)
       .order("id", { ascending: true })
       .range(from, to);
     if (!error && Array.isArray(data) && data.length > 0) {
       return rerankCatalogSearchResults(query, data as any[]);
     }
   } catch (error) {
-    console.error("Catalog SQL fallback (ILIKE) failed.", error);
+    console.error("Catalog code quick search (exact) failed.", error);
   }
 
   return [] as any[];
@@ -193,6 +273,10 @@ export async function GET(request: NextRequest) {
 
   let rows: any[] = [];
   let source = "supabase";
+  const codeLikeQuery = isLikelyCodeQuery(query);
+  const genericShortQuery = isGenericShortQuery(query);
+  const lowSignalQuery = isLowSignalQuery(query);
+  const baseClient = admin ?? supabase;
 
   try {
     const typesenseRows = await searchCatalogWithTypesense({
@@ -211,6 +295,40 @@ export async function GET(request: NextRequest) {
   }
 
   if (rows.length === 0) {
+    if (codeLikeQuery) {
+      const codeRows = await searchCatalogByCodeQuick(
+        baseClient,
+        query,
+        category,
+        limit,
+        offset,
+      );
+      if (codeRows.length > 0) {
+        rows = codeRows;
+        source = "supabase-code-fast";
+      } else {
+        source = "supabase-code-empty";
+      }
+    } else if (lowSignalQuery) {
+      rows = [];
+      source = "supabase-low-signal-skip";
+    } else if (genericShortQuery) {
+      const genericRows = await searchCatalogWithSqlFallback(
+        baseClient,
+        query,
+        category,
+        limit,
+        offset,
+      );
+      rows = genericRows;
+      source =
+        genericRows.length > 0
+          ? "supabase-generic-sql"
+          : "supabase-generic-empty";
+    }
+  }
+
+  if (rows.length === 0 && !codeLikeQuery && !genericShortQuery && !lowSignalQuery) {
     const fallback = await searchCatalogWithSupabase(
       supabase,
       admin,
