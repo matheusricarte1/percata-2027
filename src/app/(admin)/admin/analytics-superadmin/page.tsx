@@ -213,6 +213,32 @@ function trendLabel(trend: RegressionSummary["trend"]) {
   return "Dados insuficientes";
 }
 
+const SEGMENT_TITLE: Record<SegmentKey, string> = {
+  current: "Corrente (completo)",
+  legacy: "Legado (sem preço)",
+  combined: "Consolidado institucional",
+};
+
+function pressureDescription(value: string) {
+  if (value === "alta") return "Demanda em crescimento relevante.";
+  if (value === "baixa") return "Demanda em retração no período.";
+  if (value === "sazonal") return "Demanda concentrada em poucos meses.";
+  return "Demanda com variação moderada.";
+}
+
+function predictabilityDescription(value: string) {
+  if (value === "boa") return "Há sinal suficiente para planejar compras.";
+  if (value === "média") return "Planejamento possível com margem de cautela.";
+  if (value === "baixa") return "Planejamento exige monitoramento mais próximo.";
+  return "Série curta para previsão robusta.";
+}
+
+function concentrationDescription(value: string) {
+  if (value === "alto") return "Risco de concentração operacional elevado.";
+  if (value === "baixo") return "Risco de concentração controlado.";
+  return "Risco intermediário de concentração.";
+}
+
 export default function SuperadminAnalyticsPage() {
   const [role, setRole] = useState<UserRole>("solicitante");
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -410,98 +436,149 @@ export default function SuperadminAnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="DFDs analisadas" value={formatNumber(payload?.dataset.dfds || 0)} />
-        <MetricCard label="Itens analisados" value={formatNumber(payload?.dataset.items || 0)} />
-        <MetricCard label="Códigos únicos" value={formatNumber(payload?.dataset.unique_codes || 0)} />
-        <MetricCard label="Outliers críticos (corrente)" value={formatNumber(outliersCritical)} tone="warn" />
-      </div>
-
-      <div className="rounded-2xl border border-[#D2D0CE] bg-white p-4 text-xs text-[#4F6785]">
-        Base utilizada: <b>{formatNumber(payload?.dataset.current_dfds || 0)} DFDs correntes</b> + <b>{formatNumber(payload?.dataset.legacy_dfds || 0)} DFDs legadas</b>
-        {" · "}
-        <b>{formatNumber(payload?.dataset.current_items || 0)} itens correntes</b> + <b>{formatNumber(payload?.dataset.legacy_items || 0)} itens legados</b>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <SegmentButton
-          active={activeSegment === "current"}
-          onClick={() => setActiveSegment("current")}
-          title="Corrente (completo)"
-          subtitle="Preço + quantidade + risco"
-        />
-        <SegmentButton
-          active={activeSegment === "legacy"}
-          onClick={() => setActiveSegment("legacy")}
-          title="Legado (sem preço)"
-          subtitle="Volume + recorrência + distribuição"
-        />
-        <SegmentButton
-          active={activeSegment === "combined"}
-          onClick={() => setActiveSegment("combined")}
-          title="Consolidado"
-          subtitle="Visão geral institucional"
-        />
-      </div>
+      <section className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6A7E95]">
+              1. Escopo da leitura
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-[#0F2A4A]">
+              Escolha o segmento e leia o bloco executivo
+            </h2>
+            <p className="mt-1 text-xs text-[#5A6E86]">
+              Primeiro escolha a visão (corrente, legado ou consolidado). Depois leia decisões e ações recomendadas.
+            </p>
+          </div>
+          <span className="inline-flex rounded-full border border-[#D9E5F2] bg-[#F7FAFF] px-3 py-1 text-xs font-semibold text-[#294D74]">
+            Janela: {windowMonths} meses
+          </span>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <SegmentButton
+            active={activeSegment === "current"}
+            onClick={() => setActiveSegment("current")}
+            title="Corrente (completo)"
+            subtitle="Preço + quantidade + risco"
+          />
+          <SegmentButton
+            active={activeSegment === "legacy"}
+            onClick={() => setActiveSegment("legacy")}
+            title="Legado (sem preço)"
+            subtitle="Volume + recorrência + distribuição"
+          />
+          <SegmentButton
+            active={activeSegment === "combined"}
+            onClick={() => setActiveSegment("combined")}
+            title="Consolidado"
+            subtitle="Visão geral institucional"
+          />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <InlineKpi label="DFDs analisadas" value={formatNumber(payload?.dataset.dfds || 0)} />
+          <InlineKpi label="Itens analisados" value={formatNumber(payload?.dataset.items || 0)} />
+          <InlineKpi label="Códigos únicos" value={formatNumber(payload?.dataset.unique_codes || 0)} />
+          <InlineKpi label="Outliers críticos (corrente)" value={formatNumber(outliersCritical)} tone="warn" />
+        </div>
+        <p className="mt-4 rounded-xl border border-[#E6EDF6] bg-[#F9FBFE] px-3 py-2 text-xs text-[#4F6785]">
+          Base utilizada: <b>{formatNumber(payload?.dataset.current_dfds || 0)} DFDs correntes</b> +{" "}
+          <b>{formatNumber(payload?.dataset.legacy_dfds || 0)} DFDs legadas</b>{" "}
+          {" · "}
+          <b>{formatNumber(payload?.dataset.current_items || 0)} itens correntes</b> +{" "}
+          <b>{formatNumber(payload?.dataset.legacy_items || 0)} itens legados</b>
+        </p>
+      </section>
 
       {segment ? (
         <>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <DecisionCard
-              pergunta="1. Há pressão de demanda real agora?"
-              resposta={executive?.pressure || "moderada"}
-              explicacao={`Base em ${segment.dataset.months_covered} mês(es), tendência ${trendLabel(segment.statistics.quantity_series.mann_kendall_trend)} e concentração de ${formatPercent(segment.dataset.month_concentration_pct)}.`}
-            />
-            <DecisionCard
-              pergunta="2. A previsão é confiável?"
-              resposta={executive?.predictability || "fraca"}
-              explicacao={`Confiabilidade depende de densidade temporal, CV=${segment.statistics.quantity_series.cv.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} e p-valor=${segment.statistics.quantity_series.mann_kendall_p_value.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}.`}
-            />
-            <DecisionCard
-              pergunta="3. Qual é o risco operacional?"
-              resposta={executive?.concentrationRisk || "médio"}
-              explicacao={`Concentração mensal ${formatPercent(segment.dataset.month_concentration_pct)} e séries lumpy em ${formatPercent(executive?.lumpyShare || 0)}.`}
-            />
-          </div>
-
-          <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-[#0F2A4A]">Ações prioritárias da janela</h2>
-            <p className="text-xs text-[#5A6E86]">Síntese orientada a decisão imediata, não a descrição de todos os dados.</p>
-            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
-              {(segment.guides.length > 0 ? segment.guides.slice(0, 3) : [{ title: "Sem ação crítica", action: "Janela estável para o segmento atual." }]).map((guide, index) => (
-                <div key={`guide-top-${index}`} className="rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3">
-                  <p className="text-xs uppercase tracking-[0.1em] text-[#6A7E95]">Prioridade {index + 1}</p>
-                  <p className="mt-1 text-sm font-semibold text-[#16345C]">{guide.title}</p>
-                  <p className="mt-1 text-xs text-[#5A6E86]">{guide.action}</p>
-                </div>
-              ))}
+          <section className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6A7E95]">
+                  2. Decisão em 30 segundos
+                </p>
+                <h2 className="mt-1 text-lg font-semibold text-[#0F2A4A]">
+                  Síntese executiva do segmento {SEGMENT_TITLE[activeSegment]}
+                </h2>
+              </div>
+              <span className="inline-flex rounded-full border border-[#D9E5F2] bg-[#F7FAFF] px-3 py-1 text-xs font-semibold text-[#294D74]">
+                {segment.dataset.months_covered} mês(es) úteis na janela
+              </span>
             </div>
-          </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <DecisionCard
+                pergunta="Pressão de demanda"
+                resposta={executive?.pressure || "moderada"}
+                explicacao={pressureDescription(executive?.pressure || "moderada")}
+                detalhe={`Tendência ${trendLabel(segment.statistics.quantity_series.mann_kendall_trend)} · concentração mensal ${formatPercent(segment.dataset.month_concentration_pct)}.`}
+              />
+              <DecisionCard
+                pergunta="Confiabilidade da previsão"
+                resposta={executive?.predictability || "fraca"}
+                explicacao={predictabilityDescription(executive?.predictability || "fraca")}
+                detalhe={`CV=${segment.statistics.quantity_series.cv.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} · p-valor=${segment.statistics.quantity_series.mann_kendall_p_value.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}.`}
+              />
+              <DecisionCard
+                pergunta="Risco operacional"
+                resposta={executive?.concentrationRisk || "médio"}
+                explicacao={concentrationDescription(executive?.concentrationRisk || "médio")}
+                detalhe={`Séries lumpy: ${formatPercent(executive?.lumpyShare || 0)}.`}
+              />
+            </div>
+            <div className="mt-4 rounded-2xl border border-[#D9E5F2] bg-[#F7FAFF] p-4">
+              <p className="text-xs uppercase tracking-[0.1em] text-[#6A7E95]">Ação prioritária</p>
+              <p className="mt-1 text-sm font-semibold text-[#16345C]">
+                {(segment.guides[0] || { title: "Sem ação crítica" }).title}
+              </p>
+              <p className="mt-1 text-xs text-[#5A6E86]">
+                {(segment.guides[0] || { action: "Janela estável para o segmento atual." }).action}
+              </p>
+              {segment.guides.length > 1 && (
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {segment.guides.slice(1, 3).map((guide, index) => (
+                    <div key={`guide-side-${index}`} className="rounded-xl border border-[#E4ECF5] bg-white p-2.5">
+                      <p className="text-[11px] font-semibold text-[#16345C]">{guide.title}</p>
+                      <p className="mt-0.5 text-[11px] text-[#5A6E86]">{guide.action}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
 
           <details open className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
             <summary className="cursor-pointer text-base font-semibold text-[#0F2A4A]">
-              Painel essencial (executivo)
+              3. Monitoramento essencial
             </summary>
             <div className="mt-4 space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-                <MetricCard label="DFDs" value={formatNumber(segment.dataset.dfds)} />
-                <MetricCard label="Itens" value={formatNumber(segment.dataset.items)} />
-                <MetricCard label="Meses com dados" value={formatNumber(segment.dataset.months_covered)} />
-                <MetricCard label="Códigos repetidos" value={formatNumber(segment.dataset.repeated_codes)} />
-                <MetricCard label="Cobertura de código" value={formatPercent(segment.dataset.code_coverage_pct)} />
-                <MetricCard label="Cobertura de preço" value={formatPercent(segment.dataset.price_coverage_pct)} tone={segment.scope.price_signals_enabled ? "default" : "muted"} />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <MetricCard label="DFDs no segmento" value={formatNumber(segment.dataset.dfds)} compact />
+                <MetricCard label="Itens no segmento" value={formatNumber(segment.dataset.items)} compact />
+                <MetricCard label="Meses com dados" value={formatNumber(segment.dataset.months_covered)} compact />
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <InlineKpi label="Códigos repetidos" value={formatNumber(segment.dataset.repeated_codes)} />
+                <InlineKpi label="Cobertura de código" value={formatPercent(segment.dataset.code_coverage_pct)} />
+                <InlineKpi
+                  label="Cobertura de preço"
+                  value={formatPercent(segment.dataset.price_coverage_pct)}
+                  tone={segment.scope.price_signals_enabled ? "default" : "muted"}
+                />
               </div>
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <RegressionCard title="Volume de DFD" summary={segment.regression.dfd_volume} formatter={formatNumber} />
                 <RegressionCard title="Quantidade total" summary={segment.regression.total_quantity} formatter={formatNumber} />
-                <RegressionCard title={segment.scope.price_signals_enabled ? "Valor total" : "Valor total (leitura limitada)"} summary={segment.regression.total_value} formatter={formatCurrency} />
+                <RegressionCard
+                  title={segment.scope.price_signals_enabled ? "Valor total" : "Valor total (leitura limitada)"}
+                  summary={segment.regression.total_value}
+                  formatter={formatCurrency}
+                />
               </div>
             </div>
           </details>
 
           <details className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
             <summary className="cursor-pointer text-base font-semibold text-[#0F2A4A]">
-              Diagnóstico estatístico e ciência de dados
+              4. Diagnóstico estatístico e ciência de dados
             </summary>
             <div className="mt-4 space-y-4">
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -554,7 +631,7 @@ export default function SuperadminAnalyticsPage() {
 
           <details className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
             <summary className="cursor-pointer text-base font-semibold text-[#0F2A4A]">
-              Evidências detalhadas e tabelas
+              5. Evidências detalhadas e tabelas
             </summary>
             <div className="mt-4 space-y-4">
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -669,7 +746,7 @@ function SegmentButton({
   );
 }
 
-function MetricCard({
+function InlineKpi({
   label,
   value,
   tone = "default",
@@ -677,6 +754,32 @@ function MetricCard({
   label: string;
   value: string;
   tone?: "default" | "warn" | "muted";
+}) {
+  const classes =
+    tone === "warn"
+      ? "rounded-xl border border-[#F4CDD0] bg-[#FFF6F7] p-3"
+      : tone === "muted"
+        ? "rounded-xl border border-[#DCE5EF] bg-[#F9FBFD] p-3"
+        : "rounded-xl border border-[#E1E9F3] bg-[#FAFCFF] p-3";
+
+  return (
+    <div className={classes}>
+      <p className="text-[10px] uppercase tracking-[0.1em] text-[#6A7E95]">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-[#0F2A4A]">{value}</p>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  tone = "default",
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "warn" | "muted";
+  compact?: boolean;
 }) {
   const classes =
     tone === "warn"
@@ -688,7 +791,9 @@ function MetricCard({
   return (
     <div className={classes}>
       <p className="text-xs uppercase tracking-[0.12em] text-[#6A7E95]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[#0F2A4A]">{value}</p>
+      <p className={compact ? "mt-1 text-xl font-semibold text-[#0F2A4A]" : "mt-2 text-2xl font-semibold text-[#0F2A4A]"}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -1176,10 +1281,12 @@ function DecisionCard({
   pergunta,
   resposta,
   explicacao,
+  detalhe,
 }: {
   pergunta: string;
   resposta: string;
   explicacao: string;
+  detalhe: string;
 }) {
   const tone =
     resposta === "alto" || resposta === "alta"
@@ -1191,8 +1298,9 @@ function DecisionCard({
   return (
     <div className={`rounded-2xl border p-4 ${tone}`}>
       <p className="text-xs uppercase tracking-[0.1em] text-[#6A7E95]">{pergunta}</p>
-      <p className="mt-2 text-xl font-semibold capitalize text-[#16345C]">{resposta}</p>
-      <p className="mt-1 text-xs text-[#5A6E86]">{explicacao}</p>
+      <p className="mt-1 text-lg font-semibold capitalize text-[#16345C]">{resposta}</p>
+      <p className="text-xs font-medium text-[#345779]">{explicacao}</p>
+      <p className="mt-1 text-[11px] text-[#5A6E86]">{detalhe}</p>
     </div>
   );
 }
