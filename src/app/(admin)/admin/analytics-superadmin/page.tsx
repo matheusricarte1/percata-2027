@@ -291,6 +291,55 @@ export default function SuperadminAnalyticsPage() {
     return segments[activeSegment];
   }, [activeSegment, segments]);
 
+  const executive = useMemo(() => {
+    if (!segment) return null;
+
+    const lumpyShare =
+      segment.statistics.intermittency.series_count > 0
+        ? (segment.statistics.intermittency.class_distribution.lumpy /
+            segment.statistics.intermittency.series_count) *
+          100
+        : 0;
+
+    const trendSignal =
+      segment.statistics.quantity_series.mann_kendall_p_value <= 0.1
+        ? segment.statistics.quantity_series.mann_kendall_trend
+        : "flat";
+
+    const pressure =
+      trendSignal === "up"
+        ? "alta"
+        : trendSignal === "down"
+          ? "baixa"
+          : segment.dataset.month_concentration_pct >= 55
+            ? "sazonal"
+            : "moderada";
+
+    const predictability =
+      segment.dataset.months_covered < 6
+        ? "fraca"
+        : segment.statistics.quantity_series.cv <= 0.8 &&
+            segment.statistics.quantity_series.mann_kendall_p_value <= 0.1
+          ? "boa"
+          : segment.statistics.quantity_series.cv <= 1.4
+            ? "média"
+            : "baixa";
+
+    const concentrationRisk =
+      segment.dataset.month_concentration_pct >= 60 || lumpyShare >= 35
+        ? "alto"
+        : segment.dataset.month_concentration_pct >= 40 || lumpyShare >= 20
+          ? "médio"
+          : "baixo";
+
+    return {
+      pressure,
+      predictability,
+      concentrationRisk,
+      lumpyShare,
+    };
+  }, [segment]);
+
   const outliersCritical = useMemo(
     () => (payload?.price_outliers || []).filter((row) => Math.abs(row.zScore) >= 3).length,
     [payload],
@@ -397,202 +446,185 @@ export default function SuperadminAnalyticsPage() {
 
       {segment ? (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-            <MetricCard label="DFDs" value={formatNumber(segment.dataset.dfds)} />
-            <MetricCard label="Itens" value={formatNumber(segment.dataset.items)} />
-            <MetricCard label="Meses com dados" value={formatNumber(segment.dataset.months_covered)} />
-            <MetricCard label="Códigos repetidos" value={formatNumber(segment.dataset.repeated_codes)} />
-            <MetricCard label="Cobertura de código" value={formatPercent(segment.dataset.code_coverage_pct)} />
-            <MetricCard label="Cobertura de preço" value={formatPercent(segment.dataset.price_coverage_pct)} tone={segment.scope.price_signals_enabled ? "default" : "muted"} />
-          </div>
-
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <RegressionCard
-              title="Volume de DFD"
-              summary={segment.regression.dfd_volume}
-              formatter={formatNumber}
+            <DecisionCard
+              pergunta="1. Há pressão de demanda real agora?"
+              resposta={executive?.pressure || "moderada"}
+              explicacao={`Base em ${segment.dataset.months_covered} mês(es), tendência ${trendLabel(segment.statistics.quantity_series.mann_kendall_trend)} e concentração de ${formatPercent(segment.dataset.month_concentration_pct)}.`}
             />
-            <RegressionCard
-              title="Quantidade total"
-              summary={segment.regression.total_quantity}
-              formatter={formatNumber}
+            <DecisionCard
+              pergunta="2. A previsão é confiável?"
+              resposta={executive?.predictability || "fraca"}
+              explicacao={`Confiabilidade depende de densidade temporal, CV=${segment.statistics.quantity_series.cv.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} e p-valor=${segment.statistics.quantity_series.mann_kendall_p_value.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}.`}
             />
-            <RegressionCard
-              title={segment.scope.price_signals_enabled ? "Valor total" : "Valor total (leitura limitada)"}
-              summary={segment.regression.total_value}
-              formatter={formatCurrency}
+            <DecisionCard
+              pergunta="3. Qual é o risco operacional?"
+              resposta={executive?.concentrationRisk || "médio"}
+              explicacao={`Concentração mensal ${formatPercent(segment.dataset.month_concentration_pct)} e séries lumpy em ${formatPercent(executive?.lumpyShare || 0)}.`}
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-[#0F2A4A]">Estatística robusta de tendência</h2>
-              <p className="text-xs text-[#5A6E86]">
-                Theil-Sen + Mann-Kendall para evitar leituras frágeis em séries irregulares.
-              </p>
-              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                <DeepStatPill
-                  label="Theil-Sen (quantidade)"
-                  value={formatNumber(segment.statistics.quantity_series.theil_sen_slope)}
-                />
-                <DeepStatPill
-                  label="Mann-Kendall p-valor"
-                  value={segment.statistics.quantity_series.mann_kendall_p_value.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}
-                />
-                <DeepStatPill
-                  label="Mann-Kendall tendência"
-                  value={trendLabel(segment.statistics.quantity_series.mann_kendall_trend)}
-                />
-                <DeepStatPill
-                  label="CV (quantidade)"
-                  value={segment.statistics.quantity_series.cv.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
-                />
-                <DeepStatPill
-                  label="HHI (quantidade)"
-                  value={segment.statistics.quantity_series.hhi.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}
-                />
-                <DeepStatPill
-                  label="Meses efetivos"
-                  value={segment.statistics.quantity_series.effective_periods.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-[#0F2A4A]">Demanda intermitente (ADI/CV²)</h2>
-              <p className="text-xs text-[#5A6E86]">
-                Classificação em smooth, intermittent, erratic e lumpy por série de código.
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
-                <DeepStatPill label="Smooth" value={formatNumber(segment.statistics.intermittency.class_distribution.smooth)} />
-                <DeepStatPill label="Intermittent" value={formatNumber(segment.statistics.intermittency.class_distribution.intermittent)} />
-                <DeepStatPill label="Erratic" value={formatNumber(segment.statistics.intermittency.class_distribution.erratic)} />
-                <DeepStatPill label="Lumpy" value={formatNumber(segment.statistics.intermittency.class_distribution.lumpy)} />
-                <DeepStatPill label="Insuficiente" value={formatNumber(segment.statistics.intermittency.class_distribution.insufficient)} />
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <DeepStatPill label="ADI mediano" value={segment.statistics.intermittency.median_adi.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
-                <DeepStatPill label="CV² mediano" value={segment.statistics.intermittency.median_cv2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <ChartCard title="Trajetória visual da série" subtitle="Sparkline de volume e quantidade por mês">
-              <DualSparkline rows={segment.charts.monthly} />
-            </ChartCard>
-            <ChartCard title="Mapa de calor temporal" subtitle="Concentração mensal de DFDs">
-              <SeasonalityHeatmap rows={segment.charts.monthly} />
-            </ChartCard>
-            <ChartCard title="Rosca de intermitência" subtitle="Distribuição ADI/CV² por classe">
-              <IntermittencyDonut distribution={segment.statistics.intermittency.class_distribution} />
-            </ChartCard>
           </div>
 
           <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-[#0F2A4A]">Cobertura de dados e confiabilidade</h2>
-            <p className="text-xs text-[#5A6E86]">
-              Quanto maior a cobertura e menor a concentração, mais robusta a decisão.
-            </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <CoverageBars
-                codeCoverage={segment.dataset.code_coverage_pct}
-                quantityCoverage={segment.dataset.quantity_coverage_pct}
-                priceCoverage={segment.dataset.price_coverage_pct}
-              />
-              <ReliabilityMeters
-                r2={segment.regression.total_quantity.r2}
-                pValue={segment.statistics.quantity_series.mann_kendall_p_value}
-                concentration={segment.statistics.quantity_series.top1_share_pct}
-              />
+            <h2 className="text-lg font-semibold text-[#0F2A4A]">Ações prioritárias da janela</h2>
+            <p className="text-xs text-[#5A6E86]">Síntese orientada a decisão imediata, não a descrição de todos os dados.</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+              {(segment.guides.length > 0 ? segment.guides.slice(0, 3) : [{ title: "Sem ação crítica", action: "Janela estável para o segmento atual." }]).map((guide, index) => (
+                <div key={`guide-top-${index}`} className="rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3">
+                  <p className="text-xs uppercase tracking-[0.1em] text-[#6A7E95]">Prioridade {index + 1}</p>
+                  <p className="mt-1 text-sm font-semibold text-[#16345C]">{guide.title}</p>
+                  <p className="mt-1 text-xs text-[#5A6E86]">{guide.action}</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <ChartCard title="DFDs por mês" subtitle="Evolução mensal de volume">
-              <MonthlyBars rows={segment.charts.monthly} accessor="dfd_count" formatter={formatNumber} colorClass="bg-[#2B6CB0]" />
-            </ChartCard>
-            <ChartCard title="Quantidade por mês" subtitle="Carga operacional por período">
-              <MonthlyBars rows={segment.charts.monthly} accessor="total_quantity" formatter={formatNumber} colorClass="bg-[#0F7B54]" />
-            </ChartCard>
-            <ChartCard title="Top códigos por recorrência" subtitle="Mais frequentes no período">
-              <TopCodesBars rows={segment.charts.top_codes_by_frequency} valueKey="observations" formatter={formatNumber} />
-            </ChartCard>
-            <ChartCard title="Top códigos por quantidade" subtitle="Maior peso de consumo">
-              <TopCodesBars rows={segment.charts.top_codes_by_quantity} valueKey="totalQuantity" formatter={formatNumber} />
-            </ChartCard>
-          </div>
+          <details open className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+            <summary className="cursor-pointer text-base font-semibold text-[#0F2A4A]">
+              Painel essencial (executivo)
+            </summary>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                <MetricCard label="DFDs" value={formatNumber(segment.dataset.dfds)} />
+                <MetricCard label="Itens" value={formatNumber(segment.dataset.items)} />
+                <MetricCard label="Meses com dados" value={formatNumber(segment.dataset.months_covered)} />
+                <MetricCard label="Códigos repetidos" value={formatNumber(segment.dataset.repeated_codes)} />
+                <MetricCard label="Cobertura de código" value={formatPercent(segment.dataset.code_coverage_pct)} />
+                <MetricCard label="Cobertura de preço" value={formatPercent(segment.dataset.price_coverage_pct)} tone={segment.scope.price_signals_enabled ? "default" : "muted"} />
+              </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <RegressionCard title="Volume de DFD" summary={segment.regression.dfd_volume} formatter={formatNumber} />
+                <RegressionCard title="Quantidade total" summary={segment.regression.total_quantity} formatter={formatNumber} />
+                <RegressionCard title={segment.scope.price_signals_enabled ? "Valor total" : "Valor total (leitura limitada)"} summary={segment.regression.total_value} formatter={formatCurrency} />
+              </div>
+            </div>
+          </details>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-[#0F2A4A]">Análises automáticas</h2>
-              <div className="mt-3 space-y-2">
-                {segment.insights.length === 0 && (
-                  <p className="text-sm text-[#5A6E86]">Sem alertas para a janela atual.</p>
-                )}
-                {segment.insights.map((insight, index) => (
-                  <div
-                    key={`${insight.title}-${index}`}
-                    className={
-                      insight.level === "critical"
-                        ? "rounded-xl border border-[#F1BBC2] bg-[#FFF3F5] p-3"
-                        : insight.level === "warning"
-                          ? "rounded-xl border border-[#F4D5A8] bg-[#FFF9EE] p-3"
-                          : "rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3"
-                    }
-                  >
-                    <p className="text-sm font-semibold text-[#16345C]">{insight.title}</p>
-                    <p className="mt-1 text-xs text-[#5A6E86]">{insight.detail}</p>
+          <details className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+            <summary className="cursor-pointer text-base font-semibold text-[#0F2A4A]">
+              Diagnóstico estatístico e ciência de dados
+            </summary>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="rounded-2xl border border-[#E3EAF3] bg-[#FAFCFF] p-4">
+                  <h3 className="text-sm font-semibold text-[#16345C]">Estatística robusta de tendência</h3>
+                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                    <DeepStatPill label="Theil-Sen (quantidade)" value={formatNumber(segment.statistics.quantity_series.theil_sen_slope)} />
+                    <DeepStatPill label="Mann-Kendall p-valor" value={segment.statistics.quantity_series.mann_kendall_p_value.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} />
+                    <DeepStatPill label="Mann-Kendall tendência" value={trendLabel(segment.statistics.quantity_series.mann_kendall_trend)} />
+                    <DeepStatPill label="CV (quantidade)" value={segment.statistics.quantity_series.cv.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
+                    <DeepStatPill label="HHI (quantidade)" value={segment.statistics.quantity_series.hhi.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} />
+                    <DeepStatPill label="Meses efetivos" value={segment.statistics.quantity_series.effective_periods.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-[#0F2A4A]">Guia de decisão</h2>
-              <div className="mt-3 space-y-2">
-                {segment.guides.map((guide, index) => (
-                  <div key={`${guide.title}-${index}`} className="rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3">
-                    <p className="text-sm font-semibold text-[#16345C]">{guide.title}</p>
-                    <p className="mt-1 text-xs text-[#5A6E86]">{guide.action}</p>
+                </div>
+                <div className="rounded-2xl border border-[#E3EAF3] bg-[#FAFCFF] p-4">
+                  <h3 className="text-sm font-semibold text-[#16345C]">Demanda intermitente (ADI/CV²)</h3>
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
+                    <DeepStatPill label="Suave" value={formatNumber(segment.statistics.intermittency.class_distribution.smooth)} />
+                    <DeepStatPill label="Intermitente" value={formatNumber(segment.statistics.intermittency.class_distribution.intermittent)} />
+                    <DeepStatPill label="Errática" value={formatNumber(segment.statistics.intermittency.class_distribution.erratic)} />
+                    <DeepStatPill label="Lumpy" value={formatNumber(segment.statistics.intermittency.class_distribution.lumpy)} />
+                    <DeepStatPill label="Insuficiente" value={formatNumber(segment.statistics.intermittency.class_distribution.insufficient)} />
                   </div>
-                ))}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <DeepStatPill label="ADI mediano" value={segment.statistics.intermittency.median_adi.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
+                    <DeepStatPill label="CV² mediano" value={segment.statistics.intermittency.median_cv2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <ChartCard title="Trajetória visual da série" subtitle="Sparkline de volume e quantidade por mês">
+                  <DualSparkline rows={segment.charts.monthly} />
+                </ChartCard>
+                <ChartCard title="Mapa de calor temporal" subtitle="Concentração mensal de DFDs">
+                  <SeasonalityHeatmap rows={segment.charts.monthly} />
+                </ChartCard>
+                <ChartCard title="Rosca de intermitência" subtitle="Distribuição ADI/CV² por classe">
+                  <IntermittencyDonut distribution={segment.statistics.intermittency.class_distribution} />
+                </ChartCard>
+              </div>
+              <div className="rounded-2xl border border-[#E3EAF3] bg-[#FAFCFF] p-4">
+                <h3 className="text-sm font-semibold text-[#16345C]">Cobertura e confiabilidade</h3>
+                <div className="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  <CoverageBars codeCoverage={segment.dataset.code_coverage_pct} quantityCoverage={segment.dataset.quantity_coverage_pct} priceCoverage={segment.dataset.price_coverage_pct} />
+                  <ReliabilityMeters r2={segment.regression.total_quantity.r2} pValue={segment.statistics.quantity_series.mann_kendall_p_value} concentration={segment.statistics.quantity_series.top1_share_pct} />
+                </div>
               </div>
             </div>
-          </div>
+          </details>
 
-          {segment.statistics.intermittency.top_lumpy.length > 0 && (
-            <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-[#0F2A4A]">Séries lumpy prioritárias</h2>
-                <span className="text-xs text-[#5A6E86]">
-                  {segment.statistics.intermittency.top_lumpy.length} códigos
-                </span>
+          <details className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+            <summary className="cursor-pointer text-base font-semibold text-[#0F2A4A]">
+              Evidências detalhadas e tabelas
+            </summary>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <ChartCard title="DFDs por mês" subtitle="Evolução mensal de volume">
+                  <MonthlyBars rows={segment.charts.monthly} accessor="dfd_count" formatter={formatNumber} colorClass="bg-[#2B6CB0]" />
+                </ChartCard>
+                <ChartCard title="Quantidade por mês" subtitle="Carga operacional por período">
+                  <MonthlyBars rows={segment.charts.monthly} accessor="total_quantity" formatter={formatNumber} colorClass="bg-[#0F7B54]" />
+                </ChartCard>
+                <ChartCard title="Top códigos por recorrência" subtitle="Mais frequentes no período">
+                  <TopCodesBars rows={segment.charts.top_codes_by_frequency} valueKey="observations" formatter={formatNumber} />
+                </ChartCard>
+                <ChartCard title="Top códigos por quantidade" subtitle="Maior peso de consumo">
+                  <TopCodesBars rows={segment.charts.top_codes_by_quantity} valueKey="totalQuantity" formatter={formatNumber} />
+                </ChartCard>
               </div>
-              <div className="max-h-[280px] overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-white">
-                    <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
-                      <th className="pb-2">Código</th>
-                      <th className="pb-2 text-right">ADI</th>
-                      <th className="pb-2 text-right">CV²</th>
-                      <th className="pb-2 text-right">Obs.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {segment.statistics.intermittency.top_lumpy.map((row) => (
-                      <tr key={`lumpy-${row.codigoEfisco}`} className="border-t border-[#EEF2F7]">
-                        <td className="py-2 pr-2 font-semibold text-[#16345C]">{row.codigoEfisco}</td>
-                        <td className="py-2 text-right text-[#5A6E86]">{row.adi.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
-                        <td className="py-2 text-right text-[#5A6E86]">{row.cv2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
-                        <td className="py-2 text-right text-[#5A6E86]">{formatNumber(row.observations)}</td>
-                      </tr>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+                  <h2 className="text-lg font-semibold text-[#0F2A4A]">Análises automáticas</h2>
+                  <div className="mt-3 space-y-2">
+                    {segment.insights.length === 0 && <p className="text-sm text-[#5A6E86]">Sem alertas para a janela atual.</p>}
+                    {segment.insights.map((insight, index) => (
+                      <div
+                        key={`${insight.title}-${index}`}
+                        className={
+                          insight.level === "critical"
+                            ? "rounded-xl border border-[#F1BBC2] bg-[#FFF3F5] p-3"
+                            : insight.level === "warning"
+                              ? "rounded-xl border border-[#F4D5A8] bg-[#FFF9EE] p-3"
+                              : "rounded-xl border border-[#D9E5F2] bg-[#F7FAFF] p-3"
+                        }
+                      >
+                        <p className="text-sm font-semibold text-[#16345C]">{insight.title}</p>
+                        <p className="mt-1 text-xs text-[#5A6E86]">{insight.detail}</p>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
+                <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+                  <h2 className="text-lg font-semibold text-[#0F2A4A]">Séries lumpy prioritárias</h2>
+                  {segment.statistics.intermittency.top_lumpy.length === 0 ? (
+                    <p className="mt-3 text-sm text-[#5A6E86]">Nenhuma série lumpy relevante na janela.</p>
+                  ) : (
+                    <div className="mt-3 max-h-[280px] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-white">
+                          <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+                            <th className="pb-2">Código</th>
+                            <th className="pb-2 text-right">ADI</th>
+                            <th className="pb-2 text-right">CV²</th>
+                            <th className="pb-2 text-right">Obs.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {segment.statistics.intermittency.top_lumpy.map((row) => (
+                            <tr key={`lumpy-${row.codigoEfisco}`} className="border-t border-[#EEF2F7]">
+                              <td className="py-2 pr-2 font-semibold text-[#16345C]">{row.codigoEfisco}</td>
+                              <td className="py-2 text-right text-[#5A6E86]">{row.adi.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+                              <td className="py-2 text-right text-[#5A6E86]">{row.cv2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+                              <td className="py-2 text-right text-[#5A6E86]">{formatNumber(row.observations)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          )}
+          </details>
 
           {activeSegment === "current" && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -1136,6 +1168,31 @@ function DataTableOutliers({ rows }: { rows: OutlierRow[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function DecisionCard({
+  pergunta,
+  resposta,
+  explicacao,
+}: {
+  pergunta: string;
+  resposta: string;
+  explicacao: string;
+}) {
+  const tone =
+    resposta === "alto" || resposta === "alta"
+      ? "border-[#F6C7CC] bg-[#FFF4F5]"
+      : resposta === "baixo" || resposta === "boa"
+        ? "border-[#CBE8DB] bg-[#F3FBF7]"
+        : "border-[#D9E5F2] bg-[#F7FAFF]";
+
+  return (
+    <div className={`rounded-2xl border p-4 ${tone}`}>
+      <p className="text-xs uppercase tracking-[0.1em] text-[#6A7E95]">{pergunta}</p>
+      <p className="mt-2 text-xl font-semibold capitalize text-[#16345C]">{resposta}</p>
+      <p className="mt-1 text-xs text-[#5A6E86]">{explicacao}</p>
     </div>
   );
 }
