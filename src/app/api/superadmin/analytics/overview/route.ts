@@ -168,6 +168,17 @@ type ForecastRow = {
   slope: number;
   r2: number;
   trend: "up" | "down" | "flat" | "insufficient_data";
+  confidence: "high" | "medium" | "low";
+};
+
+type PriceVolatilitySignal = {
+  codigoEfisco: string;
+  descricao: string;
+  observations: number;
+  latestPrice: number;
+  meanPrice: number;
+  cvPct: number;
+  maxDeviationPct: number;
 };
 
 function parseWindowMonths(raw: string | null) {
@@ -628,7 +639,19 @@ async function fetchLegacyItems(
   return items;
 }
 
-function buildTopForecasts(dfds: DfdRow[], items: ItemRow[]) {
+function resolveForecastConfidence(sampleMonths: number, r2: number): "high" | "medium" | "low" {
+  if (sampleMonths >= 8 && r2 >= 0.5) return "high";
+  if (sampleMonths >= 4 && r2 >= 0.2) return "medium";
+  return "low";
+}
+
+function buildTopForecasts(
+  dfds: DfdRow[],
+  items: ItemRow[],
+  options?: { minSampleMonths?: number; limit?: number },
+) {
+  const minSampleMonths = Math.max(1, Number(options?.minSampleMonths || 4));
+  const limit = Math.max(1, Number(options?.limit || 25));
   const dfdMonthById = new Map<string, string>();
   for (const dfd of dfds) {
     const month = toYearMonth(String(dfd.created_at || ""));
@@ -693,15 +716,16 @@ function buildTopForecasts(dfds: DfdRow[], items: ItemRow[]) {
         slope: regression.slope,
         r2: regression.r2,
         trend: regression.trend,
+        confidence: resolveForecastConfidence(points.length, regression.r2),
       } as ForecastRow;
     })
-    .filter((row) => row.sampleMonths >= 4)
+    .filter((row) => row.sampleMonths >= minSampleMonths)
     .sort((a, b) => {
       const predictionDiff = b.predictedNextQuantity - a.predictedNextQuantity;
       if (predictionDiff !== 0) return predictionDiff;
       return b.observations - a.observations;
     })
-    .slice(0, 25);
+    .slice(0, limit);
 }
 
 function buildPriceObservationRows(dfds: DfdRow[], items: ItemRow[]) {
@@ -735,6 +759,51 @@ function buildPriceObservationRows(dfds: DfdRow[], items: ItemRow[]) {
   }
 
   return observations;
+}
+
+function buildPriceVolatilitySignals(observations: PriceObservation[]) {
+  const byCode = new Map<string, PriceObservation[]>();
+  for (const observation of observations) {
+    const codigo = String(observation.codigoEfisco || "").trim();
+    if (!codigo) continue;
+    if (!byCode.has(codigo)) byCode.set(codigo, []);
+    byCode.get(codigo)!.push(observation);
+  }
+
+  const rows: PriceVolatilitySignal[] = [];
+  for (const [codigoEfisco, codeRows] of byCode.entries()) {
+    if (codeRows.length < 2) continue;
+    const prices = codeRows
+      .map((row) => Number(row.unitPrice || 0))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    if (prices.length < 2) continue;
+    const average = mean(prices);
+    const deviation = sampleStdDev(prices, average);
+    if (average <= 0) continue;
+    const latest = codeRows
+      .slice()
+      .sort((a, b) => String(a.mes || "").localeCompare(String(b.mes || "")))
+      .at(-1);
+    const latestPrice = Number(latest?.unitPrice || 0);
+    const maxDeviation = Math.max(...prices.map((price) => Math.abs(price - average)));
+    rows.push({
+      codigoEfisco,
+      descricao: String(codeRows[0]?.descricao || "Descrição não informada"),
+      observations: prices.length,
+      latestPrice: normalizeCurrency(latestPrice),
+      meanPrice: normalizeCurrency(average),
+      cvPct: normalizeCurrency((deviation / average) * 100),
+      maxDeviationPct: normalizeCurrency((maxDeviation / average) * 100),
+    });
+  }
+
+  return rows
+    .sort((a, b) => {
+      const diff = b.cvPct - a.cvPct;
+      if (diff !== 0) return diff;
+      return b.maxDeviationPct - a.maxDeviationPct;
+    })
+    .slice(0, 20);
 }
 
 function buildSegmentAnalytics(
@@ -1157,10 +1226,50 @@ export const GET = withAuthorizedRole(
       priceSignalsEnabled: true,
     });
 
-    const forecasts = buildTopForecasts(currentYearDfds, currentYearItems);
+    const strictForecasts = buildTopForecasts(currentYearDfds, currentYearItems, {
+      minSampleMonths: 4,
+      limit: 25,
+    });
+    const exploratoryForecasts = buildTopForecasts(currentYearDfds, currentYearItems, {
+      minSampleMonths: 2,
+      limit: 25,
+    });
+    const forecasts =
+      strictForecasts.length > 0 ? strictForecasts : exploratoryForecasts;
+    const forecastsMode =
+      strictForecasts.length > 0
+        ? "strict"
+        : exploratoryForecasts.length > 0
+          ? "exploratory"
+          : "empty";
+    const forecastsReason =
+      forecastsMode === "strict"
+        ? "Previsões com série mínima de 4 meses por código."
+        : forecastsMode === "exploratory"
+          ? "Previsões exploratórias: série curta (2-3 meses) com confiança limitada."
+          : "Sem séries com recorrência mínima para previsão.";
 
     const priceObservations = buildPriceObservationRows(currentYearDfds, currentYearItems);
-    const priceOutliers = detectPriceOutliers(priceObservations)
+    const strictPriceOutliers = detectPriceOutliers(priceObservations, 6, 2.5);
+    const exploratoryPriceOutliers = detectPriceOutliers(priceObservations, 3, 2.2);
+    const selectedPriceOutliers =
+      strictPriceOutliers.length > 0
+        ? strictPriceOutliers
+        : exploratoryPriceOutliers;
+    const priceOutliersMode =
+      strictPriceOutliers.length > 0
+        ? "strict"
+        : exploratoryPriceOutliers.length > 0
+          ? "exploratory"
+          : "empty";
+    const priceOutliersReason =
+      priceOutliersMode === "strict"
+        ? "Outliers com critério robusto (mín. 6 observações por código)."
+        : priceOutliersMode === "exploratory"
+          ? "Sinais exploratórios: critérios relaxados (mín. 3 observações por código)."
+          : "Sem volume histórico suficiente para detectar outliers de preço.";
+    const priceWatchlist = buildPriceVolatilitySignals(priceObservations);
+    const priceOutliers = selectedPriceOutliers
       .slice(0, 40)
       .map((row) => ({
         ...row,
@@ -1194,7 +1303,12 @@ export const GET = withAuthorizedRole(
         dfd_volume: combinedSegment.regression.dfd_volume,
       },
       top_forecasts: forecasts,
+      top_forecasts_mode: forecastsMode,
+      top_forecasts_reason: forecastsReason,
       price_outliers: priceOutliers,
+      price_outliers_mode: priceOutliersMode,
+      price_outliers_reason: priceOutliersReason,
+      price_watchlist: priceWatchlist,
       segments: {
         legacy: legacySegment,
         current: currentSegment,

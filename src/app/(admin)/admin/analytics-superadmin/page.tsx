@@ -36,6 +36,7 @@ type ForecastRow = {
   slope: number;
   r2: number;
   trend: "up" | "down" | "flat" | "insufficient_data";
+  confidence?: "high" | "medium" | "low";
 };
 
 type OutlierRow = {
@@ -49,6 +50,16 @@ type OutlierRow = {
   dfdId: string;
   protocolo: string;
   mes: string;
+};
+
+type PriceVolatilitySignal = {
+  codigoEfisco: string;
+  descricao: string;
+  observations: number;
+  latestPrice: number;
+  meanPrice: number;
+  cvPct: number;
+  maxDeviationPct: number;
 };
 
 type SegmentInsight = {
@@ -169,7 +180,12 @@ type AnalyticsPayload = {
     dfd_volume: RegressionSummary;
   };
   top_forecasts: ForecastRow[];
+  top_forecasts_mode?: "strict" | "exploratory" | "empty";
+  top_forecasts_reason?: string;
   price_outliers: OutlierRow[];
+  price_outliers_mode?: "strict" | "exploratory" | "empty";
+  price_outliers_reason?: string;
+  price_watchlist?: PriceVolatilitySignal[];
   segments?: {
     legacy: SegmentAnalytics;
     current: SegmentAnalytics;
@@ -626,6 +642,7 @@ export default function SuperadminAnalyticsPage() {
                   <ReliabilityMeters r2={segment.regression.total_quantity.r2} pValue={segment.statistics.quantity_series.mann_kendall_p_value} concentration={segment.statistics.quantity_series.top1_share_pct} />
                 </div>
               </div>
+              <FutureScenariosPanel segment={segment} />
             </div>
           </details>
 
@@ -705,8 +722,17 @@ export default function SuperadminAnalyticsPage() {
 
           {activeSegment === "current" && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <DataTableForecast rows={payload?.top_forecasts || []} />
-              <DataTableOutliers rows={payload?.price_outliers || []} />
+              <DataTableForecast
+                rows={payload?.top_forecasts || []}
+                mode={payload?.top_forecasts_mode || "empty"}
+                reason={payload?.top_forecasts_reason || ""}
+              />
+              <DataTableOutliers
+                rows={payload?.price_outliers || []}
+                mode={payload?.price_outliers_mode || "empty"}
+                reason={payload?.price_outliers_reason || ""}
+                watchlist={payload?.price_watchlist || []}
+              />
             </div>
           )}
         </>
@@ -1200,79 +1226,317 @@ function DeepStatPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DataTableForecast({ rows }: { rows: ForecastRow[] }) {
+function FutureScenariosPanel({ segment }: { segment: SegmentAnalytics }) {
+  const scenario = useMemo(() => {
+    const project = (
+      summary: RegressionSummary,
+      cv: number,
+    ) => {
+      const horizon = 6;
+      const base = Array.from({ length: horizon }, (_, index) =>
+        Math.max(0, summary.currentValue + summary.slope * (index + 1)),
+      );
+      const uncertainty = Math.max(
+        0.08,
+        Math.min(0.5, (Number.isFinite(cv) ? cv : 0) * 0.2 + 0.08),
+      );
+      const expansion = base.map((value) => value * (1 + uncertainty * 0.6));
+      const containment = base.map((value) =>
+        Math.max(0, value * (1 - uncertainty * 0.75)),
+      );
+      return {
+        base6m: base.reduce((acc, value) => acc + value, 0),
+        expansion6m: expansion.reduce((acc, value) => acc + value, 0),
+        containment6m: containment.reduce((acc, value) => acc + value, 0),
+        uncertaintyPct: Math.round(uncertainty * 100),
+      };
+    };
+
+    const monthly = segment.charts.monthly || [];
+    const recent =
+      monthly.length >= 2
+        ? monthly.slice(-2).reduce((acc, row) => acc + Number(row.total_quantity || 0), 0) / 2
+        : 0;
+    const previous =
+      monthly.length >= 4
+        ? monthly
+            .slice(-4, -2)
+            .reduce((acc, row) => acc + Number(row.total_quantity || 0), 0) / 2
+        : 0;
+    const regimeShiftPct =
+      previous > 0 ? ((recent - previous) / previous) * 100 : 0;
+
+    return {
+      dfd: project(segment.regression.dfd_volume, segment.statistics.dfd_series.cv),
+      quantity: project(
+        segment.regression.total_quantity,
+        segment.statistics.quantity_series.cv,
+      ),
+      value: project(segment.regression.total_value, segment.statistics.value_series.cv),
+      regimeShiftPct: Number.isFinite(regimeShiftPct) ? regimeShiftPct : 0,
+    };
+  }, [segment]);
+
   return (
-    <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-[#0F2A4A]">Previsões de quantidade (corrente)</h2>
-        <span className="text-xs text-[#5A6E86]">{rows.length} itens</span>
+    <div className="rounded-2xl border border-[#E3EAF3] bg-[#FAFCFF] p-4">
+      <h3 className="text-sm font-semibold text-[#16345C]">Cenários futuros (próximos 6 meses)</h3>
+      <p className="mt-1 text-xs text-[#5A6E86]">
+        Projeção em três cenários: base (tendência atual), expansão e contenção.
+      </p>
+      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
+        <ScenarioMiniCard
+          title="Volume de DFD"
+          unit="DFDs"
+          base={scenario.dfd.base6m}
+          expansion={scenario.dfd.expansion6m}
+          containment={scenario.dfd.containment6m}
+          uncertaintyPct={scenario.dfd.uncertaintyPct}
+          formatter={formatNumber}
+        />
+        <ScenarioMiniCard
+          title="Quantidade total"
+          unit="Unidades"
+          base={scenario.quantity.base6m}
+          expansion={scenario.quantity.expansion6m}
+          containment={scenario.quantity.containment6m}
+          uncertaintyPct={scenario.quantity.uncertaintyPct}
+          formatter={formatNumber}
+        />
+        <ScenarioMiniCard
+          title={segment.scope.price_signals_enabled ? "Valor total" : "Valor total (limitado)"}
+          unit="BRL"
+          base={scenario.value.base6m}
+          expansion={scenario.value.expansion6m}
+          containment={scenario.value.containment6m}
+          uncertaintyPct={scenario.value.uncertaintyPct}
+          formatter={formatCurrency}
+        />
       </div>
-      <div className="max-h-[360px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white">
-            <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
-              <th className="pb-2">Código</th>
-              <th className="pb-2 text-right">Atual</th>
-              <th className="pb-2 text-right">Próxima</th>
-              <th className="pb-2 text-right">R²</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.codigoEfisco} className="border-t border-[#EEF2F7]">
-                <td className="py-2 pr-2">
-                  <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
-                  <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
-                </td>
-                <td className="py-2 text-right font-medium text-[#16345C]">{formatNumber(row.latestQuantity)}</td>
-                <td className="py-2 text-right font-semibold text-[#0B5E3F]">{formatNumber(row.predictedNextQuantity)}</td>
-                <td className="py-2 text-right text-xs text-[#5A6E86]">{Math.round((row.r2 || 0) * 100)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-3 rounded-xl border border-[#E4ECF5] bg-white p-3 text-xs text-[#4C6687]">
+        <b>Leitura de ruptura:</b>{" "}
+        {scenario.regimeShiftPct > 20
+          ? `aceleração recente de ${scenario.regimeShiftPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% na quantidade média.`
+          : scenario.regimeShiftPct < -20
+            ? `desaceleração recente de ${Math.abs(scenario.regimeShiftPct).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% na quantidade média.`
+            : "sem ruptura forte no curto prazo; variação dentro da faixa esperada."}
       </div>
     </div>
   );
 }
 
-function DataTableOutliers({ rows }: { rows: OutlierRow[] }) {
+function ScenarioMiniCard({
+  title,
+  unit,
+  base,
+  expansion,
+  containment,
+  uncertaintyPct,
+  formatter,
+}: {
+  title: string;
+  unit: string;
+  base: number;
+  expansion: number;
+  containment: number;
+  uncertaintyPct: number;
+  formatter: (value: number) => string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#DDE7F2] bg-white p-3">
+      <p className="text-[11px] uppercase tracking-[0.1em] text-[#6A7E95]">{title}</p>
+      <p className="mt-1 text-sm font-semibold text-[#16345C]">Base: {formatter(base)}</p>
+      <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+        <span className="rounded-lg border border-[#DFF0E8] bg-[#F2FBF7] px-2 py-1 text-[#186345]">
+          Expansão: {formatter(expansion)}
+        </span>
+        <span className="rounded-lg border border-[#F3E4D1] bg-[#FFF8EE] px-2 py-1 text-[#8B5A1E]">
+          Contenção: {formatter(containment)}
+        </span>
+      </div>
+      <p className="mt-2 text-[11px] text-[#5A6E86]">
+        Incerteza: {uncertaintyPct}% · unidade: {unit}
+      </p>
+    </div>
+  );
+}
+
+function modeLabel(mode: "strict" | "exploratory" | "empty") {
+  if (mode === "strict") return "Robusto";
+  if (mode === "exploratory") return "Exploratório";
+  return "Sem base";
+}
+
+function modeTone(mode: "strict" | "exploratory" | "empty") {
+  if (mode === "strict") return "border-[#CBE8DB] bg-[#F3FBF7] text-[#0E5C3F]";
+  if (mode === "exploratory") return "border-[#F4D5A8] bg-[#FFF9EE] text-[#8B5A1E]";
+  return "border-[#E1E9F3] bg-[#F7FAFF] text-[#4C6687]";
+}
+
+function forecastConfidenceLabel(value?: "high" | "medium" | "low") {
+  if (value === "high") return "Alta";
+  if (value === "medium") return "Média";
+  return "Baixa";
+}
+
+function DataTableForecast({
+  rows,
+  mode,
+  reason,
+}: {
+  rows: ForecastRow[];
+  mode: "strict" | "exploratory" | "empty";
+  reason: string;
+}) {
   return (
     <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-[#0F2A4A]">Outliers de preço (corrente)</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-[#0F2A4A]">Previsões de quantidade (corrente)</h2>
+          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${modeTone(mode)}`}>
+            {modeLabel(mode)}
+          </span>
+        </div>
+        <span className="text-xs text-[#5A6E86]">{rows.length} itens</span>
+      </div>
+      <p className="mb-3 rounded-xl border border-[#E4ECF5] bg-[#F9FBFE] px-3 py-2 text-xs text-[#4C6687]">
+        {reason || "Sem explicação adicional para o modo atual."}
+      </p>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-[#E4ECF5] bg-[#F8FBFF] p-3 text-sm text-[#5A6E86]">
+          Ainda não há recorrência suficiente por código para estimar a próxima quantidade.
+        </p>
+      ) : (
+        <div className="max-h-[360px] overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+                <th className="pb-2">Código</th>
+                <th className="pb-2 text-right">Atual</th>
+                <th className="pb-2 text-right">Próxima</th>
+                <th className="pb-2 text-right">R²</th>
+                <th className="pb-2 text-right">Conf.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.codigoEfisco} className="border-t border-[#EEF2F7]">
+                  <td className="py-2 pr-2">
+                    <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
+                    <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
+                  </td>
+                  <td className="py-2 text-right font-medium text-[#16345C]">{formatNumber(row.latestQuantity)}</td>
+                  <td className="py-2 text-right font-semibold text-[#0B5E3F]">{formatNumber(row.predictedNextQuantity)}</td>
+                  <td className="py-2 text-right text-xs text-[#5A6E86]">{Math.round((row.r2 || 0) * 100)}%</td>
+                  <td className="py-2 text-right text-xs font-semibold text-[#406A92]">
+                    {forecastConfidenceLabel(row.confidence)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DataTableOutliers({
+  rows,
+  mode,
+  reason,
+  watchlist,
+}: {
+  rows: OutlierRow[];
+  mode: "strict" | "exploratory" | "empty";
+  reason: string;
+  watchlist: PriceVolatilitySignal[];
+}) {
+  return (
+    <div className="rounded-3xl border border-[#D2D0CE] bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-[#0F2A4A]">Outliers de preço (corrente)</h2>
+          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${modeTone(mode)}`}>
+            {modeLabel(mode)}
+          </span>
+        </div>
         <span className="text-xs text-[#5A6E86]">{rows.length} sinais</span>
       </div>
-      <div className="max-h-[360px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white">
-            <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
-              <th className="pb-2">Código</th>
-              <th className="pb-2 text-right">Preço</th>
-              <th className="pb-2 text-right">Média</th>
-              <th className="pb-2 text-right">Z-score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${row.dfdId}-${row.codigoEfisco}-${index}`} className="border-t border-[#EEF2F7]">
-                <td className="py-2 pr-2">
-                  <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
-                  <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
-                </td>
-                <td className="py-2 text-right font-semibold text-[#8A1E2A]">{formatCurrency(row.unitPrice)}</td>
-                <td className="py-2 text-right text-[#2B4C6F]">{formatCurrency(row.mediaHistorica)}</td>
-                <td className="py-2 text-right">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[#F4CDD0] bg-[#FFF3F4] px-2 py-0.5 text-xs font-semibold text-[#8A1E2A]">
-                    <WarningCircle size={12} weight="fill" />
-                    {row.zScore.toFixed(2)}
-                  </span>
-                </td>
+      <p className="mb-3 rounded-xl border border-[#E4ECF5] bg-[#F9FBFE] px-3 py-2 text-xs text-[#4C6687]">
+        {reason || "Sem explicação adicional para o modo atual."}
+      </p>
+      {rows.length === 0 ? (
+        <div className="space-y-3">
+          <p className="rounded-xl border border-[#E4ECF5] bg-[#F8FBFF] p-3 text-sm text-[#5A6E86]">
+            Sem outliers detectáveis no período. Isso pode significar estabilidade de preço ou base histórica curta.
+          </p>
+          {watchlist.length > 0 && (
+            <div className="rounded-xl border border-[#E4ECF5] bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#6A7E95]">
+                Radar de volatilidade (quando não há outlier estatístico)
+              </p>
+              <div className="mt-2 max-h-[220px] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+                      <th className="pb-2">Código</th>
+                      <th className="pb-2 text-right">Média</th>
+                      <th className="pb-2 text-right">CV%</th>
+                      <th className="pb-2 text-right">Desvio máx.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {watchlist.slice(0, 12).map((row) => (
+                      <tr key={`watch-${row.codigoEfisco}`} className="border-t border-[#EEF2F7]">
+                        <td className="py-2 pr-2">
+                          <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
+                          <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
+                        </td>
+                        <td className="py-2 text-right text-[#2B4C6F]">{formatCurrency(row.meanPrice)}</td>
+                        <td className="py-2 text-right text-[#5A6E86]">{row.cvPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</td>
+                        <td className="py-2 text-right text-[#5A6E86]">
+                          {row.maxDeviationPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="max-h-[360px] overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr className="text-left text-xs uppercase tracking-[0.12em] text-[#6B7D92]">
+                <th className="pb-2">Código</th>
+                <th className="pb-2 text-right">Preço</th>
+                <th className="pb-2 text-right">Média</th>
+                <th className="pb-2 text-right">Z-score</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${row.dfdId}-${row.codigoEfisco}-${index}`} className="border-t border-[#EEF2F7]">
+                  <td className="py-2 pr-2">
+                    <p className="font-semibold text-[#16345C]">{row.codigoEfisco}</p>
+                    <p className="line-clamp-1 text-xs text-[#5A6E86]">{row.descricao}</p>
+                  </td>
+                  <td className="py-2 text-right font-semibold text-[#8A1E2A]">{formatCurrency(row.unitPrice)}</td>
+                  <td className="py-2 text-right text-[#2B4C6F]">{formatCurrency(row.mediaHistorica)}</td>
+                  <td className="py-2 text-right">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#F4CDD0] bg-[#FFF3F4] px-2 py-0.5 text-xs font-semibold text-[#8A1E2A]">
+                      <WarningCircle size={12} weight="fill" />
+                      {row.zScore.toFixed(2)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
