@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { downloadWorkbookFromSheets } from "@/lib/export-excel";
+import { calculateCapitalPriorities, type CapitalPriorityResult } from "@/lib/capital-priority";
 import {
   buildDfdItemDetailRows,
   buildDfdSheetRows,
@@ -50,6 +51,9 @@ type RawItem = {
   codigo_tce: string;
   codigo_item_efisco?: string | null;
   item_key: string;
+  campus_id: string | null;
+  unit_key: string | null;
+  eligible_status: boolean;
   descricao: string;
   quantidade: number;
   valor_unitario_estimado: number;
@@ -66,6 +70,9 @@ type RawItem = {
 
 type ConsolidatedItem = {
   item_key: string;
+  campus_id: string | null;
+  unit_key: string | null;
+  eligible_status: boolean;
   siad: string;
   descricao: string;
   grupo_nome: string;
@@ -84,6 +91,7 @@ type ConsolidatedItem = {
   criticidade_level: number;
   priorizacao_level: number;
   rank_score: number;
+  capital_priority?: CapitalPriorityResult;
   is_highlight: boolean;
   description_variants: number;
   min_unit_value: number;
@@ -327,9 +335,24 @@ function applyPareto(
   criticidadeWeight: number,
   priorizacaoWeight: number,
 ): ConsolidatedItem[] {
+  const capitalResults = calculateCapitalPriorities(source.filter((item) =>
+    String(item.gnd_dominante || "").startsWith("4")
+  ).map((item) => ({
+    key: item.item_key,
+    campusId: item.campus_id,
+    unitKey: item.unit_key,
+    value: item.valor_total,
+    criticidadeLevel: item.criticidade_level,
+    prioridadeLevel: item.priorizacao_level,
+    chefiaPareto: item.source_highlight_count > 0,
+    eligible: item.eligible_status,
+  })));
   const scored = source.map((item) => ({
     ...item,
-    rank_score: computeRankScore(item, criticidadeWeight, priorizacaoWeight),
+    capital_priority: capitalResults.get(item.item_key),
+    rank_score: capitalResults.has(item.item_key)
+      ? capitalResults.get(item.item_key)?.finalScore ?? 0
+      : computeRankScore(item, criticidadeWeight, priorizacaoWeight),
   }));
 
   const limit = getHighlightLimit(scored.length);
@@ -380,8 +403,17 @@ function buildConsolidatedExportRows(source: ConsolidatedItem[]) {
       departamentos_laboratorios: item.locais_uso.join(", "),
       criticidade: CRITICIDADE_LABELS[item.criticidade_level] || CRITICIDADE_LABELS[0],
       priorizacao: PRIORIZACAO_LABELS[item.priorizacao_level] || PRIORIZACAO_LABELS[0],
-      score: Number(item.rank_score.toFixed(2)),
-      pareto: item.is_highlight ? "SIM" : "NAO",
+      score: item.capital_priority?.status === "pending" ? "" : Number(item.rank_score.toFixed(2)),
+      pareto: item.capital_priority ? (item.source_highlight_count > 0 ? "SIM" : "NAO") : (item.is_highlight ? "SIM" : "NAO"),
+      versao_pontuacao_capital: item.capital_priority?.version || "",
+      status_pontuacao_capital: item.capital_priority?.status || "",
+      motivo_pendencia_capital: item.capital_priority?.reason || "",
+      score_chefia_capital: item.capital_priority?.humanScore ?? "",
+      bonus_pareto_capital: item.capital_priority?.paretoBonus ?? "",
+      penalidade_campus_capital: item.capital_priority?.campusPenalty ?? "",
+      acrescimo_unidade_capital: item.capital_priority?.unitIncrement ?? "",
+      referencia_campus_capital: item.capital_priority?.campusReference ?? "",
+      referencia_unidade_capital: item.capital_priority?.unitReference ?? "",
       variantes_descricao: item.description_variants,
       menor_valor_unitario: Number(item.min_unit_value || 0),
       maior_valor_unitario: Number(item.max_unit_value || 0),
@@ -670,6 +702,7 @@ export default function ConsolidationPage() {
       const laboratoriosData = laboratoriosRes as any[];
 
       const itemsRowsData: any[] = [];
+      const dfdMetaById = new Map(approvedDfdsRows.map((dfd) => [String(dfd.id), dfd]));
       const legacyItemsSelect =
         "id, dfd_id, codigo_tce, codigo_item_efisco, descricao, quantidade, valor_unitario_estimado, is_highlight_item, gnd, link_referencia, justificativa_item, justificativa_quantidade";
 
@@ -700,17 +733,25 @@ export default function ConsolidationPage() {
         .map(
           (row) => {
             const itemCode = resolveConsolidationItemCode(row);
+            const dfdMeta = dfdMetaById.get(String(row.dfd_id)) as any;
+            const campusId = String(dfdMeta?.campus_id || "").trim() || null;
+            const unitId = String(dfdMeta?.unidade_id || "").trim();
+            const unitKey = unitId ? `${String(dfdMeta?.tipo_unidade || "unidade")}:${unitId}` : null;
+            const baseKey = itemCode ||
+              [String(row.descricao || "").trim().toLowerCase(), String(row.gnd || "").trim().toLowerCase()]
+                .filter(Boolean).join("|") || String(row.id || "");
+            const isCapital = String(row.gnd || "").trim().startsWith("4");
             return {
               id: String(row.id || ""),
               dfd_id: String(row.dfd_id || ""),
               codigo_tce: itemCode,
               codigo_item_efisco: String(row.codigo_item_efisco || "").trim() || null,
-              item_key:
-                itemCode ||
-                [String(row.descricao || "").trim().toLowerCase(), String(row.gnd || "").trim().toLowerCase()]
-                  .filter(Boolean)
-                  .join("|") ||
-                String(row.id || ""),
+              item_key: isCapital
+                ? `capital:${campusId || "sem-campus"}:${unitKey || String(row.dfd_id)}:${String(row.gnd || "")}:${baseKey}:${String(row.criticidade || "sem-criticidade")}:${String(row.moscow_categoria || "sem-prioridade")}:${row.is_highlight_item ? "pareto" : "comum"}`
+                : baseKey,
+              campus_id: campusId,
+              unit_key: unitKey,
+              eligible_status: CONSOLIDATION_ELIGIBLE_STATUSES.has(normalizeDfdStatus(dfdMeta?.status)),
               descricao: String(row.descricao || "").trim() || "Descrição não informada",
               quantidade: Math.max(0, Number(row.quantidade || 0)),
               valor_unitario_estimado: Math.max(0, Number(row.valor_unitario_estimado || 0)),
@@ -792,6 +833,9 @@ export default function ConsolidationPage() {
         string,
         {
           item_key: string;
+          campus_id: string | null;
+          unit_key: string | null;
+          eligible_status: boolean;
           siad: string;
           descricao: string;
           descricaoSet: Set<string>;
@@ -838,6 +882,9 @@ export default function ConsolidationPage() {
         if (!consolidated.has(row.item_key)) {
           consolidated.set(row.item_key, {
             item_key: row.item_key,
+            campus_id: row.campus_id,
+            unit_key: row.unit_key,
+            eligible_status: row.eligible_status,
             siad: row.codigo_tce || row.codigo_item_efisco || "Sem código",
             descricao: row.descricao,
             descricaoSet: new Set<string>(),
@@ -984,6 +1031,9 @@ export default function ConsolidationPage() {
 
         return {
           item_key: entry.item_key,
+          campus_id: entry.campus_id,
+          unit_key: entry.unit_key,
+          eligible_status: entry.eligible_status,
           siad: entry.siad,
           descricao: entry.descricao,
           grupo_nome: grupo,
@@ -1150,7 +1200,7 @@ export default function ConsolidationPage() {
     }
 
     if (highlightOnly) {
-      next = next.filter((item) => item.is_highlight);
+      next = next.filter((item) => item.capital_priority ? item.source_highlight_count > 0 : item.is_highlight);
     }
 
     if (quickFocus === "criticos") {
@@ -1164,9 +1214,9 @@ export default function ConsolidationPage() {
     } else if (smartFilter === "outlier") {
       next = next.filter((item) => item.spread_percent >= 80);
     } else if (smartFilter === "incompleto") {
-      next = next.filter((item) => item.criticidade_level === 0 || item.priorizacao_level === 0);
+      next = next.filter((item) => item.criticidade_level === 0 || item.priorizacao_level === 0 || item.capital_priority?.status === "pending");
     } else if (smartFilter === "pareto") {
-      next = next.filter((item) => item.is_highlight);
+      next = next.filter((item) => item.capital_priority ? item.source_highlight_count > 0 : item.is_highlight);
     }
 
     return [...next].sort((a, b) => {
@@ -1269,7 +1319,7 @@ export default function ConsolidationPage() {
   }, [localUsoFilter, localUsoOptions]);
 
   const paretoCount = useMemo(
-    () => items.filter((item) => item.is_highlight).length,
+    () => items.filter((item) => item.capital_priority ? item.source_highlight_count > 0 : item.is_highlight).length,
     [items],
   );
 
@@ -1739,7 +1789,7 @@ export default function ConsolidationPage() {
                       Priorização essencial
                     </span>
                     <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-upe-accent-matte-gold/20 text-upe-accent-matte-gold border-upe-accent-matte-gold/30">
-                      Top Pareto
+                      Capital: Pareto da chefia
                     </span>
                     <span className="px-2.5 py-1 rounded-lg border text-[10px] uppercase tracking-widest font-semibold bg-amber-100 text-amber-700 border-amber-200">
                       Atenção de qualidade
@@ -1810,7 +1860,8 @@ export default function ConsolidationPage() {
                     6,
                     Math.min(100, Math.round((item.rank_score / maxVisibleScore) * 100)),
                   );
-                  const isExpanded = expandedItemId === item.siad;
+                  const isExpanded = expandedItemId === item.item_key;
+                  const chefiaPareto = item.capital_priority ? item.source_highlight_count > 0 : item.is_highlight;
                   const hasQualityGap =
                     item.criticidade_level === 0 ||
                     item.priorizacao_level === 0 ||
@@ -1832,7 +1883,7 @@ export default function ConsolidationPage() {
                         "mx-3 my-1.5 rounded-[22px] border border-[#E5EDF7] bg-white p-4 shadow-[0_10px_24px_rgba(22,64,115,0.06)] transition-colors md:mx-4",
                         stripedBg,
                         rowDensity,
-                        item.is_highlight && "ring-1 ring-inset ring-upe-accent-matte-gold/25",
+                        chefiaPareto && "ring-1 ring-inset ring-upe-accent-matte-gold/25",
                       )}
                     >
                       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_220px_170px]">
@@ -1926,10 +1977,10 @@ export default function ConsolidationPage() {
                         <div className="grid gap-2 self-start">
                           <div className="rounded-[18px] border border-[var(--semantic-success-border)] bg-[var(--semantic-success-soft)] p-3">
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--semantic-success)]">
-                              Score
+                              {item.capital_priority ? "Nota de capital" : "Score"}
                             </p>
                             <p className="mt-1 text-[28px] font-semibold leading-none tracking-tight text-[var(--semantic-text)]">
-                              {Math.round(item.rank_score)}
+                              {item.capital_priority?.status === "pending" ? "Pendente" : item.capital_priority ? item.rank_score.toFixed(2) : Math.round(item.rank_score)}
                             </p>
                             {showScoreBars ? (
                               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#DCE8F7]">
@@ -1943,7 +1994,7 @@ export default function ConsolidationPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              setExpandedItemId((prev) => (prev === item.siad ? null : item.siad))
+                              setExpandedItemId((prev) => (prev === item.item_key ? null : item.item_key))
                             }
                             className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D9E6F3] bg-white px-4 text-sm font-semibold text-[#164073] hover:bg-[#F5F9FF]"
                           >
@@ -1965,13 +2016,13 @@ export default function ConsolidationPage() {
                             <span
                               className={cn(
                                 "inline-flex items-center justify-center w-9 h-9 rounded-xl",
-                                item.is_highlight
+                                chefiaPareto
                                   ? "bg-upe-accent-matte-gold text-white"
                                   : "bg-upe-neutral-cool-ice text-upe-neutral-cool-steel-gray",
                               )}
-                              title={item.is_highlight ? "Dentro do Pareto (20%)" : "Fora do Pareto"}
+                              title={item.capital_priority ? (chefiaPareto ? "Pareto indicado pela chefia" : "Sem Pareto da chefia") : (chefiaPareto ? "Dentro do Pareto (20%)" : "Fora do Pareto")}
                             >
-                              <Star size={14} weight={item.is_highlight ? "fill" : "bold"} />
+                              <Star size={14} weight={chefiaPareto ? "fill" : "bold"} />
                             </span>
                           </div>
                         </div>
@@ -1980,6 +2031,22 @@ export default function ConsolidationPage() {
                       {isExpanded ? (
                         <div className="mt-4 grid gap-4 border-t border-[#E6EDF7] pt-4 lg:grid-cols-[1fr_1fr]">
                           <div className="space-y-3">
+                            {item.capital_priority ? (
+                              <div className="rounded-xl border border-[#C9D8EF] bg-[#F4F8FF] p-3 text-xs text-[#17315D]">
+                                <p className="font-semibold">Pontuação de capital · {item.capital_priority.version}</p>
+                                {item.capital_priority.status === "pending" ? (
+                                  <p className="mt-1">{item.capital_priority.reason}</p>
+                                ) : (
+                                  <div className="mt-2 space-y-1 tabular-nums">
+                                    <p>Chefia: {item.capital_priority.humanScore?.toFixed(2)} · Pareto: +{item.capital_priority.paretoBonus?.toFixed(2)}</p>
+                                    <p>Concentração no campus: −{item.capital_priority.campusPenalty?.toFixed(2)} · acréscimo da unidade: −{item.capital_priority.unitIncrement?.toFixed(2)}</p>
+                                    <p>Carteira do campus: {item.capital_priority.campusTotal?.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} ({item.capital_priority.campusSize} necessidades)</p>
+                                    <p>Referência do campus: {item.capital_priority.campusReference?.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
+                                    {item.capital_priority.unitReference !== undefined ? <p>Referência da unidade: {item.capital_priority.unitReference.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} ({item.capital_priority.unitSize} necessidades)</p> : <p>Unidade sem amostra suficiente para ajuste local.</p>}
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-medium text-black/50">
                               <span>Variações {item.description_variants}</span>
                               <span className="text-black/25">•</span>
@@ -2002,9 +2069,10 @@ export default function ConsolidationPage() {
                                 max={4}
                                 step={1}
                                 value={item.criticidade_level}
+                                disabled={Boolean(item.capital_priority)}
                                 onChange={(event) =>
                                   updateItemLevel(
-                                    item.siad,
+                                    item.item_key,
                                     "criticidade_level",
                                     Number(event.target.value),
                                   )
@@ -2027,9 +2095,10 @@ export default function ConsolidationPage() {
                                 max={4}
                                 step={1}
                                 value={item.priorizacao_level}
+                                disabled={Boolean(item.capital_priority)}
                                 onChange={(event) =>
                                   updateItemLevel(
-                                    item.siad,
+                                    item.item_key,
                                     "priorizacao_level",
                                     Number(event.target.value),
                                   )
