@@ -9,7 +9,7 @@
     "test": "tsx --test src/lib/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:db": "psql \"$DATABASE_URL\" -f supabase-migrations/tests/run_all.sql",
+    "test:db": "psql \"$DATABASE_URL\" -f supabase/tests/run_all.sql",
     "lint": "eslint src scripts e2e next.config.ts eslint.config.mjs postcss.config.mjs tailwind.config.js playwright.config.ts",
     "audit:unused": "npx --yes knip@6.41.0 --config knip.json --include files --no-progress",
     "design:audit": "node scripts/audit-design-system.mjs",

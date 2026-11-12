@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Warning } from "@/components/icons/phosphor/exports/Warning";
 import { ArrowLeft } from "@/components/icons/phosphor/exports/ArrowLeft";

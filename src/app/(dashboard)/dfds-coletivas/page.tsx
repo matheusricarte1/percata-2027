@@ -537,7 +537,6 @@ export default function DfdsColetivasPage() {
     });
   }, [draft.selectedUnitKeys, units]);
 
-  const selectedUnitIsChefia = selectedUnit?.role_in_unit === "chefia";
   const proposalScope = useMemo(() => buildCollectiveScope(draft), [draft]);
   const planningSubsidies = useMemo(() => buildPlanningSubsidies(draft), [draft]);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ClockCounterClockwise } from "@/components/icons/phosphor/exports/ClockCounterClockwise";
 import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";

@@ -568,43 +568,6 @@ export default function AdminUsuarios() {
     fetchPendingLegacyLinks();
   }, []);
 
-  const handleUpdateRole = async (user: UserRow, newRole: string) => {
-    if (newRole === "admin" && currentUserRole !== "superadmin") {
-      toast.warning("Somente superadmin pode atribuir perfil admin.");
-      return;
-    }
-    if (!user.profile_id) {
-      toast.info("Usuário importado sem perfil local. Sincronize os acessos primeiro.");
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/admin/users/manage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "update_role",
-          profile_id: user.profile_id,
-          role: newRole,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "Falha ao atualizar papel.");
-      }
-
-      toast.success(UX_SUCCESS.saved);
-      await Promise.all([fetchUsuarios(), fetchAuditLogs()]);
-    } catch (error: any) {
-      toast.error(
-        getFriendlyErrorMessage(
-          error,
-          "Não conseguimos atualizar o perfil deste usuário agora.",
-        ),
-      );
-    }
-  };
-
   const openEditPanel = (user: UserRow) => {
     setActionUser(null);
     setEditingUser(user);

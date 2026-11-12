@@ -1,7 +1,7 @@
 "use client";
 import { useSubmissionPolicy } from "@/lib/use-submission-policy";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "@/components/icons/phosphor/exports/Plus";
 import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";

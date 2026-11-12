@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Printer } from "@/components/icons/phosphor/exports/Printer";
 import { DownloadSimple } from "@/components/icons/phosphor/exports/DownloadSimple";
 import { SealCheck } from "@/components/icons/phosphor/exports/SealCheck";

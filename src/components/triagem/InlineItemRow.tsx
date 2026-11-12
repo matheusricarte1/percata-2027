@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BarChart3 } from "@/components/icons/lucide/exports/BarChart3";
 import { Barcode } from "@/components/icons/lucide/exports/Barcode";
 import { Box } from "@/components/icons/lucide/exports/Box";

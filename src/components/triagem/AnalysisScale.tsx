@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { AlertTriangle } from "@/components/icons/lucide/exports/AlertTriangle";
 import { Flag } from "@/components/icons/lucide/exports/Flag";
 import { RotateCcw } from "@/components/icons/lucide/exports/RotateCcw";

@@ -653,29 +653,6 @@ export default function NovaDFDPage() {
     });
   };
 
-  const updateGroupPlanningSubsidy = (
-    groupIndex: number,
-    field: string,
-    value: string,
-  ) => {
-    setDfdGroups((prev) =>
-      prev.map((group, index) =>
-        index === groupIndex
-          ? {
-              ...group,
-              formData: {
-                ...group.formData,
-                planning_subsidies: {
-                  ...group.formData.planning_subsidies,
-                  [field]: value,
-                },
-              },
-            }
-          : group,
-      ),
-    );
-  };
-
   const applyRoutingRecommendation = (groupIndex: number) => {
     setDfdGroups((prev) => {
       const next = prev.map((group, index) =>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { describeChanges, type AnalysisItem } from "@/lib/dfd-analysis";
 type HistoryRow = {

@@ -4,8 +4,6 @@ import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/su
 import { toPublicSiteUrl } from "@/lib/site-url";
 import { createClient } from "@/utils/supabase/server";
 
-const WELCOME_TITLE = "Seu acesso institucional está pronto";
-
 /**
  * Persiste a primeira comunicação após o usuário concluir campus e vínculos.
  * O endpoint pode ser chamado novamente após uma recarga sem repetir o e-mail.
