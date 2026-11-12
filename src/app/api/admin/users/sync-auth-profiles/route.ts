@@ -28,7 +28,7 @@ function isMissingLegacyTableError(error: any): boolean {
 }
 
 export const POST = withAuthorizedRole(
-  ["admin", "superadmin"],
+  ["superadmin"],
   async ({ request, supabaseAdmin, user }) => {
     // Sync varre todo auth.users + faz upsert + linka legacy. É caro: 2/min basta.
     const limited = await enforceRateLimit(

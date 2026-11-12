@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MagnifyingGlass, TrendUp, CursorClick, Sparkle, WarningCircle } from "@phosphor-icons/react";
+import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";
+import { TrendUp } from "@/components/icons/phosphor/exports/TrendUp";
+import { CursorClick } from "@/components/icons/phosphor/exports/CursorClick";
+import { Sparkle } from "@/components/icons/phosphor/exports/Sparkle";
+import { WarningCircle } from "@/components/icons/phosphor/exports/WarningCircle";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { MechanicalValue } from "@/components/ui/MechanicalValue";
 
 type Metrics = {
   searches_7d: number;
@@ -233,23 +238,23 @@ export default function AdminCatalogoBuscaPage() {
 
   return (
     <main className="space-y-6">
-      <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
+      <section className="rounded-[28px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#526070]">
+            <p className="type-caption font-semibold uppercase tracking-[0.18em] text-[var(--p-color-fg-muted)]">
               Administração
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#164073]">
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
               Busca do catálogo
             </h1>
-            <p className="mt-2 max-w-3xl text-sm text-[#526070]">
+            <p className="mt-2 max-w-3xl text-sm text-[var(--p-color-fg-muted)]">
               Leituras reais da busca: consultas feitas, itens escolhidos e overrides manuais para subir ou bloquear resultados.
             </p>
           </div>
           <button
             type="button"
             onClick={loadInsights}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#CBD5E1] px-4 text-sm font-semibold text-[#164073]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[var(--p-color-border-strong)] px-4 text-sm font-semibold text-[var(--p-color-brand-500)]"
           >
             <MagnifyingGlass size={16} weight="bold" /> Atualizar
           </button>
@@ -310,11 +315,11 @@ export default function AdminCatalogoBuscaPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
-        <div className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-[#164073]">Consultas observadas</h2>
-              <p className="mt-1 text-sm text-[#526070]">
+              <h2 className="text-xl font-semibold text-[var(--p-color-brand-500)]">Consultas observadas</h2>
+              <p className="mt-1 text-sm text-[var(--p-color-fg-muted)]">
                 Use a query real e o item clicado como base para calibrar overrides.
               </p>
             </div>
@@ -322,13 +327,13 @@ export default function AdminCatalogoBuscaPage() {
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
               placeholder="Filtrar query, item ou código"
-              className="h-11 rounded-2xl border border-[#CBD5E1] px-4 text-sm outline-none focus:border-[#164073]"
+              className="h-11 rounded-2xl border border-[var(--p-color-border-strong)] px-4 text-sm outline-none focus:border-[var(--p-color-brand-500)]"
             />
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-2xl border border-[#E5EDF5]">
+          <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--p-color-border-muted)]">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#F8FAFC] text-[#526070]">
+              <thead className="bg-[var(--p-color-surface-soft)] text-[var(--p-color-fg-muted)]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Query</th>
                   <th className="px-4 py-3 font-semibold">Uso</th>
@@ -339,23 +344,23 @@ export default function AdminCatalogoBuscaPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-[#667085]">
+                    <td colSpan={4} className="px-4 py-6 text-center text-[var(--p-color-fg-muted)]">
                       Carregando consultas...
                     </td>
                   </tr>
                 ) : visibleQueries.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-[#667085]">
+                    <td colSpan={4} className="px-4 py-6 text-center text-[var(--p-color-fg-muted)]">
                       Nenhuma consulta encontrada.
                     </td>
                   </tr>
                 ) : (
                   visibleQueries.map((query) => (
-                    <tr key={query.query_norm} className="border-t border-[#EEF2F7] align-top">
+                    <tr key={query.query_norm} className="border-t border-[var(--p-color-surface-muted)] align-top">
                       <td className="px-4 py-4">
-                        <div className="font-semibold text-[#0F172A]">{query.query_label}</div>
-                        <div className="mt-1 text-xs text-[#667085]">{query.query_norm}</div>
-                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[#526070]">
+                        <div className="font-semibold text-[var(--p-color-fg)]">{query.query_label}</div>
+                        <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">{query.query_norm}</div>
+                        <div className="mt-2 flex flex-wrap gap-2 type-caption text-[var(--p-color-fg-muted)]">
                           {query.contexts.map((context) => (
                             <span key={context} className="rounded-full bg-[#F3F6FB] px-2 py-1">
                               {context}
@@ -363,20 +368,20 @@ export default function AdminCatalogoBuscaPage() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-[#344054]">
+                      <td className="px-4 py-4 text-[var(--p-color-fg-default)]">
                         <div>{query.searches} busca(s)</div>
                         <div>{query.clicks} clique(s)</div>
                         <div>{query.zero_result_searches} sem resultado</div>
-                        <div className="mt-1 text-xs text-[#667085]">
+                        <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                           Última: {formatDateTime(query.last_searched_at)} · {query.latest_result_count} resultado(s)
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-[#344054]">
+                      <td className="px-4 py-4 text-[var(--p-color-fg-default)]">
                         <div className="font-medium">{query.top_clicked_label || "Sem clique ainda"}</div>
-                        <div className="mt-1 text-xs text-[#667085]">
+                        <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                           {query.top_clicked_code || "Sem código"}
                         </div>
-                        <div className="mt-1 text-xs text-[#667085]">
+                        <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                           Média de resultados: {Math.round(query.avg_result_count)}
                         </div>
                       </td>
@@ -385,14 +390,14 @@ export default function AdminCatalogoBuscaPage() {
                           <button
                             type="button"
                             onClick={() => prefillOverride(query.query_norm, query, "boost")}
-                            className="rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white"
+                            className="rounded-xl bg-[var(--p-color-brand-500)] px-3 py-2 text-xs font-semibold text-white"
                           >
                             Boostar
                           </button>
                           <button
                             type="button"
                             onClick={() => prefillOverride(query.query_norm, query, "block")}
-                            className="rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#7A271A]"
+                            className="rounded-xl border border-[var(--p-color-border-strong)] px-3 py-2 text-xs font-semibold text-[var(--p-color-danger)]"
                           >
                             Bloquear
                           </button>
@@ -407,22 +412,22 @@ export default function AdminCatalogoBuscaPage() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-[#164073]">Novo override</h2>
-            <p className="mt-1 text-sm text-[#526070]">
+          <section className="rounded-[28px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[var(--p-color-brand-500)]">Novo override</h2>
+            <p className="mt-1 text-sm text-[var(--p-color-fg-muted)]">
               Crie uma regra explícita para uma query problemática.
             </p>
             <div className="mt-5 grid gap-4">
-              <label className="text-sm font-medium text-[#344054]">
+              <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                 Query normalizada
                 <input
                   value={draft.query_norm}
                   onChange={(event) => setDraft((current) => ({ ...current, query_norm: event.target.value }))}
-                  className="mt-2 h-11 w-full rounded-2xl border border-[#CBD5E1] px-4 outline-none focus:border-[#164073]"
+                  className="mt-2 h-11 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 outline-none focus:border-[var(--p-color-brand-500)]"
                 />
               </label>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="text-sm font-medium text-[#344054]">
+                <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                   Modo
                   <select
                     value={draft.match_mode}
@@ -432,13 +437,13 @@ export default function AdminCatalogoBuscaPage() {
                         match_mode: event.target.value as OverrideDraft["match_mode"],
                       }))
                     }
-                    className="mt-2 h-11 w-full rounded-2xl border border-[#CBD5E1] px-4 outline-none focus:border-[#164073]"
+                    className="mt-2 h-11 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 outline-none focus:border-[var(--p-color-brand-500)]"
                   >
                     <option value="exact">Exato</option>
                     <option value="contains">Contém</option>
                   </select>
                 </label>
-                <label className="text-sm font-medium text-[#344054]">
+                <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                   Tipo
                   <select
                     value={draft.override_type}
@@ -448,7 +453,7 @@ export default function AdminCatalogoBuscaPage() {
                         override_type: event.target.value as OverrideDraft["override_type"],
                       }))
                     }
-                    className="mt-2 h-11 w-full rounded-2xl border border-[#CBD5E1] px-4 outline-none focus:border-[#164073]"
+                    className="mt-2 h-11 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 outline-none focus:border-[var(--p-color-brand-500)]"
                   >
                     <option value="boost">Boost</option>
                     <option value="block">Block</option>
@@ -456,67 +461,67 @@ export default function AdminCatalogoBuscaPage() {
                 </label>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="text-sm font-medium text-[#344054]">
+                <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                   Catalog ID
                   <input
                     value={draft.catalog_id}
                     onChange={(event) => setDraft((current) => ({ ...current, catalog_id: event.target.value }))}
-                    className="mt-2 h-11 w-full rounded-2xl border border-[#CBD5E1] px-4 outline-none focus:border-[#164073]"
+                    className="mt-2 h-11 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 outline-none focus:border-[var(--p-color-brand-500)]"
                   />
                 </label>
-                <label className="text-sm font-medium text-[#344054]">
+                <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                   Código e-Fisco
                   <input
                     value={draft.codigo_efisco}
                     onChange={(event) => setDraft((current) => ({ ...current, codigo_efisco: event.target.value }))}
-                    className="mt-2 h-11 w-full rounded-2xl border border-[#CBD5E1] px-4 outline-none focus:border-[#164073]"
+                    className="mt-2 h-11 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 outline-none focus:border-[var(--p-color-brand-500)]"
                   />
                 </label>
               </div>
-              <label className="text-sm font-medium text-[#344054]">
+              <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                 Peso
                 <input
                   value={draft.weight}
                   onChange={(event) => setDraft((current) => ({ ...current, weight: event.target.value }))}
-                  className="mt-2 h-11 w-full rounded-2xl border border-[#CBD5E1] px-4 outline-none focus:border-[#164073]"
+                  className="mt-2 h-11 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 outline-none focus:border-[var(--p-color-brand-500)]"
                 />
               </label>
-              <label className="text-sm font-medium text-[#344054]">
+              <label className="text-sm font-medium text-[var(--p-color-fg-default)]">
                 Observação
                 <textarea
                   value={draft.notes}
                   onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
                   rows={4}
-                  className="mt-2 w-full rounded-2xl border border-[#CBD5E1] px-4 py-3 outline-none focus:border-[#164073]"
+                  className="mt-2 w-full rounded-2xl border border-[var(--p-color-border-strong)] px-4 py-3 outline-none focus:border-[var(--p-color-brand-500)]"
                 />
               </label>
               <button
                 type="button"
                 onClick={createOverride}
                 disabled={saving}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#164073] px-4 text-sm font-semibold text-white disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--p-color-brand-500)] px-4 text-sm font-semibold text-white disabled:opacity-60"
               >
                 <Sparkle size={16} weight="bold" /> {saving ? "Salvando..." : "Salvar override"}
               </button>
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-[#164073]">Overrides ativos e históricos</h2>
+          <section className="rounded-[28px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[var(--p-color-brand-500)]">Overrides ativos e históricos</h2>
             <div className="mt-5 space-y-3">
               {(payload?.overrides || []).map((override) => (
                 <div
                   key={override.id}
-                  className="rounded-2xl border border-[#E5EDF5] p-4"
+                  className="rounded-2xl border border-[var(--p-color-border-muted)] p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-[#0F172A]">{override.query_norm}</div>
-                      <div className="mt-1 text-xs text-[#667085]">
+                      <div className="font-semibold text-[var(--p-color-fg)]">{override.query_norm}</div>
+                      <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                         {override.override_type} · {override.match_mode} · código {override.codigo_efisco || "—"} · peso {override.weight}
                       </div>
                       {override.notes && (
-                        <p className="mt-2 text-sm text-[#344054]">{override.notes}</p>
+                        <p className="mt-2 text-sm text-[var(--p-color-fg-default)]">{override.notes}</p>
                       )}
                     </div>
                     <button
@@ -525,35 +530,35 @@ export default function AdminCatalogoBuscaPage() {
                       className={cn(
                         "rounded-xl px-3 py-2 text-xs font-semibold",
                         override.is_active
-                          ? "bg-[#FEF3F2] text-[#B42318]"
+                          ? "bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]"
                           : "bg-[#ECFDF3] text-[#027A48]",
                       )}
                     >
                       {override.is_active ? "Desativar" : "Ativar"}
                     </button>
                   </div>
-                  <div className="mt-2 text-xs text-[#667085]">
+                  <div className="mt-2 text-xs text-[var(--p-color-fg-muted)]">
                     Atualizado em {formatDateTime(override.updated_at)}
                   </div>
                 </div>
               ))}
               {(payload?.overrides || []).length === 0 && (
-                <p className="text-sm text-[#667085]">Nenhum override cadastrado.</p>
+                <p className="text-sm text-[var(--p-color-fg-muted)]">Nenhum override cadastrado.</p>
               )}
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-[#164073]">Buscas recentes</h2>
+          <section className="rounded-[28px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[var(--p-color-brand-500)]">Buscas recentes</h2>
             <div className="mt-4 space-y-3">
               {(payload?.recentLogs || []).slice(0, 10).map((log) => (
-                <div key={log.id} className="rounded-2xl border border-[#E5EDF5] p-4">
+                <div key={log.id} className="rounded-2xl border border-[var(--p-color-border-muted)] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-[#0F172A]">
+                      <div className="font-semibold text-[var(--p-color-fg)]">
                         {log.query_text || log.query_norm}
                       </div>
-                      <div className="mt-1 text-xs text-[#667085]">
+                      <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                         {log.context} · {log.source} · {formatDateTime(log.created_at)}
                       </div>
                     </div>
@@ -561,7 +566,7 @@ export default function AdminCatalogoBuscaPage() {
                       className={cn(
                         "rounded-full px-2.5 py-1 text-xs font-semibold",
                         log.result_count === 0
-                          ? "bg-[#FEF3F2] text-[#B42318]"
+                          ? "bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]"
                           : "bg-[#ECFDF3] text-[#027A48]",
                       )}
                     >
@@ -572,7 +577,7 @@ export default function AdminCatalogoBuscaPage() {
                     <button
                       type="button"
                       onClick={() => prefillOverride(log.query_norm || log.query_text, undefined, "boost")}
-                      className="rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white"
+                      className="rounded-xl bg-[var(--p-color-brand-500)] px-3 py-2 text-xs font-semibold text-white"
                     >
                       Preparar boost
                     </button>
@@ -580,7 +585,7 @@ export default function AdminCatalogoBuscaPage() {
                       <button
                         type="button"
                         onClick={() => prefillOverride(log.query_norm || log.query_text, undefined, "boost")}
-                        className="rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#164073]"
+                        className="rounded-xl border border-[var(--p-color-border-strong)] px-3 py-2 text-xs font-semibold text-[var(--p-color-brand-500)]"
                       >
                         Tratar gap
                       </button>
@@ -591,17 +596,17 @@ export default function AdminCatalogoBuscaPage() {
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-[#DDE5EF] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-[#164073]">Cliques recentes</h2>
+          <section className="rounded-[28px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[var(--p-color-brand-500)]">Cliques recentes</h2>
             <div className="mt-4 space-y-3">
               {(payload?.recentClicks || []).slice(0, 12).map((click) => (
-                <div key={click.id} className="rounded-2xl border border-[#E5EDF5] p-4">
+                <div key={click.id} className="rounded-2xl border border-[var(--p-color-border-muted)] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-[#0F172A]">
+                      <div className="font-semibold text-[var(--p-color-fg)]">
                         {click.item_descricao || click.codigo_efisco || "Item"}
                       </div>
-                      <div className="mt-1 text-xs text-[#667085]">
+                      <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                         {click.query_text || click.query_norm || "Sem query"} · {click.action_type} · {formatDateTime(click.created_at)}
                       </div>
                     </div>
@@ -609,14 +614,14 @@ export default function AdminCatalogoBuscaPage() {
                       <button
                         type="button"
                         onClick={() => prefillOverride(click.query_norm || click.query_text || "", click, "boost")}
-                        className="rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white"
+                        className="rounded-xl bg-[var(--p-color-brand-500)] px-3 py-2 text-xs font-semibold text-white"
                       >
                         Boost
                       </button>
                       <button
                         type="button"
                         onClick={() => prefillOverride(click.query_norm || click.query_text || "", click, "block")}
-                        className="rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#7A271A]"
+                        className="rounded-xl border border-[var(--p-color-border-strong)] px-3 py-2 text-xs font-semibold text-[var(--p-color-danger)]"
                       >
                         Block
                       </button>
@@ -642,14 +647,16 @@ function MetricCard({
   icon: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] border border-[#DDE5EF] bg-white p-5 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--p-color-border-muted)] bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-[#526070]">{label}</span>
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F3F6FB] text-[#164073]">
+        <span className="text-sm font-medium text-[var(--p-color-fg-muted)]">{label}</span>
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F3F6FB] text-[var(--p-color-brand-500)]">
           {icon}
         </span>
       </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight text-[#164073]">{value}</div>
+      <div className="mt-4 min-w-0 overflow-visible text-3xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
+        <MechanicalValue value={value} />
+      </div>
     </section>
   );
 }
@@ -673,40 +680,40 @@ function QueueCard({
 }) {
   const accentClass =
     accent === "rose"
-      ? "bg-[#FEF3F2] text-[#B42318]"
+      ? "bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]"
       : accent === "amber"
-        ? "bg-[#FFFAEB] text-[#B54708]"
+        ? "bg-[#FFFAEB] text-[var(--p-color-warning)]"
         : "bg-[#EFF6FF] text-[#1D4ED8]";
 
   return (
-    <section className="rounded-[24px] border border-[#DDE5EF] bg-white p-5 shadow-sm">
+    <section className="rounded-[24px] border border-[var(--p-color-border-muted)] bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-semibold text-[#164073]">{title}</div>
-          <p className="mt-1 text-sm text-[#526070]">{description}</p>
+          <div className="text-sm font-semibold text-[var(--p-color-brand-500)]">{title}</div>
+          <p className="mt-1 text-sm text-[var(--p-color-fg-muted)]">{description}</p>
         </div>
         <span className={cn("inline-flex h-10 min-w-10 items-center justify-center rounded-2xl px-3 text-sm font-semibold", accentClass)}>
           {icon}
         </span>
       </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight text-[#164073]">{count}</div>
+      <div className="mt-4 text-3xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">{count}</div>
       <div className="mt-4 space-y-3">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#D7E2EE] px-4 py-4 text-sm text-[#667085]">
+          <div className="rounded-2xl border border-dashed border-[var(--p-color-border)] px-4 py-4 text-sm text-[var(--p-color-fg-muted)]">
             Nada crítico nesta fila agora.
           </div>
         ) : (
           items.slice(0, 3).map((query) => (
-            <div key={query.query_norm} className="rounded-2xl border border-[#E5EDF5] px-4 py-3">
-              <div className="font-semibold text-[#0F172A]">{query.query_label}</div>
-              <div className="mt-1 text-xs text-[#667085]">
+            <div key={query.query_norm} className="rounded-2xl border border-[var(--p-color-border-muted)] px-4 py-3">
+              <div className="font-semibold text-[var(--p-color-fg)]">{query.query_label}</div>
+              <div className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                 {query.searches} busca(s) · {query.clicks} clique(s) · última em {formatDateTime(query.last_searched_at)}
               </div>
               <div className="mt-3">
                 <button
                   type="button"
                   onClick={() => onBoost(query)}
-                  className="rounded-xl bg-[#164073] px-3 py-2 text-xs font-semibold text-white"
+                  className="rounded-xl bg-[var(--p-color-brand-500)] px-3 py-2 text-xs font-semibold text-white"
                 >
                   Abrir no override
                 </button>

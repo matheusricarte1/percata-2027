@@ -1,10 +1,25 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
+import { cleanupUnsafeLocalStorage } from "@/lib/browser-storage";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabasePublishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE!;
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+cleanupUnsafeLocalStorage();
+
+export const supabase = createBrowserClient(supabaseUrl, supabasePublishable, {
+  auth: {
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: "pkce",
+    persistSession: true,
+  },
+  cookieOptions: {
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  },
+});
 let inFlightSafeUser: Promise<User | null> | null = null;
 
 function isAuthLockRaceError(error: unknown): boolean {

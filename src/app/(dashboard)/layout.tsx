@@ -104,7 +104,7 @@ export default function DashboardLayout({
       role={role}
       title={titles[role]}
       searchPlaceholder="Pesquisar no sistema..."
-      titleClassName="text-[#164073]"
+      titleClassName="text-[var(--p-color-brand-500)]"
       showUnreadCount
     >
       {children}

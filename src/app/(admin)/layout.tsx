@@ -43,7 +43,7 @@ export default function AdminLayout({
           ? "Painel Institucional (Superadmin)"
           : "Painel de Administração"
       }
-      titleClassName="text-[#164073]"
+      titleClassName="text-[var(--p-color-brand-500)]"
       searchPlaceholder="Pesquisar informações gerais..."
     >
       {children}

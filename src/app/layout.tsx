@@ -1,7 +1,13 @@
+import type { CSSProperties, ReactNode } from "react";
 import type { Metadata } from "next";
-import "./globals.css";
-import { AppProviders } from "@/components/providers/AppProviders";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { AppProviders } from "@/components/providers/AppProviders";
+import "./globals.css";
+
+const rootFontVariables = {
+  "--font-inter": '"Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif',
+  "--font-outfit": '"Segoe UI Semibold", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif',
+} as CSSProperties;
 
 export const metadata: Metadata = {
   title: "PERCATA | UPE Campus Petrolina & Ouricuri",
@@ -12,22 +18,10 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="pt-BR" suppressHydrationWarning style={rootFontVariables}>
       <body className="min-h-screen bg-background antialiased">
         <InitColorSchemeScript
           attribute="class"

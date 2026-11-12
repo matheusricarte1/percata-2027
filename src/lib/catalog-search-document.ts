@@ -16,6 +16,10 @@ export type CatalogSearchRow = {
   codigo_natureza_preferencial?: string | null;
   gnd_preferencial?: string | null;
   natureza_count?: number | string | null;
+  has_mixed_expense_classes?: boolean | null;
+  has_missing_natureza?: boolean | null;
+  gnds?: string[] | null;
+  naturezas?: string[] | null;
   unidade_medida?: string | null;
   rank?: number | null;
 };
@@ -41,6 +45,10 @@ export type CatalogSearchDocument = {
   codigo_natureza_preferencial: string;
   gnd_preferencial: string;
   natureza_count: number;
+  has_mixed_expense_classes?: boolean;
+  has_missing_natureza?: boolean;
+  gnds?: string[];
+  naturezas?: string[];
   unidade_medida: string;
 };
 
@@ -97,6 +105,10 @@ export function buildCatalogSearchDocument(row: CatalogSearchRow): CatalogSearch
     codigo_natureza_preferencial: cleanText(row.codigo_natureza_preferencial),
     gnd_preferencial: cleanText(row.gnd_preferencial),
     natureza_count: Number(row.natureza_count || 0),
+    has_mixed_expense_classes: Boolean(row.has_mixed_expense_classes),
+    has_missing_natureza: Boolean(row.has_missing_natureza),
+    gnds: row.gnds || [],
+    naturezas: row.naturezas || [],
     unidade_medida: cleanText(row.unidade_medida || "UN"),
   };
 }
@@ -120,6 +132,10 @@ export function catalogDocumentToRow(document: CatalogSearchDocument, rank = 0):
     codigo_natureza_preferencial: document.codigo_natureza_preferencial,
     gnd_preferencial: document.gnd_preferencial,
     natureza_count: document.natureza_count,
+    has_mixed_expense_classes: Boolean(document.has_mixed_expense_classes),
+    has_missing_natureza: Boolean(document.has_missing_natureza),
+    gnds: document.gnds || [],
+    naturezas: document.naturezas || [],
     unidade_medida: document.unidade_medida,
     rank,
   };

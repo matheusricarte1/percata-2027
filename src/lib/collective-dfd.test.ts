@@ -10,6 +10,9 @@ import {
   canEditCollectiveRoom,
   canPublishCollectiveRoom,
   canReopenCollectiveRoom,
+  formatCollectiveDistributionText,
+  formatCollectiveJustificationText,
+  formatParsedCollectiveDistribution,
   parseCollectiveDistributionText,
   splitCollectiveItemsByExpenseClass,
   stripCollectiveContributionProfileFields,
@@ -117,6 +120,24 @@ describe("collective-dfd", () => {
       { name: "Joao", quantidade: 1.5 },
       { name: "Ana", quantidade: 3 },
     ]);
+    assert.equal(
+      formatParsedCollectiveDistribution(result),
+      "Maria Silva: 2; Joao: 1.5; Ana: 3",
+    );
+    assert.equal(
+      formatCollectiveDistributionText(
+        "Uso comum.\nDistribuicao por usuario: Maria Silva: 2; Joao: 1",
+      ),
+      "Maria Silva: 2; Joao: 1",
+    );
+  });
+
+  it("formats item justification without internal collective metadata", () => {
+    const result = formatCollectiveJustificationText(
+      "Necessário para aulas.\nhttps://percata.vercel.app/dfd/abc\nDistribuicao por usuario: Ana: 1",
+    );
+
+    assert.equal(result, "Necessário para aulas.");
   });
 
   it("lets proposal owners edit only their own proposal metadata", () => {

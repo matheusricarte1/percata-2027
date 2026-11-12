@@ -34,7 +34,7 @@ export function buildChefiaAssignmentMap(
 ) {
   const unitTypeById = new Map(units.map((unit) => [unit.id, unit.type]));
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
-  const map = new Map<string, ChefiaAssignment>();
+  const map = new Map<string, ChefiaAssignment[]>();
 
   for (const row of userUnits) {
     if (!row.unit_id || !row.user_id) continue;
@@ -44,14 +44,16 @@ export function buildChefiaAssignmentMap(
     if (!expectedType || expectedType !== unitType) continue;
 
     const key = `${unitType}:${row.unit_id}`;
-    if (map.has(key)) continue;
+    const assignments = map.get(key) || [];
+    if (assignments.some((person) => person.user_id === String(row.user_id))) continue;
 
     const profile = profileById.get(String(row.user_id));
-    map.set(key, {
+    assignments.push({
       user_id: String(row.user_id),
       full_name: profile?.full_name || null,
       email: profile?.email || null,
     });
+    map.set(key, assignments);
   }
 
   return map;

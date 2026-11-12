@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { withAuthorizedRole } from "@/lib/api-auth";
+import {
+  normalizeCatalogCode,
+  resolveLegacyCatalogIdsByCode,
+} from "@/lib/catalog-legacy-bridge";
 
 type DfdRecord = {
   id: string;
@@ -74,29 +78,40 @@ export const POST = withAuthorizedRole(
 
     const codes = Array.from(new Set(items.map(getItemCode)));
     const { data: catalogItems, error: catalogError } = await admin
-      .from("catalogo")
+      .from("catalogo_efisco_v2")
       .select("id,codigo_efisco")
       .in("codigo_efisco", codes);
     if (catalogError) throw catalogError;
 
+    const legacyIdByCode = await resolveLegacyCatalogIdsByCode(
+      admin,
+      (catalogItems || []).map((item: any) => normalizeCatalogCode(item.codigo_efisco)),
+    );
+
     const catalogByCode = new Map(
-      (catalogItems || []).map((item: any) => [
-        String(item.codigo_efisco || "").trim(),
-        item,
-      ]),
+      (catalogItems || []).map((item: any) => {
+        const code = normalizeCatalogCode(item.codigo_efisco);
+        return [
+          code,
+          {
+            ...item,
+            legacy_catalogo_id: legacyIdByCode.get(code) || null,
+          },
+        ];
+      }),
     );
     const kitRows = items
       .map((item) => {
         const catalogItem = catalogByCode.get(getItemCode(item));
-        if (!catalogItem) return null;
+        if (!catalogItem?.legacy_catalogo_id) return null;
         return {
-          item_id: catalogItem.id,
+          item_id: catalogItem.legacy_catalogo_id,
           quantidade: Math.max(1, Math.floor(Number(item.quantidade || 1))),
         };
       })
       .filter(Boolean) as Array<{ item_id: number | string; quantidade: number }>;
 
-    const unmatched = codes.filter((code) => !catalogByCode.has(code));
+    const unmatched = codes.filter((code) => !catalogByCode.get(code)?.legacy_catalogo_id);
     if (kitRows.length === 0) {
       return NextResponse.json(
         {

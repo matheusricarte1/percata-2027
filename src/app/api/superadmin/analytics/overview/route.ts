@@ -1174,7 +1174,7 @@ function buildSegmentAnalytics(
 }
 
 export const GET = withAuthorizedRole(
-  ["superadmin"],
+  ["admin", "superadmin"],
   async ({ request, supabaseAdmin }) => {
     const admin = supabaseAdmin!;
     const windowMonths = parseWindowMonths(
@@ -1185,6 +1185,9 @@ export const GET = withAuthorizedRole(
     );
     const now = monthFloor(new Date());
     const since = shiftMonths(now, -(windowMonths - 1));
+    const profilesPromise = admin
+      .from("profiles")
+      .select("role,campus_id,created_at");
 
     const currentDfds = (await fetchEligibleDfds(admin, since.toISOString())).map((row) => ({
       ...row,
@@ -1278,6 +1281,20 @@ export const GET = withAuthorizedRole(
         desvioPadrao: normalizeCurrency(row.desvioPadrao),
         zScore: normalizeCurrency(row.zScore),
       }));
+    const { data: profileRows } = await profilesPromise;
+    const peopleRows = profileRows || [];
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setUTCDate(ninetyDaysAgo.getUTCDate() - 90);
+    const roleCounts = peopleRows.reduce<Record<string, number>>((acc, row) => {
+      const role = String(row.role || "solicitante");
+      acc[role] = (acc[role] || 0) + 1;
+      return acc;
+    }, {});
+    const withCampus = peopleRows.filter((row) => Boolean(row.campus_id)).length;
+    const recentProfiles = peopleRows.filter((row) => {
+      const createdAt = new Date(String(row.created_at || ""));
+      return Number.isFinite(createdAt.getTime()) && createdAt >= ninetyDaysAgo;
+    }).length;
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
@@ -1309,6 +1326,13 @@ export const GET = withAuthorizedRole(
       price_outliers_mode: priceOutliersMode,
       price_outliers_reason: priceOutliersReason,
       price_watchlist: priceWatchlist,
+      people: {
+        total_profiles: peopleRows.length,
+        with_campus: withCampus,
+        campus_coverage_pct: percentage(withCampus, peopleRows.length),
+        recent_profiles_90d: recentProfiles,
+        role_counts: roleCounts,
+      },
       segments: {
         legacy: legacySegment,
         current: currentSegment,

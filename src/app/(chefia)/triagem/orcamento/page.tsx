@@ -3,26 +3,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Boxes,
-  CheckCircle2,
-  Clock3,
-  Download,
-  FileSpreadsheet,
-  Filter,
-  GitBranch,
-  Grid3X3,
-  Layers3,
-  LineChart,
-  Network,
-  RefreshCw,
-  Search,
-  TimerReset,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
+import { AlertTriangle } from "@/components/icons/lucide/exports/AlertTriangle";
+import { ArrowRight } from "@/components/icons/lucide/exports/ArrowRight";
+import { Boxes } from "@/components/icons/lucide/exports/Boxes";
+import { CheckCircle2 } from "@/components/icons/lucide/exports/CheckCircle2";
+import { Clock3 } from "@/components/icons/lucide/exports/Clock3";
+import { Download } from "@/components/icons/lucide/exports/Download";
+import { FileSpreadsheet } from "@/components/icons/lucide/exports/FileSpreadsheet";
+import { Filter } from "@/components/icons/lucide/exports/Filter";
+import { GitBranch } from "@/components/icons/lucide/exports/GitBranch";
+import { Grid3X3 } from "@/components/icons/lucide/exports/Grid3X3";
+import { Layers3 } from "@/components/icons/lucide/exports/Layers3";
+import { LineChart } from "@/components/icons/lucide/exports/LineChart";
+import { Network } from "@/components/icons/lucide/exports/Network";
+import { RefreshCw } from "@/components/icons/lucide/exports/RefreshCw";
+import { Search } from "@/components/icons/lucide/exports/Search";
+import { TimerReset } from "@/components/icons/lucide/exports/TimerReset";
+import { TrendingUp } from "@/components/icons/lucide/exports/TrendingUp";
+import { Wallet } from "@/components/icons/lucide/exports/Wallet";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { LoadingPanel, EmptyState } from "@/components/feedback/SystemFeedback";
 import { toast } from "sonner";
@@ -30,11 +28,16 @@ import { getSafeUser, supabase } from "@/lib/supabase";
 import { normalizeRole } from "@/lib/access";
 import { parseCollectiveDistributionText } from "@/lib/collective-dfd";
 import {
+  buildCollectiveDistributionReportFields,
+  buildPlanningSubsidyReportFields,
   buildCsv as buildReportCsv,
   collectExportHeaders,
   protectReportRow,
 } from "@/lib/admin-reports";
+import type { DfdPlanningSubsidies } from "@/lib/dfd-planning";
 import { cn } from "@/lib/utils";
+import { AvatarStack } from "@/components/user/AvatarStack";
+import { MechanicalValue } from "@/components/ui/MechanicalValue";
 
 type DfdStatus =
   | "rascunho"
@@ -60,12 +63,18 @@ type ScopeOption = {
   unit_type?: string | null;
 };
 
+type PersonSummary = {
+  name: string;
+  avatarUrl: string | null;
+};
+
 interface DfdDashboardRow {
   id: string;
   numero_protocolo: string | null;
   objeto_contratacao: string | null;
   justificativa_contratacao: string | null;
   justificativa_quantidade?: string | null;
+  planning_subsidies?: DfdPlanningSubsidies | null;
   status: DfdStatus;
   valor_total_estimado: number | null;
   created_at: string | null;
@@ -75,6 +84,9 @@ interface DfdDashboardRow {
   analysis_unidade_id?: string | null;
   analysis_tipo_unidade?: string | null;
   prioridade?: number | null;
+  solicitante_id?: string | null;
+  solicitante?: PersonSummary | null;
+  chefia_responsavel?: PersonSummary | null;
   raw?: Record<string, unknown>;
 }
 
@@ -85,6 +97,11 @@ interface DfdItemDashboardRow {
   quantidade: number | null;
   valor_unitario_estimado: number | null;
   gnd: string | null;
+  gnd_derivado?: string | null;
+  codigo_natureza_despesa?: string | null;
+  codigo_tce?: string | null;
+  codigo_item_efisco?: string | null;
+  unidade_medida?: string | null;
   local_uso?: string | null;
   justificativa_item?: string | null;
   justificativa_quantidade?: string | null;
@@ -157,11 +174,11 @@ const GND_LABELS: Record<string, string> = {
 };
 
 const STATUS_META: Record<string, { label: string; tone: string; dot: string }> = {
-  rascunho: { label: "Rascunho", tone: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
+  rascunho: { label: "Rascunho", tone: "bg-[var(--p-color-surface-muted)] text-[var(--p-color-fg-muted)] border-[var(--p-color-border)]", dot: "bg-[var(--p-color-fg-subtle)]" },
   enviada: { label: "Enviada", tone: "bg-[var(--semantic-action-soft)] text-[var(--semantic-action)] border-[var(--semantic-action-border)]", dot: "bg-[var(--semantic-action)]" },
-  triagem: { label: "Em análise", tone: "bg-amber-50 text-amber-800 border-amber-200", dot: "bg-amber-500" },
-  devolvida: { label: "Devolvida", tone: "bg-red-50 text-red-800 border-red-200", dot: "bg-red-500" },
-  aprovada: { label: "Homologada", tone: "bg-emerald-50 text-emerald-800 border-emerald-200", dot: "bg-emerald-500" },
+  triagem: { label: "Em análise", tone: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)] border-[var(--p-color-warning-border)]", dot: "bg-[var(--p-color-warning)]" },
+  devolvida: { label: "Devolvida", tone: "bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)] border-[var(--p-color-danger-border)]", dot: "bg-[var(--p-color-danger)]" },
+  aprovada: { label: "Homologada", tone: "bg-[var(--p-color-success-bg)] text-[var(--p-color-success)] border-[var(--p-color-success-border)]", dot: "bg-[var(--p-color-success)]" },
   pactuando: { label: "Recebida pela Admin.", tone: "bg-[var(--semantic-collab-soft)] text-[var(--semantic-collab)] border-[var(--semantic-collab-border)]", dot: "bg-[var(--semantic-collab)]" },
   concluida: { label: "Consolidada", tone: "bg-[var(--semantic-insight-soft)] text-[var(--semantic-insight)] border-[var(--semantic-insight-border)]", dot: "bg-[var(--semantic-insight)]" },
 };
@@ -208,8 +225,8 @@ function normalizeLocationLabel(value?: string | null) {
 function getStatusMeta(status?: string | null) {
   return STATUS_META[normalizeStatus(status)] || {
     label: String(status || "Sem status"),
-    tone: "bg-slate-100 text-slate-700 border-slate-200",
-    dot: "bg-slate-400",
+    tone: "bg-[var(--p-color-surface-muted)] text-[var(--p-color-fg-muted)] border-[var(--p-color-border)]",
+    dot: "bg-[var(--p-color-fg-subtle)]",
   };
 }
 
@@ -423,9 +440,12 @@ async function resolveScopeOptions(
   return includeInstitutional ? [...scopedOptions, institutionalOption] : scopedOptions;
 }
 
-function buildCsv(rows: DfdWithMetrics[]) {
+function buildCsv(rows: DfdWithMetrics[], items: DfdItemDashboardRow[]) {
+  const visibleDfdIds = new Set(rows.map((dfd) => dfd.id));
   const preferredHeaders = [
+    "dataset",
     "protocolo",
+    "dfd_id",
     "objeto",
     "status",
     "valor",
@@ -439,11 +459,36 @@ function buildCsv(rows: DfdWithMetrics[]) {
     "prioridade_score",
     "item_principal",
     "participantes_coletiva",
+    "item_id",
+    "codigo_efisco",
+    "descricao_item",
+    "quantidade_item",
+    "unidade_medida",
+    "valor_unitario_item",
+    "valor_total_item",
+    "gnd_item",
+    "gnd_derivado_item",
+    "natureza_item",
+    "local_uso_item",
+    "justificativa_item",
+    "distribuicao_usuarios",
+    "distribuicao_usuarios_total",
+    "distribuicao_usuarios_json",
+    "subsidios_etp_tr",
+    "subsidio_etp_tr_problema_resolver",
+    "subsidio_etp_tr_beneficiarios",
+    "subsidio_etp_tr_resultado_esperado",
+    "subsidio_etp_tr_requisitos_essenciais",
+    "subsidio_etp_tr_cuidados_restricoes",
+    "subsidio_etp_tr_alternativas_consideradas",
+    "subsidio_etp_tr_observacoes_etp_tr",
   ];
   const exportRows = rows.map((dfd) =>
     protectReportRow({
+      dataset: "dfd_setor",
       ...(dfd.raw || {}),
       protocolo: dfd.numero_protocolo || dfd.id,
+      dfd_id: dfd.id,
       objeto: dfd.objeto_contratacao || "",
       status: getStatusMeta(dfd.status).label,
       status_original: dfd.status,
@@ -461,10 +506,45 @@ function buildCsv(rows: DfdWithMetrics[]) {
       participantes_coletiva: dfd.participants.join("; "),
       unidade_id: dfd.analysis_unidade_id || dfd.unidade_id || "",
       tipo_unidade: dfd.analysis_tipo_unidade || dfd.tipo_unidade || "",
+      ...buildPlanningSubsidyReportFields(dfd.planning_subsidies),
     }),
   );
+  const itemRows = items
+    .filter((item) => visibleDfdIds.has(String(item.dfd_id || "")))
+    .map((item, index) => {
+      const dfd = rows.find((row) => row.id === String(item.dfd_id || ""));
+      const quantity = Number(item.quantidade || 0);
+      const unitValue = Number(item.valor_unitario_estimado || 0);
+      return protectReportRow({
+        dataset: "item_setor",
+        linha: index + 1,
+        protocolo: dfd?.numero_protocolo || item.dfd_id || "",
+        dfd_id: item.dfd_id || "",
+        objeto: dfd?.objeto_contratacao || "",
+        status: dfd ? getStatusMeta(dfd.status).label : "",
+        coletiva: dfd?.collective ? "SIM" : "NAO",
+        participantes_coletiva: dfd?.participants.join("; ") || "",
+        item_id: item.id,
+        codigo_efisco: item.codigo_item_efisco || item.codigo_tce || "",
+        descricao_item: item.descricao || "",
+        quantidade_item: quantity,
+        unidade_medida: item.unidade_medida || "",
+        valor_unitario_item: unitValue,
+        valor_total_item: quantity * unitValue,
+        gnd_item: item.gnd || "",
+        gnd_derivado_item: item.gnd_derivado || "",
+        natureza_item: item.codigo_natureza_despesa || "",
+        local_uso_item: item.local_uso || "",
+        justificativa_item: item.justificativa_item || "",
+        ...buildCollectiveDistributionReportFields(
+          { justificativa_item: item.justificativa_item },
+          "",
+        ),
+      });
+    });
 
-  return buildReportCsv(exportRows, collectExportHeaders(exportRows, preferredHeaders));
+  const allRows = [...exportRows, ...itemRows];
+  return buildReportCsv(allRows, collectExportHeaders(allRows, preferredHeaders));
 }
 
 export default function OrcamentoSetorial() {
@@ -563,6 +643,10 @@ export default function OrcamentoSetorial() {
           objeto_contratacao: String(row.objeto_contratacao || "") || null,
           justificativa_contratacao: String(row.justificativa_contratacao || "") || null,
           justificativa_quantidade: String(row.justificativa_quantidade || "") || null,
+          planning_subsidies:
+            row.planning_subsidies && typeof row.planning_subsidies === "object"
+              ? (row.planning_subsidies as DfdPlanningSubsidies)
+              : null,
           status: String(row.status || ""),
           valor_total_estimado: Number(row.valor_total_estimado || 0),
           created_at: String(row.created_at || "") || null,
@@ -572,6 +656,7 @@ export default function OrcamentoSetorial() {
           analysis_unidade_id: String(row.analysis_unidade_id || "") || null,
           analysis_tipo_unidade: String(row.analysis_tipo_unidade || "") || null,
           prioridade: Number(row.prioridade || 0),
+          solicitante_id: String(row.solicitante_id || "") || null,
           raw: row,
         }))
         .filter((row) => row.id);
@@ -652,7 +737,76 @@ export default function OrcamentoSetorial() {
         }),
       );
 
-      setDfds(scopedDfds);
+      const solicitanteIds = Array.from(
+        new Set(scopedDfds.map((dfd) => dfd.solicitante_id).filter(Boolean) as string[]),
+      );
+      const analysisUnits = Array.from(
+        new Map(
+          scopedDfds
+            .map((dfd) => {
+              const unitId = dfd.analysis_unidade_id || dfd.unidade_id || null;
+              const unitType = dfd.analysis_tipo_unidade || dfd.tipo_unidade || null;
+              return unitId && unitType ? [`${unitType}:${unitId}`, { unitId, unitType }] : null;
+            })
+            .filter(Boolean) as Array<[string, { unitId: string; unitType: string }]>,
+        ).values(),
+      );
+      const analysisUnitIds = analysisUnits.map((unit) => unit.unitId);
+      const [solicitanteProfilesResult, chefiaLinksResult] = await Promise.all([
+        solicitanteIds.length
+          ? supabase.from("profiles").select("id,full_name,email,avatar_url").in("id", solicitanteIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        analysisUnitIds.length
+          ? supabase
+              .from("user_units")
+              .select("user_id,unit_id,unit_type")
+              .in("unit_id", analysisUnitIds)
+              .eq("role_in_unit", "chefia")
+          : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (solicitanteProfilesResult.error) throw solicitanteProfilesResult.error;
+      if (chefiaLinksResult.error) throw chefiaLinksResult.error;
+
+      const chefiaLinksByUnit = new Map<string, string>();
+      for (const link of (chefiaLinksResult.data || []) as Array<Record<string, unknown>>) {
+        const userId = String(link.user_id || "").trim();
+        const unitId = String(link.unit_id || "").trim();
+        const unitType = String(link.unit_type || "").trim();
+        if (userId && unitId && unitType && !chefiaLinksByUnit.has(`${unitType}:${unitId}`)) {
+          chefiaLinksByUnit.set(`${unitType}:${unitId}`, userId);
+        }
+      }
+      const chefiaIds = Array.from(new Set(chefiaLinksByUnit.values()));
+      const chefiaProfilesResult = chefiaIds.length
+        ? await supabase.from("profiles").select("id,full_name,email,avatar_url").in("id", chefiaIds)
+        : { data: [], error: null };
+      if (chefiaProfilesResult.error) throw chefiaProfilesResult.error;
+
+      const peopleById = new Map<string, PersonSummary>();
+      for (const profile of [
+        ...((solicitanteProfilesResult.data || []) as Array<Record<string, unknown>>),
+        ...((chefiaProfilesResult.data || []) as Array<Record<string, unknown>>),
+      ]) {
+        const id = String(profile.id || "").trim();
+        if (!id) continue;
+        peopleById.set(id, {
+          name: String(profile.full_name || profile.email || "Pessoa não identificada").trim(),
+          avatarUrl: String(profile.avatar_url || "").trim() || null,
+        });
+      }
+
+      const dfdsWithPeople = scopedDfds.map((dfd) => {
+        const unitId = dfd.analysis_unidade_id || dfd.unidade_id || null;
+        const unitType = dfd.analysis_tipo_unidade || dfd.tipo_unidade || null;
+        const chefiaId = unitId && unitType ? chefiaLinksByUnit.get(`${unitType}:${unitId}`) : null;
+        return {
+          ...dfd,
+          solicitante: dfd.solicitante_id ? peopleById.get(dfd.solicitante_id) || null : null,
+          chefia_responsavel: chefiaId ? peopleById.get(chefiaId) || null : null,
+        };
+      });
+
+      setDfds(dfdsWithPeople);
       const selectedOption = resolvedScopeOptions.find((option) => option.key === selectedScopeKey);
       if (selectedOption) {
         setScopeLabel(selectedOption.label);
@@ -685,6 +839,11 @@ export default function OrcamentoSetorial() {
           quantidade: Number(row.quantidade || 0),
           valor_unitario_estimado: Number(row.valor_unitario_estimado || 0),
           gnd: String(row.gnd || "") || null,
+          gnd_derivado: String(row.gnd_derivado || "") || null,
+          codigo_natureza_despesa: String(row.codigo_natureza_despesa || "") || null,
+          codigo_tce: String(row.codigo_tce || "") || null,
+          codigo_item_efisco: String(row.codigo_item_efisco || "") || null,
+          unidade_medida: String(row.unidade_medida || "") || null,
           local_uso:
             normalizeLocationLabel(String(row.local_uso || "")) ||
             unitNameByDfdId.get(String(row.dfd_id || "")) ||
@@ -724,7 +883,7 @@ export default function OrcamentoSetorial() {
   }, [analytics.dfdMetrics, expenseFilter, search, statusFilter]);
 
   function exportReport() {
-    const blob = new Blob([buildCsv(filteredDfds)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([buildCsv(filteredDfds, items)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -735,7 +894,7 @@ export default function OrcamentoSetorial() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F2F1] px-3 py-5 md:px-6">
+    <div className="min-h-screen bg-[var(--p-color-bg-muted)] px-3 py-5 md:px-6">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <HeaderPanel
           scopeLabel={scopeLabel}
@@ -1087,7 +1246,7 @@ function HeaderPanel({
                 {scopeLabel}
               </div>
             )}
-            <p className="mt-2 text-xs font-semibold text-[#5B6675]">
+            <p className="mt-2 text-xs font-semibold text-[var(--p-color-fg-muted)]">
               {scopeOptions.find((option) => option.key === selectedScopeKey)?.detail ||
                 "O painel usa apenas as DFDs vinculadas a este recorte."}
             </p>
@@ -1146,7 +1305,7 @@ function ChiefChip({ name, avatarUrl }: { name: string; avatarUrl: string | null
     .join("") || "CH";
 
   return (
-    <span className="inline-flex items-center gap-3 rounded-full border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] py-1.5 pl-1.5 pr-4 text-[12px] font-semibold text-[var(--semantic-collab)]">
+    <span className="inline-flex items-center gap-3 rounded-full border border-[var(--semantic-collab-border)] bg-[var(--semantic-collab-soft)] py-1.5 pl-1.5 pr-4 text-xs font-semibold text-[var(--semantic-collab)]">
       <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[var(--semantic-collab)] text-sm font-bold text-white shadow-sm">
         {avatarUrl ? (
           <img
@@ -1159,7 +1318,7 @@ function ChiefChip({ name, avatarUrl }: { name: string; avatarUrl: string | null
         )}
       </span>
       <span className="flex flex-col items-start leading-tight">
-        <span className="text-[10px] uppercase tracking-[0.16em] text-[#5B6675]">
+        <span className="type-kicker uppercase tracking-[0.16em] text-[var(--p-color-fg-muted)]">
           Chefia
         </span>
         <span>{name}</span>
@@ -1170,7 +1329,7 @@ function ChiefChip({ name, avatarUrl }: { name: string; avatarUrl: string | null
 
 function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--semantic-action-border)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[var(--semantic-action)]">
+    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--semantic-action-border)] bg-white px-3 py-1.5 type-caption font-semibold text-[var(--semantic-action)]">
       {icon}
       {label}
     </span>
@@ -1186,22 +1345,22 @@ function HealthStrip({ analytics }: { analytics: ReturnType<typeof buildAnalytic
   ];
   const tone =
     analytics.healthScore >= 88
-      ? "border-emerald-200 bg-emerald-50"
+      ? "border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)]"
       : analytics.healthScore >= 70
-        ? "border-amber-200 bg-amber-50"
-        : "border-red-200 bg-red-50";
+        ? "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)]"
+        : "border-[var(--p-color-danger-border)] bg-[var(--p-color-danger-bg)]";
   return (
     <section className={cn("rounded-[22px] border p-5 shadow-sm", tone)}>
       <div className="grid gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#5B6675]">
+          <p className="type-caption font-bold uppercase tracking-[0.18em] text-[var(--p-color-fg-muted)]">
             Saúde das DFDs do Setor
           </p>
           <div className="mt-2 flex flex-wrap items-end gap-3">
-            <h2 className="font-display text-2xl font-semibold text-[#17233C]">
+            <h2 className="font-display text-2xl font-semibold text-[var(--p-color-fg)]">
               {analytics.healthLabel}
             </h2>
-            <span className="mb-1 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#164073]">
+            <span className="mb-1 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[var(--p-color-brand-500)]">
               {analytics.healthScore}%
             </span>
           </div>
@@ -1210,17 +1369,17 @@ function HealthStrip({ analytics }: { analytics: ReturnType<typeof buildAnalytic
               initial={{ width: 0 }}
               animate={{ width: `${analytics.healthScore}%` }}
               transition={{ duration: 0.55, ease: "easeOut" }}
-              className="h-full rounded-full bg-gradient-to-r from-[#EC2029] via-[#C9A646] to-[#2A7C8C]"
+              className="h-full rounded-full bg-gradient-to-r from-[var(--p-color-danger)] via-[var(--p-color-warning)] to-[var(--p-color-collab)]"
             />
           </div>
-          <p className="mt-3 text-sm leading-6 text-[#52627A]">
+          <p className="mt-3 text-sm leading-6 text-[var(--p-color-fg-muted)]">
             Esta leitura resume o quanto o setor está pronto para decidir sem acumular ruído de fila, devolução e duplicidade.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {reasons.map((reason) => (
-            <div key={reason} className="flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm font-semibold text-[#2E3A4A]">
-              <span className="h-2 w-2 rounded-full bg-[#164073]" />
+            <div key={reason} className="flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm font-semibold text-[var(--p-color-fg-default)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--p-color-brand-500)]" />
               {reason}
             </div>
           ))}
@@ -1297,11 +1456,11 @@ function ExecutiveCard({
   tone?: "neutral" | "warning" | "success" | "danger" | "info";
 }) {
   const tones = {
-    neutral: "border-[#D9E0E8] bg-white text-[#164073]",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    danger: "border-red-200 bg-red-50 text-red-800",
-    info: "border-[#C7D7EA] bg-[#F7FBFF] text-[#164073]",
+    neutral: "border-[var(--p-color-border)] bg-white text-[var(--p-color-brand-500)]",
+    warning: "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    success: "border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+    danger: "border-[var(--p-color-danger-border)] bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]",
+    info: "border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] text-[var(--p-color-brand-500)]",
   };
   return (
     <motion.div
@@ -1310,10 +1469,12 @@ function ExecutiveCard({
       className={cn("rounded-[20px] border p-4 shadow-sm", tones[tone])}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-70">{title}</p>
+        <p className="type-kicker font-bold uppercase tracking-[0.16em] opacity-70">{title}</p>
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 shadow-sm">{icon}</span>
       </div>
-      <p className="mt-3 font-display text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-3 min-w-0 overflow-visible font-display text-2xl font-semibold tracking-tight">
+        <MechanicalValue value={value} />
+      </p>
       <p className="mt-1 text-xs font-semibold opacity-70">{subtitle}</p>
       {micro ? <div className="mt-4">{micro}</div> : null}
     </motion.div>
@@ -1340,7 +1501,7 @@ function MiniProgress({ value }: { value: number }) {
       <motion.div
         initial={{ width: 0 }}
         animate={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-        className="h-full rounded-full bg-[#164073]"
+        className="h-full rounded-full bg-[var(--p-color-brand-500)]"
       />
     </div>
   );
@@ -1354,11 +1515,11 @@ function ActionPanel({
   duplicateGroups: DuplicateGroup[];
 }) {
   return (
-    <section className="rounded-[24px] border border-[#D9E0E8] bg-white p-5 shadow-sm" id="duplicidades">
+    <section className="rounded-[24px] border border-[var(--p-color-border)] bg-white p-5 shadow-sm" id="duplicidades">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#5B6675]">Bloco prioritário</p>
-          <h2 className="font-display text-2xl font-semibold text-[#17233C]">O que exige minha ação?</h2>
+          <p className="type-caption font-bold uppercase tracking-[0.18em] text-[var(--p-color-fg-muted)]">Bloco prioritário</p>
+          <h2 className="font-display text-2xl font-semibold text-[var(--p-color-fg)]">O que exige minha ação?</h2>
         </div>
         <Link href="/triagem" className={cn(buttonVariants({ variant: "default" }), "rounded-xl")}>
           Abrir análise da chefia
@@ -1381,26 +1542,26 @@ function ActionPanel({
       )}
 
       {duplicateGroups.length > 0 ? (
-        <div className="mt-5 rounded-2xl border border-[#C7D7EA] bg-[#F7FBFF] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[#164073]">
+        <div className="mt-5 rounded-2xl border border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--p-color-brand-500)]">
             <GitBranch className="h-4 w-4" />
             Comparador visual de DFDs semelhantes
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {duplicateGroups.slice(0, 2).map((group) => (
-              <div key={group.key} className="rounded-xl border border-[#D9E0E8] bg-white p-3">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#5B6675]">{group.label}</p>
+              <div key={group.key} className="rounded-xl border border-[var(--p-color-border)] bg-white p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--p-color-fg-muted)]">{group.label}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {group.dfds.slice(0, 2).map((dfd) => (
-                    <div key={dfd.id} className="rounded-lg bg-[#F4F7FA] p-3 text-xs">
-                      <p className="font-bold text-[#164073]">{dfd.numero_protocolo || "DFD"}</p>
-                      <p className="mt-1 line-clamp-2 text-[#2E3A4A]">{dfd.objeto_contratacao}</p>
+                    <div key={dfd.id} className="rounded-lg bg-[var(--p-color-surface-muted)] p-3 text-xs">
+                      <p className="font-bold text-[var(--p-color-brand-500)]">{dfd.numero_protocolo || "DFD"}</p>
+                      <p className="mt-1 line-clamp-2 text-[var(--p-color-fg-default)]">{dfd.objeto_contratacao}</p>
                       <p className="mt-2 font-bold">{formatCompactCurrency(dfd.value)}</p>
                       <p>{dfd.gnds[0] || "Sem GND"}</p>
                     </div>
                   ))}
                 </div>
-                <p className="mt-3 text-xs font-semibold text-[#5B6675]">
+                <p className="mt-3 text-xs font-semibold text-[var(--p-color-fg-muted)]">
                   Similaridade operacional estimada: {Math.min(95, 58 + group.count * 10)}%. Ação sugerida: avaliar consolidação.
                 </p>
               </div>
@@ -1414,9 +1575,9 @@ function ActionPanel({
 
 function ActionCard({ action }: { action: ReturnType<typeof buildAnalytics>["actions"][number] }) {
   const severity = {
-    critical: "border-red-200 bg-red-50 text-red-800",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    info: "border-[#C7D7EA] bg-[#F7FBFF] text-[#164073]",
+    critical: "border-[var(--p-color-danger-border)] bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]",
+    warning: "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    info: "border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] text-[var(--p-color-brand-500)]",
   }[action.severity];
   return (
     <div className={cn("rounded-2xl border p-4", severity)}>
@@ -1443,14 +1604,14 @@ function KanbanPanel({ columns }: { columns: ReturnType<typeof buildAnalytics>["
     <Panel title="Kanban visual por status" eyebrow="Consulta operacional" icon={<Layers3 className="h-5 w-5" />}>
       <div className="grid gap-4 md:grid-cols-4">
         {columns.map((column) => (
-          <div key={column.key} className="min-h-[330px] rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-3">
+          <div key={column.key} className="min-h-[330px] rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-info-bg)] p-3">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#164073]">{column.title}</p>
-              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-bold text-[#5B6675]">{column.dfds.length}</span>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--p-color-brand-500)]">{column.title}</p>
+              <span className="rounded-full bg-white px-2 py-1 type-caption font-bold text-[var(--p-color-fg-muted)]">{column.dfds.length}</span>
             </div>
             <div className="space-y-2">
               {column.dfds.length === 0 ? (
-                <p className="rounded-xl bg-white p-3 text-xs font-semibold text-[#7D98B8]">Sem DFDs neste status.</p>
+                <p className="rounded-xl bg-white p-3 text-xs font-semibold text-[var(--p-color-fg-subtle)]">Sem DFDs neste status.</p>
               ) : (
                 column.dfds.map((dfd) => <MiniDfdCard key={dfd.id} dfd={dfd} />)
               )}
@@ -1464,14 +1625,14 @@ function KanbanPanel({ columns }: { columns: ReturnType<typeof buildAnalytics>["
 
 function MiniDfdCard({ dfd }: { dfd: DfdWithMetrics }) {
   return (
-    <Link href={`/dfd/${dfd.id}`} className="block rounded-xl border border-[#D9E0E8] bg-white p-3 text-xs shadow-sm hover:border-[#C7D7EA]">
-      <p className="font-bold text-[#164073]">{dfd.numero_protocolo || "DFD"}</p>
-      <p className="mt-1 line-clamp-2 font-semibold text-[#2E3A4A]">{dfd.objeto_contratacao || dfd.topItem}</p>
+    <Link href={`/dfd/${dfd.id}`} className="block rounded-xl border border-[var(--p-color-border)] bg-white p-3 text-xs shadow-sm hover:border-[var(--p-color-info-border)]">
+      <p className="font-bold text-[var(--p-color-brand-500)]">{dfd.numero_protocolo || "DFD"}</p>
+      <p className="mt-1 line-clamp-2 font-semibold text-[var(--p-color-fg-default)]">{dfd.objeto_contratacao || dfd.topItem}</p>
       <div className="mt-2 flex flex-wrap gap-1">
         <Badge label={dfd.expenseClass} />
         {dfd.gnds[0] ? <Badge label={dfd.gnds[0]} /> : null}
       </div>
-      <p className="mt-2 font-bold text-[#17233C]">{formatCompactCurrency(dfd.value)}</p>
+      <p className="mt-2 font-bold text-[var(--p-color-fg)]">{formatCompactCurrency(dfd.value)}</p>
     </Link>
   );
 }
@@ -1490,9 +1651,9 @@ function TreemapPanel({ items, totalValue }: { items: RankedItem[]; totalValue: 
               <div
                 key={item.key}
                 className={cn(
-                  "flex flex-col justify-between rounded-2xl border border-white/70 bg-[#164073] p-4 text-white shadow-sm",
-                  large ? "md:col-span-2" : "bg-[#2A7C8C]",
-                  index > 3 && "bg-[#4D79A8]",
+                  "flex flex-col justify-between rounded-2xl border border-white/70 bg-[var(--p-color-brand-500)] p-4 text-white shadow-sm",
+                  large ? "md:col-span-2" : "bg-[var(--p-color-collab)]",
+                  index > 3 && "bg-[var(--p-color-brand-400)]",
                 )}
               >
                 <p className="line-clamp-3 text-sm font-bold">{item.label}</p>
@@ -1524,20 +1685,20 @@ function RankingList({ title, items, mode }: { title: string; items: RankedItem[
   const max = Math.max(1, ...items.map((item) => (mode === "value" ? item.value : item.quantity)));
   return (
     <div>
-      <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#5B6675]">{title}</p>
+      <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[var(--p-color-fg-muted)]">{title}</p>
       <div className="space-y-3">
         {items.map((item, index) => {
           const amount = mode === "value" ? item.value : item.quantity;
           return (
             <div key={item.key}>
               <div className="flex justify-between gap-3 text-sm">
-                <span className="line-clamp-1 font-bold text-[#2E3A4A]">
+                <span className="line-clamp-1 font-bold text-[var(--p-color-fg-default)]">
                   {index + 1}. {item.label}
                 </span>
-                <span className="shrink-0 font-bold text-[#164073]">{mode === "value" ? formatCompactCurrency(item.value) : item.quantity}</span>
+                <span className="shrink-0 font-bold text-[var(--p-color-brand-500)]">{mode === "value" ? formatCompactCurrency(item.value) : item.quantity}</span>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#E8EDF2]">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${(amount / max) * 100}%` }} className="h-full rounded-full bg-[#164073]" />
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--p-color-surface-subtle)]">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${(amount / max) * 100}%` }} className="h-full rounded-full bg-[var(--p-color-brand-500)]" />
               </div>
             </div>
           );
@@ -1559,14 +1720,14 @@ function TimelinePanel({ dfds }: { dfds: DfdWithMetrics[] }) {
           <div key={dfd.id} className="relative flex gap-3">
             <div className="flex flex-col items-center">
               <span className={cn("h-3 w-3 rounded-full", getStatusMeta(dfd.status).dot)} />
-              {index < recent.length - 1 ? <span className="mt-1 h-full min-h-12 w-px bg-[#D9E0E8]" /> : null}
+              {index < recent.length - 1 ? <span className="mt-1 h-full min-h-12 w-px bg-[var(--p-color-border)]" /> : null}
             </div>
             <div className="pb-3">
-              <p className="text-sm font-bold text-[#17233C]">
+              <p className="text-sm font-bold text-[var(--p-color-fg)]">
                 {dfd.numero_protocolo || "DFD"} - {getStatusMeta(dfd.status).label}
               </p>
-              <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#5B6675]">{dfd.objeto_contratacao || dfd.topItem}</p>
-              <p className="mt-1 text-xs text-[#7D98B8]">{formatDateTime(dfd.created_at)}</p>
+              <p className="mt-1 line-clamp-1 text-xs font-semibold text-[var(--p-color-fg-muted)]">{dfd.objeto_contratacao || dfd.topItem}</p>
+              <p className="mt-1 text-xs text-[var(--p-color-fg-subtle)]">{formatDateTime(dfd.created_at)}</p>
             </div>
           </div>
         ))}
@@ -1595,8 +1756,8 @@ function SmartList({
   return (
     <Panel title="Lista inteligente de DFDs" eyebrow="Camada final de consulta" icon={<Filter className="h-5 w-5" />}>
       <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_190px_190px]">
-        <label className="flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-3">
-          <Search className="h-4 w-4 text-[#7D98B8]" />
+        <label className="flex h-11 items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-white px-3">
+          <Search className="h-4 w-4 text-[var(--p-color-fg-subtle)]" />
           <input
             value={search}
             onChange={(event) => onSearch(event.target.value)}
@@ -1604,13 +1765,13 @@ function SmartList({
             className="w-full bg-transparent text-sm font-semibold outline-none"
           />
         </label>
-        <select value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)} className="h-11 rounded-xl border border-[#D9E0E8] bg-white px-3 text-sm font-bold text-[#164073] outline-none">
+        <select value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)} className="h-11 rounded-xl border border-[var(--p-color-border)] bg-white px-3 text-sm font-bold text-[var(--p-color-brand-500)] outline-none">
           <option value="todos">Todos os status</option>
           {Object.entries(STATUS_META).map(([key, meta]) => (
             <option key={key} value={key}>{meta.label}</option>
           ))}
         </select>
-        <select value={expenseFilter} onChange={(event) => onExpenseFilter(event.target.value)} className="h-11 rounded-xl border border-[#D9E0E8] bg-white px-3 text-sm font-bold text-[#164073] outline-none">
+        <select value={expenseFilter} onChange={(event) => onExpenseFilter(event.target.value)} className="h-11 rounded-xl border border-[var(--p-color-border)] bg-white px-3 text-sm font-bold text-[var(--p-color-brand-500)] outline-none">
           <option value="todos">Todas as classes</option>
           <option value="Custeio">Custeio</option>
           <option value="Capital">Capital</option>
@@ -1619,13 +1780,13 @@ function SmartList({
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white">
-        <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.6fr_0.5fr] gap-3 border-b border-[#E8EDF2] bg-[#F7FBFF] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#5B6675] max-lg:hidden">
+      <div className="overflow-hidden rounded-2xl border border-[var(--p-color-border)] bg-white">
+        <div className="grid grid-cols-[1.15fr_0.58fr_0.95fr_0.95fr_0.55fr] gap-3 border-b border-[var(--p-color-surface-subtle)] bg-[var(--p-color-info-bg)] px-4 py-3 type-kicker font-bold uppercase tracking-[0.16em] text-[var(--p-color-fg-muted)] max-lg:hidden">
           <span>DFD</span>
           <span>Status</span>
-          <span>Classificação</span>
+          <span>Solicitante</span>
+          <span>Chefia responsável</span>
           <span>Valor</span>
-          <span>Qualidade</span>
         </div>
         {dfds.length === 0 ? (
           <div className="p-4">
@@ -1636,25 +1797,75 @@ function SmartList({
             <Link
               key={dfd.id}
               href={`/dfd/${dfd.id}`}
-              className="grid gap-3 border-b border-[#E8EDF2] px-4 py-4 last:border-b-0 hover:bg-[#F7FBFF] lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.6fr_0.5fr] lg:items-center"
+              className="grid gap-3 border-b border-[var(--p-color-surface-subtle)] px-4 py-4 last:border-b-0 hover:bg-[var(--p-color-info-bg)] lg:grid-cols-[1.15fr_0.58fr_0.95fr_0.95fr_0.55fr] lg:items-center"
             >
               <div>
-                <p className="text-sm font-bold text-[#164073]">{dfd.numero_protocolo || dfd.id}</p>
-                <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#2E3A4A]">{dfd.objeto_contratacao || dfd.topItem}</p>
+                <p className="text-sm font-bold text-[var(--p-color-brand-500)]">{dfd.numero_protocolo || dfd.id}</p>
+                <p className="mt-1 line-clamp-1 text-xs font-semibold text-[var(--p-color-fg-default)]">{dfd.objeto_contratacao || dfd.topItem}</p>
+                {dfd.collective ? (
+                  <AvatarStack
+                    members={dfd.participants.map((participant) => ({
+                      id: participant,
+                      name: participant,
+                      avatarUrl: null,
+                    }))}
+                    total={dfd.participants.length}
+                    label={`${dfd.participants.length} participante(s)`}
+                    size="sm"
+                    className="mt-2"
+                  />
+                ) : null}
               </div>
               <StatusBadge status={dfd.status} />
-              <div className="flex flex-wrap gap-1">
-                <Badge label={dfd.expenseClass} />
-                {dfd.collective ? <Badge label="Coletiva" tone="info" /> : <Badge label="Individual" />}
-                {dfd.gnds[0] ? <Badge label={dfd.gnds[0]} /> : null}
-              </div>
-              <p className="text-sm font-bold text-[#17233C]">{formatCompactCurrency(dfd.value)}</p>
-              <p className="text-sm font-bold text-[#164073]">{dfd.qualityScore}%</p>
+              <PersonCell label="Solicitante" person={dfd.solicitante} emptyLabel="Solicitante não identificado" />
+              <PersonCell label="Chefia" person={dfd.chefia_responsavel} emptyLabel="Chefia ainda não definida" tone="chefia" />
+              <p className="text-sm font-bold text-[var(--p-color-fg)]">{formatCompactCurrency(dfd.value)}</p>
             </Link>
           ))
         )}
       </div>
     </Panel>
+  );
+}
+
+function PersonCell({
+  label,
+  person,
+  emptyLabel,
+  tone = "solicitante",
+}: {
+  label: string;
+  person: PersonSummary | null | undefined;
+  emptyLabel: string;
+  tone?: "solicitante" | "chefia";
+}) {
+  const name = person?.name || emptyLabel;
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+  const avatarTone = tone === "chefia"
+    ? "bg-[var(--semantic-collab)]"
+    : "bg-[var(--p-color-brand-500)]";
+
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white text-[11px] font-bold text-white shadow-sm", avatarTone)}>
+        {person?.avatarUrl ? (
+          <img src={person.avatarUrl} alt={`Foto de ${name}`} className="h-full w-full object-cover" />
+        ) : (
+          initials
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className="block type-kicker text-[9px] uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)] lg:hidden">
+          {label}
+        </span>
+        <span className="block truncate text-xs font-bold text-[var(--p-color-fg)]" title={name}>{name}</span>
+      </span>
+    </div>
   );
 }
 
@@ -1672,13 +1883,13 @@ function Panel({
   id?: string;
 }) {
   return (
-    <section id={id} className="rounded-[24px] border border-[#D9E0E8] bg-white p-5 shadow-sm">
+    <section id={id} className="rounded-[24px] border border-[var(--p-color-border)] bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#5B6675]">{eyebrow}</p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">{title}</h2>
+          <p className="type-caption font-bold uppercase tracking-[0.18em] text-[var(--p-color-fg-muted)]">{eyebrow}</p>
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)]">{title}</h2>
         </div>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#E8EDF2] text-[#164073]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)]">
           {icon}
         </span>
       </div>
@@ -1698,7 +1909,7 @@ function QuickGuideCard({
     <div className="rounded-2xl border border-[var(--semantic-neutral-border)] bg-white/80 p-3">
       <div className="mb-2 h-1.5 w-9 rounded-full bg-[var(--semantic-collab-border)]" />
       <p className="text-sm font-semibold text-[var(--semantic-text)]">{title}</p>
-      <p className="mt-1 text-xs leading-5 text-[#52627A]">{description}</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">{description}</p>
     </div>
   );
 }
@@ -1715,13 +1926,13 @@ function StatusBadge({ status }: { status: string }) {
 
 function Badge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "success" | "warning" | "info" }) {
   const tones = {
-    neutral: "border-[#D9E0E8] bg-white text-[#164073]",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    info: "border-[#C7D7EA] bg-[#E8EDF2] text-[#164073]",
+    neutral: "border-[var(--p-color-border)] bg-white text-[var(--p-color-brand-500)]",
+    success: "border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+    warning: "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    info: "border-[var(--p-color-info-border)] bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)]",
   };
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]", tones[tone])}>
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 type-kicker font-bold uppercase tracking-[0.08em]", tones[tone])}>
       {label}
     </span>
   );

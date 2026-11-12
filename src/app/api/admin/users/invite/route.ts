@@ -8,6 +8,7 @@ import {
 } from "@/lib/settings-sanitize";
 import { withAuthorizedRole } from "@/lib/api-auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { resolveManagedCampus } from "@/lib/admin-role-policy";
 
 type InvitePayload = {
   email: string;
@@ -45,7 +46,7 @@ export const POST = withAuthorizedRole(
     const email = sanitizeEmail(payload.email);
     const fullName = sanitizePlainText(payload.full_name, 160);
     const targetRole = normalizeRole(payload.role || "solicitante");
-    const campusId = payload.campus_id ? sanitizeUuid(payload.campus_id) : null;
+    const requestedCampusId = payload.campus_id ? sanitizeUuid(payload.campus_id) : null;
 
     if (!email) {
       return NextResponse.json(
@@ -53,12 +54,35 @@ export const POST = withAuthorizedRole(
         { status: 400 },
       );
     }
-    if (payload.campus_id && !campusId) {
+    if (payload.campus_id && !requestedCampusId) {
       return NextResponse.json(
         { error: "Campus informado é inválido." },
         { status: 400 },
       );
     }
+
+    let actorCampusId: string | null = null;
+    if (actorRole === "admin") {
+      const { data: actorProfile, error: actorProfileError } = await admin
+        .from("profiles")
+        .select("campus_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (actorProfileError) throw actorProfileError;
+      actorCampusId = String(actorProfile?.campus_id || "").trim() || null;
+    }
+    const managedCampus = resolveManagedCampus({
+      actorRole,
+      actorCampusId,
+      requestedCampusId,
+    });
+    if (!managedCampus.allowed) {
+      return NextResponse.json(
+        { error: "Administrador só pode convidar usuários para o próprio campus." },
+        { status: 403 },
+      );
+    }
+    const campusId = managedCampus.campusId;
 
     if (targetRole === "superadmin") {
       return NextResponse.json(

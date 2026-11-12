@@ -98,7 +98,7 @@ export function getExpenseClassGroupingLabel(expenseClass: DfdExpenseClassKey) {
   if (expenseClass === "custeio") return "Custeio";
   if (expenseClass === "investimento") return "Capital";
   if (expenseClass === "outro") return "Outra natureza";
-  return "GND não identificado";
+  return "Sem natureza";
 }
 
 export function getDfdExpenseClassViolation(items: GndSummaryInput[]) {
@@ -161,7 +161,7 @@ export function summarizeGndDistribution(
   }
   if (unknownCount > 0) {
     warnings.push(
-      `${unknownCount} item(ns) sem GND identificado. Revise a natureza da despesa antes do envio.`,
+      `${unknownCount} item(ns) sem natureza identificada. O sistema separa em DFD própria para revisão e saneamento pela equipe.`,
     );
   }
 

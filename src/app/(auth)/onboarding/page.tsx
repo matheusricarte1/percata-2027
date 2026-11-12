@@ -7,15 +7,13 @@ import { motion } from "framer-motion";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import {
-  Buildings,
-  CheckCircle,
-  Flask,
-  GraduationCap,
-  MagnifyingGlass,
-  Swap,
-  X,
-} from "@phosphor-icons/react";
+import { Buildings } from "@/components/icons/phosphor/exports/Buildings";
+import { CheckCircle } from "@/components/icons/phosphor/exports/CheckCircle";
+import { Flask } from "@/components/icons/phosphor/exports/Flask";
+import { GraduationCap } from "@/components/icons/phosphor/exports/GraduationCap";
+import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";
+import { Swap } from "@/components/icons/phosphor/exports/Swap";
+import { X } from "@/components/icons/phosphor/exports/X";
 import { toast } from "sonner";
 import { getHomeForRole, normalizeRole, type UserRole } from "@/lib/access";
 import { cn } from "@/lib/utils";
@@ -430,6 +428,15 @@ export default function OnboardingPage() {
         if (unitsError) throw unitsError;
       }
 
+      const welcomeResponse = await fetch("/api/onboarding/welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!welcomeResponse.ok) {
+        const payload = await welcomeResponse.json().catch(() => ({}));
+        throw new Error(payload?.error || "Não foi possível ativar a comunicação institucional.");
+      }
+
       toast.success("Perfil configurado com sucesso.");
       router.replace(getHomeForRole(detectedRole));
     } catch (error: any) {
@@ -454,7 +461,7 @@ export default function OnboardingPage() {
       data-animate-auto
     >
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#DCEAF0] via-[#E8EDF2] to-[#F4F7FA]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--p-color-info-border)] via-[var(--p-color-surface-subtle)] to-[var(--p-color-surface-muted)]" />
         <div className="absolute inset-0">
           {ghostCards.map((card) => (
             <motion.div
@@ -496,16 +503,16 @@ export default function OnboardingPage() {
           transition={{ duration: 0.28, ease: "easeOut" }}
           className="w-full max-w-4xl rounded-[30px] border border-white/60 bg-white/92 shadow-[0_20px_70px_-30px_rgba(15,46,87,0.45)]"
         >
-          <div className="border-b border-[#E8EDF2] px-6 py-5">
+          <div className="border-b border-[var(--p-color-surface-subtle)] px-6 py-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--p-color-fg-subtle)]">
                   Configuração Inicial
                 </p>
-                <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#164073]">
+                <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                   Complete seu onboarding
                 </h1>
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#D9E0E8] bg-[#F4F7FA] px-3 py-1 text-xs font-semibold text-[#3E4C5F]">
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--p-color-fg-muted)]">
                   <CheckCircle size={15} weight="fill" />
                   Nível detectado: {ROLE_LABELS[detectedRole]}
                 </div>
@@ -513,10 +520,10 @@ export default function OnboardingPage() {
 
               {isSuperadmin && campi.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+                  <p className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
                     Campus ativo
                   </p>
-                  <div className="inline-flex items-center gap-1 rounded-full border border-[#D9E0E8] bg-[#F4F7FA] p-1">
+                  <div className="inline-flex items-center gap-1 rounded-full border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] p-1">
                     {campi
                       .filter((campus) =>
                         ["PTR", "OUR"].includes(String(campus.sigla || "").toUpperCase()),
@@ -531,15 +538,15 @@ export default function OnboardingPage() {
                             className={cn(
                               "rounded-full px-3 py-1.5 text-xs font-semibold transition",
                               selected
-                                ? "bg-[#164073] text-white shadow-sm"
-                                : "text-[#3E4C5F] hover:bg-white",
+                                ? "bg-[var(--p-color-brand-500)] text-white shadow-sm"
+                                : "text-[var(--p-color-fg-muted)] hover:bg-white",
                             )}
                           >
                             {campus.sigla}
                           </button>
                         );
                       })}
-                    <span className="ml-1 mr-2 text-[#7D98B8]">
+                    <span className="ml-1 mr-2 text-[var(--p-color-fg-subtle)]">
                       <Swap size={14} />
                     </span>
                   </div>
@@ -547,9 +554,9 @@ export default function OnboardingPage() {
               )}
             </div>
 
-            <div className="mt-4 h-2 w-full rounded-full bg-[#E8EDF2]">
+            <div className="mt-4 h-2 w-full rounded-full bg-[var(--p-color-surface-subtle)]">
               <div
-                className="h-2 rounded-full bg-[#164073] transition-all duration-300"
+                className="h-2 rounded-full bg-[var(--p-color-brand-500)] transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -559,19 +566,19 @@ export default function OnboardingPage() {
             <div className="min-w-0">
               {bootstrapping ? (
                 <div className="space-y-3">
-                  <div className="h-4 w-48 animate-pulse rounded-full bg-[#D9E0E8]" />
-                  <div className="h-10 w-full animate-pulse rounded-xl bg-[#E8EDF2]" />
-                  <p className="text-sm text-[#5B6675]">Carregando configurações...</p>
+                  <div className="h-4 w-48 animate-pulse rounded-full bg-[var(--p-color-border)]" />
+                  <div className="h-10 w-full animate-pulse rounded-xl bg-[var(--p-color-surface-subtle)]" />
+                  <p className="text-sm text-[var(--p-color-fg-muted)]">Carregando configurações...</p>
                 </div>
               ) : (
                 <>
                 {step === 1 && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-[#164073]">
+                    <div className="flex items-center gap-2 text-[var(--p-color-brand-500)]">
                       <GraduationCap size={20} weight="duotone" />
                       <h2 className="text-lg font-semibold">Selecione seu campus base</h2>
                     </div>
-                    <p className="text-sm text-[#5B6675]">
+                    <p className="text-sm text-[var(--p-color-fg-muted)]">
                       {isSuperadmin
                         ? "Como superadmin, você pode alternar o campus ativo no topo e configurar os locais de ambos."
                         : "Escolha o campus principal para vincular departamentos e laboratórios."}
@@ -591,12 +598,12 @@ export default function OnboardingPage() {
                             className={cn(
                               "rounded-xl border px-4 py-3 text-left shadow-sm transition",
                               selected
-                                ? "border-[#164073] bg-[#E8EDF2] text-[#164073]"
-                                : "border-[#D9E0E8] bg-white text-[#2E3A4A]",
+                                ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)]"
+                                : "border-[var(--p-color-border)] bg-white text-[var(--p-color-fg-default)]",
                             )}
                           >
                             <p className="text-sm font-semibold">{campus.nome}</p>
-                            <p className="text-[11px] uppercase tracking-wider text-[#7D98B8]">
+                            <p className="type-caption uppercase tracking-wider text-[var(--p-color-fg-subtle)]">
                               {campus.sigla}
                             </p>
                           </motion.button>
@@ -608,32 +615,32 @@ export default function OnboardingPage() {
 
                 {step === 2 && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-[#164073]">
+                    <div className="flex items-center gap-2 text-[var(--p-color-brand-500)]">
                       <Buildings size={20} weight="duotone" />
                       <h2 className="text-lg font-semibold">
                         Departamentos de {currentCampusLabel}
                       </h2>
                     </div>
-                    <p className="text-sm text-[#5B6675]">
+                    <p className="text-sm text-[var(--p-color-fg-muted)]">
                       Escolha um único departamento responsável.
                     </p>
                     <div className="relative">
                       <MagnifyingGlass
                         size={16}
-                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7D98B8]"
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--p-color-fg-subtle)]"
                       />
                       <input
                         type="text"
                         value={deptQuery}
                         onChange={(event) => setDeptQuery(event.target.value)}
                         placeholder="Buscar departamento..."
-                        className="h-10 w-full rounded-xl border border-[#D9E0E8] bg-white pl-9 pr-3 text-sm text-[#2E3A4A] outline-none focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+                        className="h-10 w-full rounded-xl border border-[var(--p-color-border)] bg-white pl-9 pr-3 text-sm text-[var(--p-color-fg-default)] outline-none focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
                       />
                     </div>
-                    <div className="flex items-center justify-between text-xs text-[#5B6675]">
+                    <div className="flex items-center justify-between text-xs text-[var(--p-color-fg-muted)]">
                       <span>{filteredDepts.length} departamento(s) encontrado(s)</span>
                       {selectedDepts[0] && (
-                        <span className="font-semibold text-[#164073]">
+                        <span className="font-semibold text-[var(--p-color-brand-500)]">
                           Selecionado: {depts.find((d) => d.id === selectedDepts[0])?.nome}
                         </span>
                       )}
@@ -652,19 +659,19 @@ export default function OnboardingPage() {
                             className={cn(
                               "w-full rounded-xl border px-3 py-3 text-left text-sm font-medium transition",
                               selected
-                                ? "border-[#164073] bg-[#E8EDF2] text-[#164073] shadow-sm"
-                                : "border-[#D9E0E8] bg-white text-[#2E3A4A]",
+                                ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)] shadow-sm"
+                                : "border-[var(--p-color-border)] bg-white text-[var(--p-color-fg-default)]",
                             )}
                           >
                             <div className="flex items-center gap-3">
                               <span
                                 className={cn(
                                   "h-4 w-4 rounded-full border-2 transition",
-                                  selected ? "border-[#164073]" : "border-[#A7B1BD]",
+                                  selected ? "border-[var(--p-color-brand-500)]" : "border-[var(--p-color-border-strong)]",
                                 )}
                               >
                                 {selected && (
-                                  <span className="m-[3px] block h-1.5 w-1.5 rounded-full bg-[#164073]" />
+                                  <span className="m-[3px] block h-1.5 w-1.5 rounded-full bg-[var(--p-color-brand-500)]" />
                                 )}
                               </span>
                               <span className="text-sm">{dept.nome}</span>
@@ -673,7 +680,7 @@ export default function OnboardingPage() {
                         );
                       })}
                       {filteredDepts.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-[#D9E0E8] bg-[#FAFBFC] px-4 py-6 text-center text-sm text-[#5B6675]">
+                        <div className="rounded-xl border border-dashed border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-4 py-6 text-center text-sm text-[var(--p-color-fg-muted)]">
                           Nenhum departamento encontrado para este filtro.
                         </div>
                       )}
@@ -683,42 +690,42 @@ export default function OnboardingPage() {
 
                 {step === 3 && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-[#164073]">
+                    <div className="flex items-center gap-2 text-[var(--p-color-brand-500)]">
                       <Flask size={20} weight="duotone" />
                       <h2 className="text-lg font-semibold">
                         Laboratórios de {currentCampusLabel}
                       </h2>
                     </div>
-                    <p className="text-sm text-[#5B6675]">
+                    <p className="text-sm text-[var(--p-color-fg-muted)]">
                       Selecione os laboratórios aos quais você se vincula, se quiser. Essa escolha é opcional.
                     </p>
                     <div className="relative">
                       <MagnifyingGlass
                         size={16}
-                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7D98B8]"
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--p-color-fg-subtle)]"
                       />
                       <input
                         type="text"
                         value={labQuery}
                         onChange={(event) => setLabQuery(event.target.value)}
                         placeholder="Buscar laboratório..."
-                        className="h-10 w-full rounded-xl border border-[#D9E0E8] bg-white pl-9 pr-3 text-sm text-[#2E3A4A] outline-none focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+                        className="h-10 w-full rounded-xl border border-[var(--p-color-border)] bg-white pl-9 pr-3 text-sm text-[var(--p-color-fg-default)] outline-none focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
                       />
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5B6675]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--p-color-fg-muted)]">
                       <span>{filteredLabs.length} laboratório(s) encontrado(s)</span>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={selectAllFilteredLabs}
-                          className="rounded-full border border-[#D9E0E8] bg-white px-3 py-1 font-semibold text-[#164073] hover:border-[#164073]"
+                          className="rounded-full border border-[var(--p-color-border)] bg-white px-3 py-1 font-semibold text-[var(--p-color-brand-500)] hover:border-[var(--p-color-brand-500)]"
                         >
                           Selecionar filtrados
                         </button>
                         <button
                           type="button"
                           onClick={clearLabsForActiveCampus}
-                          className="rounded-full border border-[#D9E0E8] bg-white px-3 py-1 font-semibold text-[#5B6675] hover:border-[#A7B1BD]"
+                          className="rounded-full border border-[var(--p-color-border)] bg-white px-3 py-1 font-semibold text-[var(--p-color-fg-muted)] hover:border-[var(--p-color-border-strong)]"
                         >
                           Limpar
                         </button>
@@ -726,8 +733,8 @@ export default function OnboardingPage() {
                     </div>
 
                     {selectedLabs.length > 0 && (
-                      <div className="rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-3">
-                        <p className="mb-2 text-xs font-semibold text-[#7D98B8]">
+                      <div className="rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] p-3">
+                        <p className="mb-2 text-xs font-semibold text-[var(--p-color-fg-subtle)]">
                           Laboratórios selecionados
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -738,7 +745,7 @@ export default function OnboardingPage() {
                                 key={labId}
                                 type="button"
                                 onClick={() => toggleSelection("labs", labId)}
-                                className="inline-flex items-center gap-1 rounded-full border border-[#C7D7EA] bg-white px-3 py-1 text-xs font-semibold text-[#164073]"
+                                className="inline-flex items-center gap-1 rounded-full border border-[var(--p-color-info-border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--p-color-brand-500)]"
                               >
                                 <span>{label}</span>
                                 <X size={12} />
@@ -763,15 +770,15 @@ export default function OnboardingPage() {
                             className={cn(
                               "w-full rounded-xl border px-3 py-3 text-left text-sm font-medium transition",
                               selected
-                                ? "border-[#164073] bg-[#E8EDF2] text-[#164073] shadow-sm"
-                                : "border-[#D9E0E8] bg-white text-[#2E3A4A]",
+                                ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)] shadow-sm"
+                                : "border-[var(--p-color-border)] bg-white text-[var(--p-color-fg-default)]",
                             )}
                           >
                             <div className="flex items-center gap-3">
                               <span
                                 className={cn(
                                   "flex h-4 w-4 items-center justify-center rounded border-2 transition",
-                                  selected ? "border-[#164073] bg-[#164073]" : "border-[#A7B1BD]",
+                                  selected ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-brand-500)]" : "border-[var(--p-color-border-strong)]",
                                 )}
                               >
                                 {selected && <span className="h-1.5 w-1.5 rounded-[2px] bg-white" />}
@@ -782,12 +789,12 @@ export default function OnboardingPage() {
                         );
                       })}
                       {filteredLabs.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-[#D9E0E8] bg-[#FAFBFC] px-4 py-6 text-center text-sm text-[#5B6675]">
+                        <div className="rounded-xl border border-dashed border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-4 py-6 text-center text-sm text-[var(--p-color-fg-muted)]">
                           Nenhum laboratório encontrado para este filtro.
                         </div>
                       )}
                     </div>
-                    <div className="rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-4 py-3 text-sm text-[#3E4C5F]">
+                    <div className="rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-4 py-3 text-sm text-[var(--p-color-fg-muted)]">
                       {totalSelectedDepts} departamento(s) e {totalSelectedLabs} laboratório(s) selecionado(s).
                     </div>
                   </div>
@@ -801,7 +808,7 @@ export default function OnboardingPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, ease: "easeOut" }}
-              className="order-first rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4 shadow-sm lg:order-none"
+              className="order-first rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-info-bg)] p-4 shadow-sm lg:order-none"
             >
               <div className="overflow-hidden rounded-xl bg-white">
                 <Image
@@ -814,13 +821,13 @@ export default function OnboardingPage() {
                 />
               </div>
               <div className="mt-4 space-y-1.5">
-                <p className="text-sm font-semibold text-[#164073]">{currentVisual.title}</p>
-                <p className="text-xs leading-5 text-[#5B6675]">{currentVisual.caption}</p>
+                <p className="text-sm font-semibold text-[var(--p-color-brand-500)]">{currentVisual.title}</p>
+                <p className="text-xs leading-5 text-[var(--p-color-fg-muted)]">{currentVisual.caption}</p>
               </div>
             </motion.aside>
           </div>
 
-          <div className="flex items-center justify-between border-t border-[#E8EDF2] px-6 py-4">
+          <div className="flex items-center justify-between border-t border-[var(--p-color-surface-subtle)] px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -839,7 +846,7 @@ export default function OnboardingPage() {
                   (step === 2 && selectedDepts.length === 0)
                 }
                 onClick={() => setStep((prev) => prev + 1)}
-                className="bg-[#164073] hover:bg-[#0F2E57]"
+                className="bg-[var(--p-color-brand-500)] hover:bg-[var(--p-color-brand-600)]"
               >
                 Próximo
               </Button>
@@ -848,7 +855,7 @@ export default function OnboardingPage() {
                 type="button"
                 disabled={bootstrapping || loading || !activeCampus}
                 onClick={handleComplete}
-                className="bg-[#164073] hover:bg-[#0F2E57]"
+                className="bg-[var(--p-color-brand-500)] hover:bg-[var(--p-color-brand-600)]"
               >
                 {loading ? "Salvando..." : "Finalizar"}
               </Button>

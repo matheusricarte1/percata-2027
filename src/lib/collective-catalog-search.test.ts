@@ -5,6 +5,7 @@ import {
   buildCollectiveCatalogFallbackFilter,
   buildCollectiveCatalogSearchArgs,
   buildCollectiveCatalogPageState,
+  summarizeCollectiveCatalogItemForDisplay,
   sanitizeCollectiveCatalogSearch,
 } from "./collective-catalog-search.ts";
 
@@ -52,5 +53,25 @@ describe("collective-catalog-search", () => {
         "classe.ilike.%papel a4 branco%",
       ].join(","),
     );
+  });
+
+  it("summarizes long E-Fisco descriptions without losing the full detail text", () => {
+    const summary = summarizeCollectiveCatalogItemForDisplay({
+      id: "214444-1",
+      codigo_efisco: "214444-1",
+      descricao:
+        "SERVICO DE TRANSPORTE DE CARGAS - TRANSPORTE RODOVIARIO, DE AGUA POTAVEL, SEM TAXA DE SEGURO INCLUSA, NA REGIAO METROPOLITANA",
+      tipo_objeto: "SERVIÇO",
+      nome_classe: "Transporte de cargas e reboque",
+    });
+
+    assert.equal(summary.code, "214444-1");
+    assert.equal(summary.term, "Serviço de transporte de cargas");
+    assert.equal(
+      summary.details,
+      "Transporte rodoviário, de água potável, sem taxa de seguro inclusa, na região metropolitana",
+    );
+    assert.equal(summary.fullDescription, `${summary.term} - ${summary.details}`);
+    assert.equal(summary.classLabel, "Transporte de cargas e reboque");
   });
 });

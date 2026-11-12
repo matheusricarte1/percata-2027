@@ -1,0 +1,58 @@
+.editor[data-slot="dialog-content"] { padding: 0; border-radius: 24px; box-shadow: 0 28px 90px color-mix(in srgb, var(--p-color-fg) 24%, transparent); }
+.header { padding: 24px 56px 20px 28px; background: var(--p-color-action); color: var(--p-color-action-fg); }
+.header [data-slot="dialog-title"] { font-size: 24px; font-weight: 650; line-height: 1.2; letter-spacing: -.025em; }
+.header [data-slot="dialog-description"] { color: color-mix(in srgb, var(--p-color-action-fg) 85%, transparent); max-width: 70ch; line-height: 1.6; }
+.eyebrow { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .16em; opacity: .85; margin-bottom: 4px; }
+.header nav { gap: 8px; margin-top: 12px; }
+.header nav > * { border-color: color-mix(in srgb, var(--p-color-action-fg) 30%, transparent); color: var(--p-color-action-fg); padding: 8px 14px; }
+.header nav [aria-current="step"] { background: var(--p-color-action-fg); color: var(--p-color-action); border-color: var(--p-color-action-fg); }
+.editor [data-slot="dialog-close"] { color: var(--p-color-action-fg); top: 18px; right: 18px; }
+.editor [data-slot="dialog-close"]:hover { background: color-mix(in srgb, var(--p-color-action-fg) 15%, transparent); }
+.body { padding: 24px 28px; background: var(--p-color-bg); }
+.intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 8px; }
+.intro h3 { font-size: 18px; letter-spacing: -.02em; }
+.item { background: var(--p-color-bg-elevated); padding: 0; overflow: clip; box-shadow: 0 3px 12px color-mix(in srgb, var(--p-color-fg) 4%, transparent); }
+.itemHeading { padding: 18px 20px 14px; display: flex; align-items: flex-start; gap: 14px; }
+.itemNumber { display: flex; width: 36px; height: 36px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 10px; background: var(--semantic-action-soft); color: var(--semantic-action); font-weight: 700; font-size: 13px; }
+.itemHeading h3 { line-height: 1.5; font-size: 13px; }
+.itemHeading > button { margin-left: auto; }
+.financial { margin: 0 20px; padding: 16px; border-radius: 12px; background: var(--semantic-action-soft); display: grid; grid-template-columns: 1fr 1.4fr 1fr; align-items: end; gap: 16px; }
+.financial label { font-size: 11px; color: var(--p-color-fg-muted); }
+.financial input { font-size: 18px; font-weight: 650; background: var(--p-color-bg-elevated); border-color: var(--semantic-action-border); padding: 10px 12px; font-variant-numeric: tabular-nums; color: var(--p-color-fg); }
+.subtotal { padding: 0 0 10px; font-size: 11px; color: var(--p-color-fg-muted); }
+.subtotal strong { display: block; margin-top: 8px; font-size: 20px; line-height: 1.3; font-weight: 650; color: var(--p-color-action); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.details { margin: 14px 20px 0; padding: 0 0 16px; font-size: 12px; }
+.details summary { cursor: pointer; font-weight: 600; color: var(--p-color-action); padding: 8px 0; }
+.details[open] summary { margin-bottom: 8px; }
+.details label { font-size: 12px; }
+.fiscal { margin: 0; border-width: 1px 0 0; border-radius: 0; padding: 14px 20px; background: var(--p-color-bg); }
+.fiscal > p { font-size: 11px; line-height: 1.6; color: var(--p-color-fg-muted); }
+.fiscal > button { min-height: 34px; font-size: 12px; background: var(--p-color-bg-elevated); color: var(--p-color-action); }
+.reason { padding: 20px; border-left: 4px solid var(--p-color-action); background: var(--p-color-bg-elevated); }
+.reason h3 { display: flex; align-items: center; gap: 10px; }
+.reason h3 svg { color: var(--p-color-action); }
+.reason textarea { background: var(--p-color-bg); }
+.footer { padding: 16px 28px 20px; background: var(--p-color-bg-elevated); }
+.footer > p { margin-bottom: 12px; }
+.footerTotal { font-size: 11px; font-weight: 500; color: var(--p-color-fg-muted); }
+.footerTotal strong { display: block; margin-top: 2px; font-size: 23px; letter-spacing: -.035em; color: var(--p-color-fg); font-variant-numeric: tabular-nums; }
+.reviewTotals { border: none; background: var(--semantic-action-soft); padding: 20px; }
+.reviewTotals > div:last-child { border-left: 1px solid var(--semantic-action-border); padding-left: 20px; }
+.reviewTotals > div:last-child > p:last-child { color: var(--p-color-action); }
+.reviewTotals > div > p:last-child { font-size: 26px; margin-top: 6px; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .editor[data-slot="dialog-content"] { border-radius: 18px; }
+  .header { padding: 18px 44px 16px 18px; }
+  .header [data-slot="dialog-title"] { font-size: 20px; }
+  .header [data-slot="dialog-description"] { font-size: 12px; }
+  .header nav > * { font-size: 10px; padding: 6px 9px; }
+  .body { padding: 18px 14px; }
+  .financial { margin: 0 14px; gap: 12px; grid-template-columns: 1fr 1.4fr; }
+  .subtotal { grid-column: span 2; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; }
+  .subtotal strong { margin-top: 0; font-size: 18px; }
+  .itemHeading { padding: 14px; gap: 10px; }
+  .details { margin-left: 14px; margin-right: 14px; }
+  .fiscal { padding: 12px 14px; }
+  .footer { padding: 12px 18px 16px; }
+  .reviewTotals > div > p:last-child { font-size: 20px; }
+}

@@ -2,15 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Gear,
-  PaintBrush,
-  Bell,
-  ShieldCheck,
-  FloppyDiskBack,
-  Lightning,
-  ArrowCounterClockwise,
-} from "@phosphor-icons/react";
+import { Gear } from "@/components/icons/phosphor/exports/Gear";
+import { PaintBrush } from "@/components/icons/phosphor/exports/PaintBrush";
+import { Bell } from "@/components/icons/phosphor/exports/Bell";
+import { ShieldCheck } from "@/components/icons/phosphor/exports/ShieldCheck";
+import { FloppyDiskBack } from "@/components/icons/phosphor/exports/FloppyDiskBack";
+import { Lightning } from "@/components/icons/phosphor/exports/Lightning";
+import { ArrowCounterClockwise } from "@/components/icons/phosphor/exports/ArrowCounterClockwise";
 import { toast } from "sonner";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { Switch } from "@/components/ui/switch";
@@ -18,15 +16,25 @@ import {
   DEFAULT_USER_SETTINGS,
   mapUserSettingsRow,
   normalizeUserSettings,
-  parseUserSettingsJson,
+  parseUserSettingsSnapshot,
   toUserSettingsUpsert,
   type AccentColor,
   type UserSettings,
 } from "@/lib/user-settings";
 import { sanitizePlainText, sanitizeUiLabel, sanitizeUiMessage } from "@/lib/settings-sanitize";
+import {
+  USER_SETTINGS_SESSION_KEY,
+  USER_SETTINGS_VISUAL_KEY,
+  cleanupUnsafeLocalStorage,
+  pickVisualSettings,
+  readLocalJson,
+  readSessionJson,
+  writeLocalJson,
+  writeSessionJson,
+} from "@/lib/browser-storage";
 
 type EmailStatus = {
-  provider: "resend" | "smtp" | "none";
+  provider: "smtp" | "none";
   configured: boolean;
   fromAddress: string;
   redirectTo?: string | null;
@@ -40,8 +48,6 @@ type EmailStatus = {
   } | null;
 };
 
-const STORAGE_PREFIX = "percata:user-settings:v1";
-
 const COLOR_OPTIONS: Array<{
   value: AccentColor;
   label: string;
@@ -52,7 +58,7 @@ const COLOR_OPTIONS: Array<{
     value: "upe",
     label: "UPE",
     desc: "Azul institucional com apoio vermelho.",
-    swatches: ["#164073", "#2D5D94", "#EC2029"],
+    swatches: ["var(--p-color-brand-500)", "var(--p-color-brand-400)", "#EC2029"],
   },
   {
     value: "teal",
@@ -70,7 +76,7 @@ const COLOR_OPTIONS: Array<{
     value: "slate",
     label: "Grafite",
     desc: "Neutro, discreto e focado em leitura.",
-    swatches: ["#243447", "#4D6175", "#C14953"],
+    swatches: ["#243447", "#4D6175", "var(--p-color-danger)"],
   },
 ];
 
@@ -85,33 +91,23 @@ function isMissingSettingsTableError(error: any): boolean {
   );
 }
 
-function toStorageKey(userId: string) {
-  const safeUserId = sanitizePlainText(userId, 80);
-  return `${STORAGE_PREFIX}:${safeUserId || "unknown-user"}`;
+function loadLocalSettings(): UserSettings {
+  return (
+    parseUserSettingsSnapshot(readSessionJson(USER_SETTINGS_SESSION_KEY)) ||
+    parseUserSettingsSnapshot(readLocalJson(USER_SETTINGS_VISUAL_KEY)) ||
+    DEFAULT_USER_SETTINGS
+  );
 }
 
-function loadLocalSettings(userId: string): UserSettings {
-  try {
-    const raw = window.localStorage.getItem(toStorageKey(userId));
-    return parseUserSettingsJson(raw) || DEFAULT_USER_SETTINGS;
-  } catch {
-    return DEFAULT_USER_SETTINGS;
-  }
+function saveLocalSettings(settings: UserSettings) {
+  writeSessionJson(USER_SETTINGS_SESSION_KEY, settings);
+  writeLocalJson(USER_SETTINGS_VISUAL_KEY, pickVisualSettings(settings));
+  window.dispatchEvent(
+    new CustomEvent("percata:user-settings-changed", { detail: settings }),
+  );
 }
 
-function saveLocalSettings(userId: string, settings: UserSettings) {
-  try {
-    window.localStorage.setItem(toStorageKey(userId), JSON.stringify(settings));
-    window.localStorage.setItem(STORAGE_PREFIX, JSON.stringify(settings));
-    window.dispatchEvent(
-      new CustomEvent("percata:user-settings-changed", { detail: settings }),
-    );
-  } catch {
-    // noop
-  }
-}
-
-export function SettingsPanel({ scope }: { scope: string }) {
+export function SettingsPanel({ scope, embedded = false }: { scope: string; embedded?: boolean }) {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -154,6 +150,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
   };
 
   useEffect(() => {
+    cleanupUnsafeLocalStorage();
     let alive = true;
 
     async function bootstrap() {
@@ -181,7 +178,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
           if (isMissingSettingsTableError(error)) {
             if (!alive) return;
             setSyncMode("local");
-            const local = loadLocalSettings(user.id);
+            const local = loadLocalSettings();
             setSettings(local);
             return;
           }
@@ -191,12 +188,12 @@ export function SettingsPanel({ scope }: { scope: string }) {
         if (!alive) return;
 
         if (data) {
-          const local = loadLocalSettings(user.id);
+          const local = loadLocalSettings();
           const mapped = mapUserSettingsRow(data, local);
           setSettings(mapped);
-          saveLocalSettings(user.id, mapped);
+          saveLocalSettings(mapped);
         } else {
-          const local = loadLocalSettings(user.id);
+          const local = loadLocalSettings();
           setSettings(local);
         }
       } catch (error: any) {
@@ -204,7 +201,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
           toast.error("Falha ao carregar configurações: " + (sanitizeUiMessage(error?.message, 180) || "erro desconhecido"));
           const fallbackUser = await getSafeUser();
           if (fallbackUser?.id) {
-            setSettings(loadLocalSettings(fallbackUser.id));
+            setSettings(loadLocalSettings());
             setSyncMode("local");
           }
         }
@@ -248,7 +245,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
       if (key === "reducedMotion" && value === true) {
         next.showAnimations = false;
       }
-      if (userId) saveLocalSettings(userId, next);
+      if (userId) saveLocalSettings(next);
       return next;
     });
   };
@@ -285,7 +282,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
 
     try {
       const sanitized = normalizeUserSettings(settings);
-      saveLocalSettings(userId, sanitized);
+      saveLocalSettings(sanitized);
       if (syncMode === "supabase") {
         const { error } = await supabase.from("user_settings").upsert(
           toUserSettingsUpsert(userId, sanitized),
@@ -313,31 +310,33 @@ export function SettingsPanel({ scope }: { scope: string }) {
 
   const resetSettings = () => {
     setSettings(DEFAULT_USER_SETTINGS);
-    if (userId) saveLocalSettings(userId, DEFAULT_USER_SETTINGS);
+    if (userId) saveLocalSettings(DEFAULT_USER_SETTINGS);
     toast.success("Preferências restauradas. Clique em salvar para sincronizar.");
   };
 
   return (
     <div className="space-y-5 p-0">
-      <div className="overflow-hidden rounded-[22px] border border-[var(--upe-accent-washed-blue)] bg-[var(--md-surface)] p-6 shadow-sm">
+      <div className={`overflow-hidden rounded-[22px] border border-[var(--upe-accent-washed-blue)] bg-[var(--md-surface)] shadow-sm ${embedded ? "p-4" : "p-6"}`}>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--upe-blue-upe)] text-white shadow-sm">
             <Gear size={28} weight="fill" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--upe-blue-medium)]">
+            <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--upe-blue-medium)]">
               Experiência do usuário
             </p>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[#17233C]">
-              Configurações
-            </h1>
-            <p className="text-sm font-medium text-[#52627A]">
-              Ajuste sua experiência no sistema ({safeScope}).
+            {embedded ? (
+              <h2 className="font-display text-lg font-semibold text-[var(--p-color-fg)]">Minhas preferências</h2>
+            ) : (
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)]">Minhas preferências</h1>
+            )}
+            <p className="text-sm font-medium text-[var(--p-color-fg-muted)]">
+              Cores e notificações afetam apenas sua conta ({safeScope}).
             </p>
           </div>
           </div>
-          <div className="rounded-2xl border border-[var(--upe-accent-washed-blue)] bg-white/75 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-medium)]">
+          <div className="rounded-2xl border border-[var(--upe-accent-washed-blue)] bg-white/75 px-4 py-3 type-caption font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-medium)]">
             {syncLabel}
           </div>
         </div>
@@ -392,27 +391,27 @@ export function SettingsPanel({ scope }: { scope: string }) {
                 onCheckedChange={(checked) => update("notifyEmail", checked)}
               />
           </div>
-          <div className="mt-4 rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] p-3">
+          <div className="mt-4 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3E4C5F]">
+              <p className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-muted)]">
                 Canal de e-mail
               </p>
               <button
                 type="button"
                 onClick={() => loadEmailStatus()}
-                className="inline-flex h-8 items-center rounded-lg border border-[#D9E0E8] bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-upe)] hover:bg-[var(--upe-accent-washed-blue)]"
+                className="inline-flex h-8 items-center rounded-lg border border-[var(--p-color-border)] bg-white px-3 type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-upe)] hover:bg-[var(--upe-accent-washed-blue)]"
               >
                 Atualizar
               </button>
             </div>
 
-            <div className="mt-2 text-xs text-[#3E4C5F]">
+            <div className="mt-2 text-xs text-[var(--p-color-fg-muted)]">
               {emailStatusLoading && "Validando configuração de e-mail..."}
               {!emailStatusLoading && emailStatus && (
                 <div className="space-y-1.5">
                   <p>
                     Status:{" "}
-                    <span className={emailStatus.configured ? "text-[var(--upe-blue-upe)] font-semibold" : "text-[#A91520] font-semibold"}>
+                    <span className={emailStatus.configured ? "text-[var(--upe-blue-upe)] font-semibold" : "text-[var(--p-color-danger)] font-semibold"}>
                       {emailStatus.configured
                         ? `Ativo via ${emailStatus.provider.toUpperCase()}`
                         : "Não configurado"}
@@ -425,13 +424,13 @@ export function SettingsPanel({ scope }: { scope: string }) {
                       <span className="font-semibold text-[var(--upe-blue-upe)]">{emailStatus.redirectTo}</span>
                     </p>
                   ) : null}
-                  {emailStatus.reason ? <p className="text-[#A91520]">{emailStatus.reason}</p> : null}
+                  {emailStatus.reason ? <p className="text-[var(--p-color-danger)]">{emailStatus.reason}</p> : null}
                   {emailStatus.queueAvailable && emailStatus.queue ? (
-                    <p className="text-[11px] uppercase tracking-[0.08em] text-[#5B6675]">
+                    <p className="type-caption uppercase tracking-[0.08em] text-[var(--p-color-fg-muted)]">
                       fila: {emailStatus.queue.pending} pendente • {emailStatus.queue.processing} processando • {emailStatus.queue.failed} falha • {emailStatus.queue.sent} enviado
                     </p>
                   ) : (
-                    <p className="text-[11px] text-[#5B6675]">
+                    <p className="type-caption text-[var(--p-color-fg-muted)]">
                       Fila de e-mail indisponível no banco.
                     </p>
                   )}
@@ -444,12 +443,12 @@ export function SettingsPanel({ scope }: { scope: string }) {
                 type="button"
                 onClick={sendEmailTest}
                 disabled={sendingEmailTest || !userEmail || !emailStatus?.configured}
-                className="inline-flex h-9 items-center rounded-lg bg-[var(--upe-blue-upe)] px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white hover:bg-[var(--upe-blue-deep)] disabled:opacity-60"
+                className="inline-flex h-9 items-center rounded-lg bg-[var(--upe-blue-upe)] px-3 type-kicker font-semibold uppercase tracking-[0.12em] text-white hover:bg-[var(--upe-blue-deep)] disabled:opacity-60"
               >
                 {sendingEmailTest ? "Enviando..." : "Enviar teste para meu e-mail"}
               </button>
               {userEmail ? (
-                <span className="text-[11px] text-[#5B6675]">{userEmail}</span>
+                <span className="type-caption text-[var(--p-color-fg-muted)]">{userEmail}</span>
               ) : null}
             </div>
           </div>
@@ -462,7 +461,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
         >
           <div className="grid gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+              <p className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
                 Visibilidade do perfil
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -523,8 +522,8 @@ export function SettingsPanel({ scope }: { scope: string }) {
         </SettingCard>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#D9E0E8] bg-white px-4 py-3 shadow-sm">
-        <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#3E4C5F]">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[var(--p-color-border)] bg-white px-4 py-3 shadow-sm">
+        <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--p-color-fg-muted)]">
           <Lightning size={14} weight="fill" className="text-[var(--upe-blue-upe)]" />
           {loading ? "Carregando suas preferências..." : "Tudo pronto para salvar."}
         </p>
@@ -532,7 +531,7 @@ export function SettingsPanel({ scope }: { scope: string }) {
           type="button"
           onClick={resetSettings}
           disabled={loading || saving || !userId}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-upe)] shadow-sm hover:bg-[#F4F7FA] disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--upe-blue-upe)] shadow-sm hover:bg-[var(--p-color-surface-muted)] disabled:opacity-60"
         >
           <ArrowCounterClockwise size={16} weight="fill" />
           Restaurar padrão
@@ -547,6 +546,32 @@ export function SettingsPanel({ scope }: { scope: string }) {
           {saving ? "Salvando..." : "Salvar configurações"}
         </button>
       </div>
+
+      <details className="group mx-auto w-full max-w-3xl rounded-xl border border-transparent px-3 py-2 text-[var(--p-color-fg-subtle)] transition open:border-[var(--p-color-border-muted)] open:bg-white/70">
+        <summary className="cursor-pointer select-none text-center type-kicker font-semibold uppercase tracking-[0.12em] outline-none transition hover:text-[var(--p-color-fg-muted)] focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-[var(--upe-accent-washed-blue)]">
+          Informações do sistema
+        </summary>
+        <div className="mx-auto mt-3 max-w-2xl border-t border-[var(--p-color-border-muted)] px-2 py-4 text-xs leading-5 text-[var(--p-color-fg-muted)]">
+          <p>
+            <strong className="text-[var(--p-color-fg)]">PERCATA</strong> é um software
+            independente cuja titularidade é declarada por{" "}
+            <strong className="text-[var(--p-color-fg)]">
+              Matheus Ricarte de Oliveira Souza
+            </strong>
+            , desenvolvido com recursos próprios.
+          </p>
+          <p className="mt-2">
+            A disponibilização do sistema para uso pela unidade não implica cessão, doação,
+            transferência ou cotitularidade do software. A titularidade do programa não se
+            confunde com a responsabilidade e os direitos da UPE sobre os dados institucionais
+            tratados no sistema.
+          </p>
+          <p className="mt-2 text-[var(--p-color-fg-subtle)]">
+            Esta identificação registra a declaração do titular e não substitui instrumento
+            jurídico, licença formal ou registro de programa de computador.
+          </p>
+        </div>
+      </details>
     </div>
   );
 }
@@ -569,15 +594,15 @@ function SettingCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="rounded-[20px] border border-[#E1E8F0] bg-white p-5 shadow-sm"
+      className="rounded-[20px] border border-[var(--p-color-border-muted)] bg-white p-5 shadow-sm"
     >
       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--upe-accent-washed-blue)] text-[var(--upe-blue-upe)]">
         {icon}
       </div>
-      <h2 className="mt-4 font-display text-lg font-semibold tracking-tight text-[#17233C]">
+      <h2 className="mt-4 font-display text-lg font-semibold tracking-tight text-[var(--p-color-fg)]">
         {title}
       </h2>
-      <p className="mt-1 text-sm font-medium text-[#52627A]">{desc}</p>
+      <p className="mt-1 text-sm font-medium text-[var(--p-color-fg-muted)]">{desc}</p>
       <div className="mt-5">{children}</div>
     </motion.div>
   );
@@ -601,12 +626,12 @@ function ToggleRow({
       layout
       whileHover={disabled ? undefined : { y: -1 }}
       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-      className="rounded-2xl border border-[#E8EDF2] bg-[#FAFBFC] px-3 py-3"
+      className="rounded-2xl border border-[var(--p-color-surface-subtle)] bg-[var(--p-color-bg-elevated)] px-3 py-3"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[var(--upe-blue-upe)]">{label}</p>
-          <p className="mt-0.5 text-xs text-[#5B6675]">{desc}</p>
+          <p className="mt-0.5 text-xs text-[var(--p-color-fg-muted)]">{desc}</p>
         </div>
         <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
       </div>
@@ -636,7 +661,7 @@ function SegmentButton({
       className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition ${
         active
           ? "border-[var(--upe-blue-upe)] bg-[var(--upe-blue-upe)] text-white"
-          : "border-[#D9E0E8] bg-white text-[#3E4C5F] hover:bg-[#F4F7FA]"
+          : "border-[var(--p-color-border)] bg-white text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-muted)]"
       }`}
     >
       {icon}
@@ -665,7 +690,7 @@ function ColorOptionButton({
       className={`rounded-2xl border p-4 text-left transition ${
         active
           ? "border-[var(--upe-blue-upe)] bg-[var(--md-surface)] shadow-sm ring-2 ring-[var(--upe-accent-washed-blue)]"
-          : "border-[#E1E8F0] bg-white hover:bg-[#FAFBFC]"
+          : "border-[var(--p-color-border-muted)] bg-white hover:bg-[var(--p-color-bg-elevated)]"
       }`}
     >
       <div className="flex items-center gap-2">
@@ -678,9 +703,9 @@ function ColorOptionButton({
         ))}
       </div>
       <p className="mt-4 text-sm font-semibold text-[var(--upe-blue-upe)]">{option.label}</p>
-      <p className="mt-1 text-xs leading-5 text-[#52627A]">{option.desc}</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">{option.desc}</p>
       <span
-        className={`mt-4 inline-flex h-7 items-center rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+        className={`mt-4 inline-flex h-7 items-center rounded-full px-3 type-kicker font-semibold uppercase tracking-[0.12em] ${
           active ? "bg-[var(--upe-blue-upe)] text-white" : "bg-[var(--upe-accent-washed-blue)] text-[var(--upe-blue-medium)]"
         }`}
       >

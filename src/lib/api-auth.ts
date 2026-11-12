@@ -73,7 +73,7 @@ export function withAuthorizedRole<TParams = unknown>(
 
   return async function authorizedRoute(
     request: NextRequest,
-    routeCtx?: { params: Promise<TParams> | TParams },
+    routeCtx: { params: Promise<TParams> },
   ): Promise<NextResponse> {
     try {
       const supabase = await createClient();

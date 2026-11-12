@@ -37,10 +37,10 @@ type ActionPayload =
       ativo: boolean;
     }
   | {
-      action: "set_unit_chefia";
+      action: "set_unit_chefia" | "remove_unit_chefia";
       unit_type: "departamento" | "laboratorio";
       unit_id: string;
-      user_id?: string | null;
+      user_id: string;
     }
   | {
       action: "seed_petrolina";
@@ -165,7 +165,7 @@ async function fetchChefiaAssignments(
   service: ReturnType<typeof getServiceClient>,
   units: UnitReference[],
 ) {
-  if (units.length === 0) return new Map<string, any>();
+  if (units.length === 0) return buildChefiaAssignmentMap([], [], []);
 
   const ids = units.map((unit) => unit.id);
   const { data, error } = await service
@@ -199,14 +199,12 @@ async function fetchChefiaOptions(
   let query = service
     .from("profiles")
     .select("id, full_name, email, role, campus_id, avatar_url")
+    .eq("is_active", true)
+    .in("role", ["solicitante", "chefia", "superadmin"])
     .order("full_name", { ascending: true });
 
   if (campusId) {
-    query = query.or(
-      `campus_id.eq.${campusId},role.eq.chefia,role.eq.admin,role.eq.superadmin`,
-    );
-  } else {
-    query = query.in("role", ["chefia", "admin", "superadmin"]);
+    query = query.eq("campus_id", campusId);
   }
 
   const { data, error } = await query;
@@ -258,11 +256,13 @@ export const GET = withAuthorizedRole(["superadmin"], async ({ request }) => {
     const chefias = await fetchChefiaAssignments(service, unitRows);
     const departamentos = deptResult.map((row: any) => ({
       ...row,
-      chefia: chefias.get(`departamento:${row.id}`) || null,
+      chefias: chefias.get(`departamento:${row.id}`) || [],
+      chefia: chefias.get(`departamento:${row.id}`)?.[0] || null,
     }));
     const laboratorios = labs.map((row: any) => ({
       ...row,
-      chefia: chefias.get(`laboratorio:${row.id}`) || null,
+      chefias: chefias.get(`laboratorio:${row.id}`) || [],
+      chefia: chefias.get(`laboratorio:${row.id}`)?.[0] || null,
     }));
 
     return NextResponse.json({
@@ -280,7 +280,7 @@ export const GET = withAuthorizedRole(["superadmin"], async ({ request }) => {
   }
 });
 
-export const POST = withAuthorizedRole(["superadmin"], async ({ request }) => {
+export const POST = withAuthorizedRole(["superadmin"], async ({ request, user }) => {
   try {
     const payload = (await request.json()) as ActionPayload;
     if (!hasServiceCredentials()) {
@@ -359,12 +359,16 @@ export const POST = withAuthorizedRole(["superadmin"], async ({ request }) => {
 
       const labsMeta = await fetchLaboratorios(service);
       const hasCampus = labsMeta.hasCampusId;
+      if (hasCampus && !campusId) {
+        return NextResponse.json(
+          { error: "Campus é obrigatório para cadastrar laboratório." },
+          { status: 400 },
+        );
+      }
 
       if (id) {
         const basePatch: Record<string, any> = { nome, ativo: true };
-        if (hasCampus) {
-          basePatch.campus_id = campusId || null;
-        }
+        if (hasCampus) basePatch.campus_id = campusId;
         const { error } = await service
           .from("laboratorios")
           .update(basePatch)
@@ -388,9 +392,7 @@ export const POST = withAuthorizedRole(["superadmin"], async ({ request }) => {
       }
 
       const insertPayload: Record<string, any> = { nome, ativo: true };
-      if (hasCampus) {
-        insertPayload.campus_id = campusId || null;
-      }
+      if (hasCampus) insertPayload.campus_id = campusId;
       const { error } = await service.from("laboratorios").insert(insertPayload);
       if (error) throw error;
       return NextResponse.json({ ok: true });
@@ -418,71 +420,28 @@ export const POST = withAuthorizedRole(["superadmin"], async ({ request }) => {
       return NextResponse.json({ ok: true });
     }
 
-    if (payload.action === "set_unit_chefia") {
-      const unitType = normalizeUnitType(payload.unit_type);
+    if (payload.action === "set_unit_chefia" || payload.action === "remove_unit_chefia") {
       const unitId = sanitizeUuid(payload.unit_id);
-      const userId = payload.user_id ? sanitizeUuid(payload.user_id) : null;
-
-      if (!unitId) {
+      const userId = sanitizeUuid(payload.user_id);
+      if (!["departamento", "laboratorio"].includes(payload.unit_type) || !unitId || !userId) {
         return NextResponse.json(
-          { error: "Unidade é obrigatória para definir chefia." },
+          { error: "Informe o setor ou laboratório e a pessoa cuja chefia será alterada." },
           { status: 400 },
         );
       }
-      if (payload.user_id && !userId) {
-        return NextResponse.json(
-          { error: "Usuário informado para chefia é inválido." },
-          { status: 400 },
-        );
+      const { data, error } = await service.rpc("manage_unit_chefia", {
+        p_actor: user.id,
+        p_unit_type: normalizeUnitType(payload.unit_type),
+        p_unit_id: unitId,
+        p_user_id: userId,
+        p_remove: payload.action === "remove_unit_chefia",
+      });
+      if (error) {
+        const status = error.code === "42501" ? 403 : error.code === "P0002" ? 404
+          : ["23514", "22023"].includes(error.code) ? 409 : 500;
+        return NextResponse.json({ error: error.message }, { status });
       }
-
-      if (userId) {
-        const { data: profile, error: profileError } = await service
-          .from("profiles")
-          .select("id, role")
-          .eq("id", userId)
-          .maybeSingle();
-        if (profileError) throw profileError;
-        if (!profile?.id) {
-          return NextResponse.json(
-            { error: "Usuário selecionado não encontrado." },
-            { status: 404 },
-          );
-        }
-
-        if (!["chefia", "admin", "superadmin"].includes(String(profile.role))) {
-          const { error } = await service
-            .from("profiles")
-            .update({ role: "chefia" })
-            .eq("id", userId);
-          if (error) throw error;
-        }
-      }
-
-      const { error: deleteError } = await service
-        .from("user_units")
-        .delete()
-        .eq("unit_type", unitType)
-        .eq("unit_id", unitId)
-        .eq("role_in_unit", "chefia");
-      if (deleteError) throw deleteError;
-
-      if (userId) {
-        const { error: insertError } = await service
-          .from("user_units")
-          .upsert(
-            {
-              user_id: userId,
-              unit_type: unitType,
-              unit_id: unitId,
-              role_in_unit: "chefia",
-            },
-            { onConflict: "user_id,unit_type,unit_id" },
-          );
-        if (insertError) throw insertError;
-      }
-
-      return NextResponse.json({ ok: true });
+      return NextResponse.json(data);
     }
 
     if (payload.action === "seed_petrolina") {

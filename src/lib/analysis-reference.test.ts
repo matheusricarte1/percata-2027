@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { analysisDisplayItem } from "./analysis-reference";
+import { AnalysisSession } from "./analysis-session";
+import type { AnalysisDfd } from "./dfd-analysis";
+import { InlineItemRow } from "../components/triagem/InlineItemRow";
+import { summarizeDfd } from "./dfd-analysis-queue";
+const own = { id: "item", descricao: "Papel", quantidade: 10, valor_unitario_estimado: 2, criticidade: null, moscow_categoria: null, is_highlight_item: false };
+const reference = { ...own, quantidade: 151, criticidade: "alta", moscow_categoria: "deve_ter" };
+const dfd: AnalysisDfd = { id: "dfd", numero_protocolo: "DFD-TESTE", objeto_contratacao: "Papel", justificativa_contratacao: "Uso", status: "triagem", requester: "Nancy", sector: "Matemática", created_at: "2026-10-09", valor_total_estimado: 20, revision: "base", items: [own], draft: null, referenceEvaluation: { actorId: "chief", name: "Nancy", avatarUrl: null, updatedAt: "2026-10-09T13:00:00Z", baseRevision: "base", items: [reference] } };
+test("consulta exibe quantidade e decisões da chefia sem modificar a sessão administrativa", () => {
+ const session = new AnalysisSession({ dfd, actorId: "admin", send: async () => { throw new Error("consulta não grava"); } });
+ assert.equal(analysisDisplayItem(dfd, own).quantidade,151);
+ assert.equal(analysisDisplayItem(dfd, own).criticidade,"alta");
+ assert.equal(session.getSnapshot().working.items[0].quantidade,10);
+ assert.equal(session.getSnapshot().dirty,false);
+ assert.equal(analysisDisplayItem({ ...dfd, revision: "changed" },own),own);
+ session.dispose();
+});
+test("visão compacta mostra quantidade real e retirada administrativa acessível", () => {
+ const session = new AnalysisSession({ dfd, actorId: "admin", send: async () => ({ ok: true }), storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } });
+ session.start();
+ const html = renderToStaticMarkup(React.createElement(InlineItemRow,{ item: own, dfdSummary: summarizeDfd(dfd), session, compactMode: true, adminRemoval: true, onRemoveRequest: () => {}, onOpenDfd: () => {} }));
+ assert.match(html,/Quantidade: 151/);
+ assert.match(html,/Impacto · Alto/);
+ assert.match(html,/Quando · Essencial/);
+ assert.match(html,/<button[^>]*aria-label="Retirar item Papel"/);
+ assert.doesNotMatch(html,/<button[^>]*disabled=""[^>]*aria-label="Retirar item Papel"/);
+ session.dispose();
+});

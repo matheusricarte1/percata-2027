@@ -1,4 +1,4 @@
-type WorkbookSheet = {
+export type WorkbookSheet = {
   name: string;
   rows: Array<Record<string, unknown>>;
 };
@@ -11,9 +11,10 @@ function sanitizeSheetName(name: string) {
 
 function protectExcelCell(value: unknown) {
   if (typeof value !== "string") return value;
-  const trimmed = value.trimStart();
-  if (/^[=+\-@]/.test(trimmed)) return `'${value}`;
-  return value;
+  const clean = value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+  const trimmed = clean.trimStart();
+  if (/^[=+\-@]/.test(trimmed)) return `'${clean}`;
+  return clean;
 }
 
 function collectHeaders(rows: Array<Record<string, unknown>>) {
@@ -24,8 +25,9 @@ function collectHeaders(rows: Array<Record<string, unknown>>) {
   return Array.from(headers);
 }
 
-export async function downloadWorkbookFromSheets(sheets: WorkbookSheet[], filename: string) {
-  const ExcelJS = await import("exceljs");
+export async function buildWorkbookBuffer(sheets: WorkbookSheet[]) {
+  const excelModule = await import("exceljs");
+  const ExcelJS = excelModule.default || excelModule;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "PERCATA";
   workbook.created = new Date();
@@ -49,9 +51,14 @@ export async function downloadWorkbookFromSheets(sheets: WorkbookSheet[], filena
 
     worksheet.getRow(1).font = { bold: true };
     worksheet.views = [{ state: "frozen", ySplit: 1 }];
+    if (headers.length) worksheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
   }
 
-  const buffer = await workbook.xlsx.writeBuffer();
+  return workbook.xlsx.writeBuffer();
+}
+
+export async function downloadWorkbookFromSheets(sheets: WorkbookSheet[], filename: string) {
+  const buffer = await buildWorkbookBuffer(sheets);
   const blob = new Blob([buffer as BlobPart], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });

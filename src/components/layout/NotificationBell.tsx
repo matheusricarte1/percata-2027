@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Check, Clock } from "@phosphor-icons/react";
+import { Bell } from "@/components/icons/phosphor/exports/Bell";
+import { Check } from "@/components/icons/phosphor/exports/Check";
+import { Clock } from "@/components/icons/phosphor/exports/Clock";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { notificationActionHref } from "@/lib/notification-action-href";
 import { getSafeUser, supabase } from "@/lib/supabase";
 
 type NotificationBellProps = {
@@ -29,10 +32,10 @@ type ParsedNotificationMessage = {
 };
 
 const TYPE_STYLE_MAP: Record<string, string> = {
-  info: "border-[#DCEAF0] bg-[#F4F7FA] text-[#1C5A6B]",
-  success: "border-[#CFE6DE] bg-[#E7F0EA] text-[#5F735C]",
-  warning: "border-[#F3D0BE] bg-[#FFF3E6] text-[#B9895A]",
-  error: "border-[#F5A3A3] bg-[#FEEFF0] text-[#A91520]",
+  info: "border-[var(--p-color-info-border)] bg-[var(--p-color-surface-muted)] text-[var(--p-color-collab)]",
+  success: "border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+  warning: "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+  error: "border-[var(--p-color-danger-border)] bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]",
 };
 
 function sanitizeUrl(value: unknown) {
@@ -65,7 +68,7 @@ function parseNotificationMessage(raw: string): ParsedNotificationMessage {
       body: String(payload.body || payload.message || "").trim() || fallback.body,
       imageUrl: sanitizeUrl(payload.image_url || payload.imageUrl),
       ctaLabel: String(payload.cta_label || payload.ctaLabel || "").trim() || null,
-      ctaUrl: sanitizeUrl(payload.cta_url || payload.ctaUrl),
+      ctaUrl: notificationActionHref(payload.cta_url || payload.ctaUrl),
       senderName: String(payload.sender_name || payload.senderName || "").trim() || null,
     };
   } catch {
@@ -79,6 +82,8 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
@@ -93,11 +98,13 @@ export function NotificationBell({
     let timer: ReturnType<typeof setInterval> | null = null;
 
     async function loadNotifications() {
+      try {
       const user = await getSafeUser();
-      if (!user || !active) return;
+      if (!active) return;
+      if (!user) { setLoadError(true); setLoading(false); return; }
       setCurrentUserId(user.id);
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("notifications")
         .select("id,title,message,type,read,created_at")
         .eq("user_id", user.id)
@@ -105,8 +112,11 @@ export function NotificationBell({
         .limit(20);
 
       if (!active) return;
+      if (error) throw error;
+      setLoadError(false);
       setNotifications((data || []) as NotificationRow[]);
       setLoading(false);
+      } catch { if (active) { setLoadError(true); setLoading(false); } }
     }
 
     loadNotifications();
@@ -116,7 +126,7 @@ export function NotificationBell({
       active = false;
       if (timer) clearInterval(timer);
     };
-  }, []);
+  }, [retryKey]);
 
   async function markAsRead(id: string) {
     const previous = notifications;
@@ -164,13 +174,13 @@ export function NotificationBell({
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "relative flex h-10 w-10 items-center justify-center rounded-full text-[#2E3A4A] transition hover:bg-[var(--upe-accent-washed-blue)]",
+          "relative flex h-10 w-10 items-center justify-center rounded-full text-[var(--p-color-fg-default)] transition hover:bg-[var(--p-color-info-bg)]",
           className,
         )}
       >
         <Bell size={20} />
         {showUnreadCount && unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--upe-red-upe)] px-1 text-[9px] font-semibold text-white">
+          <span className="absolute right-1.5 top-1.5 inline-flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--p-color-danger)] px-1 type-micro font-semibold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -195,19 +205,20 @@ export function NotificationBell({
             animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 z-50 mt-2 w-[360px] overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white shadow-[var(--elevation-4)]"
+            className="absolute right-0 z-50 mt-2 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-[var(--p-color-border)] bg-white shadow-[var(--elevation-4)]"
           >
-            <div className="flex items-center justify-between border-b border-[#E8EDF2] px-4 py-3">
+            <div className="flex items-center justify-between border-b border-[var(--p-color-surface-subtle)] px-4 py-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+                <p className="type-caption font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
                   Alertas do Usuário
                 </p>
-                <h3 className="text-sm font-semibold text-[var(--upe-blue-upe)]">Notificações</h3>
+                <h3 className="text-sm font-semibold text-[var(--p-color-brand-500)]">Notificações</h3>
               </div>
               <button
                 type="button"
+                disabled={loading || loadError || unreadCount === 0}
                 onClick={markAllAsRead}
-                className="rounded-lg border border-[#D9E0E8] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#3E4C5F] transition hover:bg-[#F4F7FA]"
+                className="rounded-lg border border-[var(--p-color-border)] px-2.5 py-1 type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-muted)] transition hover:bg-[var(--p-color-surface-muted)]"
               >
                 Marcar todas
               </button>
@@ -219,26 +230,28 @@ export function NotificationBell({
                   {Array.from({ length: 3 }).map((_, index) => (
                     <div
                       key={`notif-skeleton-${index}`}
-                      className="rounded-xl border border-[#E8EDF2] bg-white px-3 py-3"
+                      className="rounded-xl border border-[var(--p-color-surface-subtle)] bg-white px-3 py-3"
                     >
-                      <div className="h-2.5 w-24 rounded-full bg-[#E8EDF2] skeleton-shimmer" />
-                      <div className="mt-2 h-3 w-4/5 rounded-full bg-[#E8EDF2] skeleton-shimmer" />
-                      <div className="mt-1.5 h-2.5 w-2/3 rounded-full bg-[#E8EDF2] skeleton-shimmer" />
+                      <div className="h-2.5 w-24 rounded-full bg-[var(--p-color-surface-subtle)] skeleton-shimmer" />
+                      <div className="mt-2 h-3 w-4/5 rounded-full bg-[var(--p-color-surface-subtle)] skeleton-shimmer" />
+                      <div className="mt-1.5 h-2.5 w-2/3 rounded-full bg-[var(--p-color-surface-subtle)] skeleton-shimmer" />
                     </div>
                   ))}
                 </div>
+              ) : loadError ? (
+                <div role="status" className="px-5 py-6 text-sm"><p className="font-semibold">Não foi possível atualizar as notificações.</p><button type="button" onClick={() => { setLoading(true); setRetryKey(key => key + 1); }} className="mt-3 min-h-11 rounded-xl border px-3 font-semibold">Tentar novamente</button></div>
               ) : notifications.length === 0 ? (
-                <div className="px-5 py-6 text-center text-xs text-[#7D98B8]">
+                <div className="px-5 py-6 text-center text-xs text-[var(--p-color-fg-subtle)]">
                   <img
                     src="/guidance/notifications-empty.png"
                     alt=""
                     className="mx-auto mb-3 aspect-[16/9] w-full max-w-[220px] object-contain"
                   />
-                  <p className="font-semibold text-[#164073]">Nenhuma notificação até o momento.</p>
+                  <p className="font-semibold text-[var(--p-color-brand-500)]">Nenhuma notificação até o momento.</p>
                   <p className="mt-1 leading-5">Quando houver movimentações nas suas DFDs, elas aparecerão aqui.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-[#E8EDF2]">
+                <div className="divide-y divide-[var(--p-color-surface-subtle)]">
                   {notifications.map((notification) => {
                     const parsedMessage = parseNotificationMessage(notification.message);
                     return (
@@ -259,20 +272,20 @@ export function NotificationBell({
                           <div className="flex items-center gap-2">
                             <span
                               className={cn(
-                                "rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]",
+                                "rounded-full border px-2 py-0.5 type-micro font-semibold uppercase tracking-[0.12em]",
                                 TYPE_STYLE_MAP[notification.type || "info"] || TYPE_STYLE_MAP.info,
                               )}
                             >
-                              {notification.type || "info"}
+                              {({ info: "Informação", success: "Concluído", warning: "Atenção", error: "Erro" })[notification.type || "info"]}
                             </span>
                             {!notification.read && (
-                              <span className="h-2 w-2 rounded-full bg-[var(--upe-red-upe)]" />
+                              <span className="h-2 w-2 rounded-full bg-[var(--p-color-danger)]" />
                             )}
                           </div>
-                          <p className="mt-2 text-sm font-semibold text-[var(--upe-blue-upe)]">
+                          <p className="mt-2 text-sm font-semibold text-[var(--p-color-brand-500)]">
                             {notification.title}
                           </p>
-                          <p className="mt-1 text-xs leading-relaxed text-[#5B6675]">
+                          <p className="mt-1 text-xs leading-relaxed text-[var(--p-color-fg-muted)]">
                             {parsedMessage.body || "Você recebeu uma atualização no sistema."}
                           </p>
                           {parsedMessage.imageUrl ? (
@@ -282,26 +295,26 @@ export function NotificationBell({
                               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                               src={parsedMessage.imageUrl}
                               alt={notification.title}
-                              className="mt-2 max-h-40 w-full rounded-lg border border-[#D9E0E8] object-cover"
+                              className="mt-2 max-h-40 w-full rounded-lg border border-[var(--p-color-border)] object-cover"
                               loading="lazy"
                             />
                           ) : null}
                           {parsedMessage.senderName ? (
-                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7D98B8]">
+                            <p className="mt-1 type-kicker font-semibold uppercase tracking-[0.1em] text-[var(--p-color-fg-subtle)]">
                               Enviado por {parsedMessage.senderName}
                             </p>
                           ) : null}
                           {parsedMessage.ctaLabel && parsedMessage.ctaUrl ? (
                             <a
                               href={parsedMessage.ctaUrl}
-                              target="_blank"
+                              target={parsedMessage.ctaUrl.startsWith("/") ? undefined : "_blank"}
                               rel="noreferrer"
-                              className="mt-2 inline-flex h-8 items-center rounded-lg border border-[#C7D7EA] bg-white px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#164073] transition hover:-translate-y-0.5 hover:bg-[#F4F7FA]"
+                              className="mt-2 inline-flex h-8 items-center rounded-lg border border-[var(--p-color-info-border)] bg-white px-2.5 type-kicker font-semibold uppercase tracking-[0.1em] text-[var(--p-color-brand-500)] transition hover:-translate-y-0.5 hover:bg-[var(--p-color-surface-muted)]"
                             >
                               {parsedMessage.ctaLabel}
                             </a>
                           ) : null}
-                          <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.1em] text-[#A7B1BD]">
+                          <p className="mt-2 inline-flex items-center gap-1 type-kicker font-medium uppercase tracking-[0.1em] text-[var(--p-color-border-strong)]">
                             <Clock size={12} />
                             {formatTimeLabel(notification.created_at)}
                           </p>
@@ -311,7 +324,7 @@ export function NotificationBell({
                           <button
                             type="button"
                             onClick={() => markAsRead(notification.id)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#D9E0E8] text-[var(--upe-blue-medium)] transition hover:bg-[var(--upe-accent-washed-blue)]"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--p-color-border)] text-[var(--p-color-brand-400)] transition hover:bg-[var(--p-color-info-bg)]"
                             aria-label="Marcar notificação como lida"
                           >
                             <Check size={14} />
@@ -330,3 +343,4 @@ export function NotificationBell({
     </div>
   );
 }
+

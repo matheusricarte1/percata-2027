@@ -4,6 +4,10 @@ import {
   UNIVERSITY_CUSTEIO_KIT_TEMPLATES,
 } from "@/lib/university-custeio-kits";
 import { withAuthorizedRole } from "@/lib/api-auth";
+import {
+  normalizeCatalogCode,
+  resolveLegacyCatalogIdsByCode,
+} from "@/lib/catalog-legacy-bridge";
 
 export const POST = withAuthorizedRole(
   ["superadmin"],
@@ -18,16 +22,27 @@ export const POST = withAuthorizedRole(
     );
 
     const { data: catalogItems, error: catalogError } = await admin
-      .from("catalogo")
+      .from("catalogo_efisco_v2")
       .select("id,codigo_efisco,descricao,gnd_preferencial")
       .in("codigo_efisco", allCodes);
     if (catalogError) throw catalogError;
 
+    const legacyIdByCode = await resolveLegacyCatalogIdsByCode(
+      admin,
+      (catalogItems || []).map((item: any) => normalizeCatalogCode(item.codigo_efisco)),
+    );
+
     const catalogByCode = new Map(
-      (catalogItems || []).map((item: any) => [
-        String(item.codigo_efisco || "").trim(),
-        item,
-      ]),
+      (catalogItems || []).map((item: any) => {
+        const code = normalizeCatalogCode(item.codigo_efisco);
+        return [
+          code,
+          {
+            ...item,
+            legacy_catalogo_id: legacyIdByCode.get(code) || null,
+          },
+        ];
+      }),
     );
 
     const results: Array<{
@@ -76,10 +91,10 @@ export const POST = withAuthorizedRole(
       const kitRows = template.itens
         .map((item) => {
           const catalogItem = catalogByCode.get(item.codigoEfisco);
-          if (!catalogItem) return null;
+          if (!catalogItem?.legacy_catalogo_id) return null;
           return {
             kit_id: kit.id,
-            item_id: catalogItem.id,
+            item_id: catalogItem.legacy_catalogo_id,
             quantidade: item.quantidade,
           };
         })
@@ -107,7 +122,7 @@ export const POST = withAuthorizedRole(
         kitId: kit.id,
         insertedItems: kitRows.length,
         unmatched: template.itens
-          .filter((item) => !catalogByCode.has(item.codigoEfisco))
+          .filter((item) => !catalogByCode.get(item.codigoEfisco)?.legacy_catalogo_id)
           .map((item) => item.codigoEfisco),
       });
     }

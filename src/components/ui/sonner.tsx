@@ -2,21 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
-import {
-  CircleCheckIcon,
-  InfoIcon,
-  TriangleAlertIcon,
-  OctagonXIcon,
-  Loader2Icon,
-} from "lucide-react";
+import { CircleCheckIcon } from "@/components/icons/lucide/exports/CircleCheckIcon";
+import { InfoIcon } from "@/components/icons/lucide/exports/InfoIcon";
+import { TriangleAlertIcon } from "@/components/icons/lucide/exports/TriangleAlertIcon";
+import { OctagonXIcon } from "@/components/icons/lucide/exports/OctagonXIcon";
+import { Loader2Icon } from "@/components/icons/lucide/exports/Loader2Icon";
 
 /**
  * Toaster do PERCATA.
  *
- * Antes: usava `next-themes` para resolver o tema. Mas o resto do app
- * controla dark mode via `html[data-theme-mode="dark"]` (manipulado pelo
- * AppProviders via localStorage). Resultado: toast podia renderizar em
- * tema oposto à página.
+ * O resto do app controla dark mode via `html[data-theme-mode="dark"]`
+ * (manipulado pelo AppProviders via localStorage). O toast acompanha esse
+ * dataset diretamente para não depender de outro dono de tema.
  *
  * Agora: lê diretamente o dataset do <html>, com fallback para
  * `prefers-color-scheme`. Fonte única alinhada com tokens.css.

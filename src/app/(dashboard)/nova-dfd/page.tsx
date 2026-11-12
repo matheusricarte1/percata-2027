@@ -2,24 +2,22 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Buildings,
-  Calendar,
-  Briefcase,
-  CheckCircle,
-  CircleNotch,
-  Flask,
-  GraduationCap,
-  Handshake,
-  Info,
-  SquaresFour,
-  StackSimple,
-  Target,
-  Trash,
-  WarningCircle,
-} from "@phosphor-icons/react";
+import { ArrowLeft } from "@/components/icons/phosphor/exports/ArrowLeft";
+import { ArrowRight } from "@/components/icons/phosphor/exports/ArrowRight";
+import { Buildings } from "@/components/icons/phosphor/exports/Buildings";
+import { Calendar } from "@/components/icons/phosphor/exports/Calendar";
+import { Briefcase } from "@/components/icons/phosphor/exports/Briefcase";
+import { CheckCircle } from "@/components/icons/phosphor/exports/CheckCircle";
+import { CircleNotch } from "@/components/icons/phosphor/exports/CircleNotch";
+import { Flask } from "@/components/icons/phosphor/exports/Flask";
+import { GraduationCap } from "@/components/icons/phosphor/exports/GraduationCap";
+import { Handshake } from "@/components/icons/phosphor/exports/Handshake";
+import { Info } from "@/components/icons/phosphor/exports/Info";
+import { SquaresFour } from "@/components/icons/phosphor/exports/SquaresFour";
+import { StackSimple } from "@/components/icons/phosphor/exports/StackSimple";
+import { Target } from "@/components/icons/phosphor/exports/Target";
+import { Trash } from "@/components/icons/phosphor/exports/Trash";
+import { WarningCircle } from "@/components/icons/phosphor/exports/WarningCircle";
 import { useRouter } from "next/navigation";
 import { useCarrinhoStore } from "@/store/carrinho";
 import { getSafeUser, supabase } from "@/lib/supabase";
@@ -58,6 +56,22 @@ import {
   getDfdProcessChecklist,
 } from "@/lib/dfd-process-guide";
 import { useDfdDraft } from "@/lib/use-dfd-draft";
+import {
+  restoreDfdDraftCartItems,
+  snapshotDfdDraftCartItems,
+} from "@/lib/dfd-draft-cart";
+import { sanitizePlanningSubsidies, type DfdPlanningSubsidies } from "@/lib/dfd-planning";
+import { resolveDfdFiscalFields } from "@/lib/catalog-fiscal";
+import { getDfdFinalizationCopy } from "@/lib/dfd-finalization";
+import { useSubmissionPolicy } from "@/lib/use-submission-policy";
+import {
+  OperationalChip,
+  OperationalEmptyState,
+  OperationalKpiCard,
+  OperationalStepper,
+  SkeuoDocumentCard,
+  SkeuoProgressRail,
+} from "@/components/ui/operational";
 
 type UnitType = "departamento" | "laboratorio";
 type GroupingMode = "grupo" | "classe" | "livre" | "coletiva";
@@ -80,6 +94,7 @@ interface DFDGroup {
     analysis_routing_reason: string;
     finalidade: DfdPurpose | "";
     contexto_academico: AcademicContext | "";
+    planning_subsidies: DfdPlanningSubsidies;
   };
 }
 
@@ -361,6 +376,7 @@ function buildCollectiveContributionFromItem({
     gnd: String(item.item_efisco?.gnd || ""),
     gnd_derivado: String(item.item_efisco?.gnd_derivado || item.item_efisco?.gnd || ""),
     codigo_natureza_despesa: item.item_efisco?.codigo_natureza_despesa || null,
+    requires_natureza_review: Boolean(item.item_efisco?.requires_natureza_review),
     tipo_objeto: item.item_efisco?.tipo_objeto || null,
     codigo_grupo: item.item_efisco?.codigo_grupo || null,
     nome_grupo: item.item_efisco?.nome_grupo || null,
@@ -377,7 +393,8 @@ function buildCollectiveContributionFromItem({
 
 export default function NovaDFDPage() {
   const router = useRouter();
-  const { items, clearCarrinho, removeItem } = useCarrinhoStore();
+  const submissionPolicy = useSubmissionPolicy();
+  const { items, clearCarrinho, removeItem, restoreDraftItems } = useCarrinhoStore();
   const [dfdGroups, setDfdGroups] = useState<DFDGroup[]>([]);
   const [userUnits, setUserUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -385,11 +402,13 @@ export default function NovaDFDPage() {
   const [finalizeMode, setFinalizeMode] = useState<FinalizeMode>("draft");
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("grupo");
   const [showGuide, setShowGuide] = useState(true);
+  const finalizationCopy = getDfdFinalizationCopy(finalizeMode);
 
   // Autosave do wizard (migration 0042 + dfdDraftActions).
   // Salva groupingMode + formData de cada grupo (não os itens, que já vivem
   // no Zustand carrinho persistente). Restaura ao montar; limpa após finalize.
   const draft = useDfdDraft();
+  const { save: scheduleDraftSave, loading: draftLoading } = draft;
   const draftRestoredRef = React.useRef(false);
   const [pendingFormRestoreMap, setPendingFormRestoreMap] = useState<
     Record<string, DFDGroup["formData"]> | null
@@ -406,15 +425,24 @@ export default function NovaDFDPage() {
     const payload = draft.draft.payload as {
       groupingMode?: GroupingMode;
       groupForms?: Record<string, DFDGroup["formData"]>;
+      cartItems?: unknown;
       showGuide?: boolean;
     };
+    const restoredCartItems = restoreDfdDraftCartItems(payload.cartItems);
+    if (restoredCartItems.length > 0) {
+      // Os itens restaurados passam por validação estrutural no helper de
+      // rascunhos. A serialização do Zustand remove a identidade de tipo,
+      // por isso a conversão precisa passar por unknown antes de voltar ao
+      // tipo do carrinho.
+      restoreDraftItems(restoredCartItems as unknown as typeof items);
+    }
     if (payload.groupingMode) setGroupingMode(payload.groupingMode);
     if (typeof payload.showGuide === "boolean") setShowGuide(payload.showGuide);
     // groupForms é aplicado no effect que reconstrói dfdGroups (logo abaixo),
     // através de uma ref consultada lá.
     setPendingFormRestoreMap(payload.groupForms || null);
     draftRestoredRef.current = true;
-  }, [draft.loading, draft.draft]);
+  }, [draft.loading, draft.draft, restoreDraftItems]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -454,6 +482,7 @@ export default function NovaDFDPage() {
           analysis_routing_reason: "",
           finalidade: "",
           contexto_academico: "",
+          planning_subsidies: {},
         };
         const restored = restoreMap?.[key];
         return {
@@ -474,22 +503,23 @@ export default function NovaDFDPage() {
   // Autosave: a cada mudança de dfdGroups/groupingMode/showGuide, agenda save.
   // O hook tem debounce 1500ms + dedup por hash; chamar sempre é seguro.
   useEffect(() => {
-    if (draft.loading || !draftRestoredRef.current) return;
+    if (!submissionPolicy.canCreate || draftLoading || !draftRestoredRef.current) return;
     if (dfdGroups.length === 0 && items.length === 0) return;
     const groupForms: Record<string, DFDGroup["formData"]> = {};
     dfdGroups.forEach((g) => {
       groupForms[g.key] = g.formData;
     });
-    draft.save(
+    scheduleDraftSave(
       {
         groupingMode,
         groupForms,
+        cartItems: snapshotDfdDraftCartItems(items),
         showGuide,
         savedAt: new Date().toISOString(),
       },
       groupingMode,
     );
-  }, [dfdGroups, groupingMode, showGuide, items.length, draft]);
+  }, [dfdGroups, groupingMode, showGuide, items, scheduleDraftSave, draftLoading, submissionPolicy.canCreate]);
 
   // Surface de erro de autosave: avisa o usuário se o BD recusar.
   // Não toasta sucesso a cada save para não poluir; só mostra erros novos.
@@ -623,6 +653,29 @@ export default function NovaDFDPage() {
     });
   };
 
+  const updateGroupPlanningSubsidy = (
+    groupIndex: number,
+    field: string,
+    value: string,
+  ) => {
+    setDfdGroups((prev) =>
+      prev.map((group, index) =>
+        index === groupIndex
+          ? {
+              ...group,
+              formData: {
+                ...group.formData,
+                planning_subsidies: {
+                  ...group.formData.planning_subsidies,
+                  [field]: value,
+                },
+              },
+            }
+          : group,
+      ),
+    );
+  };
+
   const applyRoutingRecommendation = (groupIndex: number) => {
     setDfdGroups((prev) => {
       const next = prev.map((group, index) =>
@@ -731,7 +784,10 @@ export default function NovaDFDPage() {
         if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
           errors.push(`${itemLabel}: informe um valor unitário maior que zero.`);
         }
-        if (!gnd) errors.push(`${itemLabel}: GND não informado.`);
+        if (!gnd) errors.push(`${itemLabel}: tipo de despesa não identificado.`);
+        if (gnd === "SEM_NATUREZA" && !item.item_efisco?.requires_natureza_review) {
+          errors.push(`${itemLabel}: item sem natureza precisa estar marcado para revisão.`);
+        }
         if (!link) errors.push(`${itemLabel}: adicione um link de referência.`);
         if (link && !isValidReferenceLink(link)) {
           errors.push(`${itemLabel}: use um link válido (http/https).`);
@@ -808,6 +864,7 @@ export default function NovaDFDPage() {
   };
 
   const handleFinalize = async (mode: FinalizeMode = "draft") => {
+    if (!submissionPolicy.canCreate) { toast.error("O prazo de novas solicitações encerrou. Solicite liberação ao superadmin."); return; }
     if (blockingErrors.length > 0) {
       toast.error(
         `Faltam ${blockingErrors.length} ajuste(s) antes de concluir. Exemplo: ${blockingErrors[0]}`,
@@ -853,6 +910,7 @@ export default function NovaDFDPage() {
         valorTotalEstimado: number;
         itemsToInsert: Array<Record<string, any>>;
       }) => {
+        const planningSubsidies = sanitizePlanningSubsidies(group.formData.planning_subsidies);
         const dfdPayload = {
           numero_protocolo: buildNumeroProtocolo(groupIndex),
           solicitante_id: user.id,
@@ -865,8 +923,9 @@ export default function NovaDFDPage() {
           analysis_routing_reason:
             group.formData.analysis_routing_reason.trim() || null,
           objeto_contratacao: group.formData.objeto,
-          justificativa_contratacao: group.formData.justificativa_contratacao,
+          justificativa_contratacao: String(group.formData.justificativa_contratacao || "").trim(),
           justificativa_quantidade: group.formData.justificativa_quantidade,
+          planning_subsidies: planningSubsidies,
           previsao_recebimento: group.formData.previsao_data || null,
           valor_total_estimado: valorTotalEstimado,
           status: "rascunho",
@@ -880,7 +939,7 @@ export default function NovaDFDPage() {
 
         if (
           dfdResult.error &&
-          /analysis_unidade_id|analysis_tipo_unidade|analysis_routing_reason/i.test(
+          /analysis_unidade_id|analysis_tipo_unidade|analysis_routing_reason|planning_subsidies/i.test(
             String(dfdResult.error.message || ""),
           )
         ) {
@@ -938,22 +997,24 @@ export default function NovaDFDPage() {
             buildCollectiveContributionFromItem({ item, selectedUnit, user }),
           ),
         );
-        const contributionKeys = Array.from(
-          new Set(contributionRows.map((row) => row.collective_key)),
-        );
-
         if (contributionRows.length === 0) {
           throw new Error("Nenhum item encontrado para a DFD coletiva.");
         }
 
-        await supabase
+        const contributionKeys = Array.from(
+          new Set(contributionRows.map((row) => row.collective_key)),
+        );
+
+        const { error: deleteContributionError } = await supabase
           .from("dfd_collective_contributions")
           .delete()
           .eq("user_id", user.id)
           .eq("unit_id", selectedUnit.unit_id)
           .eq("unit_type", selectedUnit.unit_type)
           .eq("status", "aberta")
+          .is("room_id", null)
           .in("collective_key", contributionKeys);
+        if (deleteContributionError) throw deleteContributionError;
 
         const { error: contributionError } = await supabase
           .from("dfd_collective_contributions")
@@ -965,7 +1026,8 @@ export default function NovaDFDPage() {
           .select("*")
           .eq("unit_id", selectedUnit.unit_id)
           .eq("unit_type", selectedUnit.unit_type)
-          .eq("status", "aberta");
+          .eq("status", "aberta")
+          .is("room_id", null);
         if (openRowsError) throw openRowsError;
 
         const userIds = Array.from(
@@ -1023,31 +1085,40 @@ export default function NovaDFDPage() {
             0,
           );
 
-          const itemsToInsert = collectiveItems.map((item) => ({
-            codigo_tce: String(item.codigo_tce || item.codigo_item_efisco || "").trim(),
-            codigo_item_efisco: String(item.codigo_item_efisco || item.codigo_tce || "").trim(),
-            descricao: String(item.descricao || "").trim(),
-            quantidade: Number(item.quantidade || 0),
-            valor_unitario_estimado: Number(item.valor_unitario_estimado || 0),
-            justificativa_item: [
-              String(item.justificativa_item || "").trim(),
-              `Distribuição por usuário: ${formatContributorDistribution(item.contributors)}`,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-            local_uso: selectedUnit.nome || null,
-            link_referencia: String(item.link_referencia || ""),
-            gnd: String(item.gnd || item.gnd_derivado || "3.3.90.30"),
-            gnd_derivado: String(item.gnd_derivado || item.gnd || "") || null,
-            tipo_objeto: item.tipo_objeto || null,
-            codigo_grupo: item.codigo_grupo || null,
-            nome_grupo: item.nome_grupo || null,
-            codigo_classe: item.codigo_classe || null,
-            nome_classe: item.nome_classe || null,
-            codigo_material_servico: null,
-            nome_material_servico: null,
-            codigo_natureza_despesa: item.codigo_natureza_despesa || null,
-          }));
+          const itemsToInsert = collectiveItems.map((item) => {
+            const fiscal = resolveDfdFiscalFields({
+              ...item,
+              codigo_tce: item.codigo_tce || item.codigo_item_efisco,
+            });
+            return {
+              codigo_tce: String(item.codigo_tce || item.codigo_item_efisco || "").trim(),
+              codigo_item_efisco: String(item.codigo_item_efisco || item.codigo_tce || "").trim(),
+              descricao: String(item.descricao || "").trim(),
+              quantidade: Number(item.quantidade || 0),
+              valor_unitario_estimado: Number(item.valor_unitario_estimado || 0),
+              justificativa_item: [
+                String(item.justificativa_item || "").trim(),
+                `Distribuição por usuário: ${formatContributorDistribution(item.contributors)}`,
+              ]
+                .filter(Boolean)
+                .join("\n"),
+              local_uso: selectedUnit.nome || null,
+              link_referencia: String(item.link_referencia || ""),
+              gnd: fiscal.gnd,
+              gnd_derivado: fiscal.gnd_derivado,
+              tipo_objeto: item.tipo_objeto || null,
+              codigo_grupo: item.codigo_grupo || null,
+              nome_grupo: item.nome_grupo || null,
+              codigo_classe: item.codigo_classe || null,
+              nome_classe: item.nome_classe || null,
+              codigo_material_servico: null,
+              nome_material_servico: null,
+              codigo_natureza_despesa: fiscal.codigo_natureza_despesa,
+              efisco_item_id: fiscal.efisco_item_id,
+              efisco_item_natureza_id: fiscal.efisco_item_natureza_id,
+              requires_natureza_review: fiscal.requires_natureza_review,
+            };
+          });
 
           const dfd = await createDfdWithItems({
             group: {
@@ -1067,13 +1138,20 @@ export default function NovaDFDPage() {
             itemsToInsert,
           });
 
-          const idsToClose = rows.map((row) => row.id).filter(Boolean);
-          if (idsToClose.length > 0) {
-            const { error: closeError } = await supabase
-              .from("dfd_collective_contributions")
-              .update({ status: "consolidada", consolidated_dfd_id: dfd.id })
-              .in("id", idsToClose);
-            if (closeError) throw closeError;
+          const contributionIds = rows.map((row) => String(row.id || "")).filter(Boolean);
+          const closeResponse = await fetch("/api/collective-contributions/consolidate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              dfd_id: dfd.id,
+              unit_id: selectedUnit.unit_id,
+              unit_type: selectedUnit.unit_type,
+              contribution_ids: contributionIds,
+            }),
+          });
+          const closePayload = await closeResponse.json().catch(() => ({}));
+          if (!closeResponse.ok) {
+            throw new Error(closePayload?.error || "Não foi possível concluir as contribuições da DFD coletiva.");
           }
           createdDfdIds.push(String(dfd.id));
           createdCount += 1;
@@ -1117,24 +1195,26 @@ export default function NovaDFDPage() {
             acc + Number(item.quantidade || 0) * Number(item.valor_unitario || 0),
           0,
         );
+        const planningSubsidies = sanitizePlanningSubsidies(group.formData.planning_subsidies);
 
         const dfdPayload = {
-            numero_protocolo: buildNumeroProtocolo(groupIndex),
-            solicitante_id: user.id,
-            campus: campusLegacy,
-            campus_id: profile?.campus_id,
-            unidade_id: group.formData.unidade_id,
-            tipo_unidade: selectedUnit.unit_type as UnitType,
-            analysis_unidade_id: group.formData.analysis_unidade_id,
-            analysis_tipo_unidade: selectedAnalysisUnit.unit_type as UnitType,
-            analysis_routing_reason:
-              group.formData.analysis_routing_reason.trim() || null,
-            objeto_contratacao: group.formData.objeto,
-            justificativa_contratacao: group.formData.justificativa_contratacao,
-            justificativa_quantidade: group.formData.justificativa_quantidade,
-            previsao_recebimento: group.formData.previsao_data || null,
-            valor_total_estimado: valorTotalEstimado,
-            status: "rascunho",
+          numero_protocolo: buildNumeroProtocolo(groupIndex),
+          solicitante_id: user.id,
+          campus: campusLegacy,
+          campus_id: profile?.campus_id,
+          unidade_id: group.formData.unidade_id,
+          tipo_unidade: selectedUnit.unit_type as UnitType,
+          analysis_unidade_id: group.formData.analysis_unidade_id,
+          analysis_tipo_unidade: selectedAnalysisUnit.unit_type as UnitType,
+          analysis_routing_reason:
+            group.formData.analysis_routing_reason.trim() || null,
+          objeto_contratacao: group.formData.objeto,
+          justificativa_contratacao: String(group.formData.justificativa_contratacao || "").trim(),
+          justificativa_quantidade: group.formData.justificativa_quantidade,
+          planning_subsidies: planningSubsidies,
+          previsao_recebimento: group.formData.previsao_data || null,
+          valor_total_estimado: valorTotalEstimado,
+          status: "rascunho",
         };
 
         let dfdResult = await supabase
@@ -1145,7 +1225,7 @@ export default function NovaDFDPage() {
 
         if (
           dfdResult.error &&
-          /analysis_unidade_id|analysis_tipo_unidade|analysis_routing_reason/i.test(
+          /analysis_unidade_id|analysis_tipo_unidade|analysis_routing_reason|planning_subsidies/i.test(
             String(dfdResult.error.message || ""),
           )
         ) {
@@ -1169,31 +1249,34 @@ export default function NovaDFDPage() {
         if (dfdResult.error) throw dfdResult.error;
         const dfd = dfdResult.data;
 
-        const itemsToInsert = group.items.map((item) => ({
-          dfd_id: dfd.id,
-          codigo_tce: String(item.item_efisco?.codigo_tce || "").trim(),
-          codigo_item_efisco: String(item.item_efisco?.codigo_tce || "").trim(),
-          descricao: String(item.item_efisco?.descricao || "").trim(),
-          quantidade: Number(item.quantidade || 0),
-          valor_unitario_estimado: Number(item.valor_unitario || 0),
-          justificativa_item: String(item.justificativa_item || ""),
-          local_uso: selectedUnit.nome || null,
-          link_referencia: String(item.link_referencia || ""),
-          gnd: String(item.item_efisco?.gnd || "3.3.90.30"),
-          gnd_derivado: String(
-            item.item_efisco?.gnd_derivado || item.item_efisco?.gnd || "",
-          ) || null,
-          tipo_objeto: item.item_efisco?.tipo_objeto || null,
-          codigo_grupo: item.item_efisco?.codigo_grupo || null,
-          nome_grupo: item.item_efisco?.nome_grupo || null,
-          codigo_classe: item.item_efisco?.codigo_classe || null,
-          nome_classe: item.item_efisco?.nome_classe || null,
-          codigo_material_servico:
-            item.item_efisco?.codigo_material_servico || null,
-          nome_material_servico: item.item_efisco?.nome_material_servico || null,
-          codigo_natureza_despesa:
-            item.item_efisco?.codigo_natureza_despesa || null,
-        }));
+        const itemsToInsert = group.items.map((item) => {
+          const fiscal = resolveDfdFiscalFields(item.item_efisco || {});
+          return {
+            dfd_id: dfd.id,
+            codigo_tce: String(item.item_efisco?.codigo_tce || "").trim(),
+            codigo_item_efisco: String(item.item_efisco?.codigo_tce || "").trim(),
+            descricao: String(item.item_efisco?.descricao || "").trim(),
+            quantidade: Number(item.quantidade || 0),
+            valor_unitario_estimado: Number(item.valor_unitario || 0),
+            justificativa_item: String(item.justificativa_item || ""),
+            local_uso: selectedUnit.nome || null,
+            link_referencia: String(item.link_referencia || ""),
+            gnd: fiscal.gnd,
+            gnd_derivado: fiscal.gnd_derivado,
+            tipo_objeto: item.item_efisco?.tipo_objeto || null,
+            codigo_grupo: item.item_efisco?.codigo_grupo || null,
+            nome_grupo: item.item_efisco?.nome_grupo || null,
+            codigo_classe: item.item_efisco?.codigo_classe || null,
+            nome_classe: item.item_efisco?.nome_classe || null,
+            codigo_material_servico:
+              item.item_efisco?.codigo_material_servico || null,
+            nome_material_servico: item.item_efisco?.nome_material_servico || null,
+            codigo_natureza_despesa: fiscal.codigo_natureza_despesa,
+            efisco_item_id: fiscal.efisco_item_id,
+            efisco_item_natureza_id: fiscal.efisco_item_natureza_id,
+            requires_natureza_review: fiscal.requires_natureza_review,
+          };
+        });
 
         const { error: itemsError } = await supabase
           .from("dfd_items")
@@ -1226,71 +1309,82 @@ export default function NovaDFDPage() {
     }
   };
 
+  if (submissionPolicy.loading || !submissionPolicy.canCreate) {
+    return <div className="flex min-h-[60vh] items-center justify-center px-4"><OperationalEmptyState title={submissionPolicy.loading ? "Verificando prazo de submissão" : "Novas solicitações encerradas"} description={submissionPolicy.loading ? "Aguarde a verificação do ciclo e das autorizações." : submissionPolicy.error || "Seu rascunho foi preservado. Para uma nova solicitação, peça liberação ao superadmin. Para corrigir uma DFD devolvida ou autorizada, abra a própria DFD."} action={<button type="button" onClick={() => router.push("/minhas-dfds")} className="min-h-11 rounded-xl bg-[var(--semantic-action)] px-4 text-sm font-semibold text-[var(--p-color-action-fg)]">Acompanhar minhas DFDs</button>} /></div>;
+  }
   if (items.length === 0) {
     return (
-      <div className="flex min-h-[72vh] flex-col items-center justify-center gap-5 px-6">
-        <img
-          src="/guidance/empty-cart.png"
-          alt=""
-          className="aspect-[16/9] w-full max-w-[420px] object-contain"
+      <div className="flex min-h-[72vh] items-center justify-center px-6">
+        <OperationalEmptyState
+          icon={
+            <img
+              src="/guidance/empty-cart.png"
+              alt=""
+              className="aspect-[16/9] w-32 object-contain"
+            />
+          }
+          title="Carrinho vazio"
+          description="Escolha itens no catálogo para começar sua solicitação com um dossiê de DFD mais organizado."
+          action={
+            <Button
+              onClick={() => router.push("/catalogo")}
+              className="h-10 rounded-xl bg-[var(--p-color-brand-500)] px-6 text-white hover:bg-[var(--p-color-brand-600)]"
+            >
+              Abrir catálogo
+            </Button>
+          }
+          className="max-w-2xl"
         />
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-[#164073]">Carrinho vazio</h2>
-          <p className="text-sm text-[#5B6675]">
-            Escolha itens no catálogo para começar sua solicitação.
-          </p>
-        </div>
-        <Button
-          onClick={() => router.push("/catalogo")}
-          className="h-10 rounded-xl bg-[#164073] px-6 text-white hover:bg-[#0F2E57]"
-        >
-          Abrir catálogo
-        </Button>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-6 px-4 pb-36 pt-6 md:px-6">
-      <section className="rounded-[28px] border border-[#D9E0E8] bg-white p-6 shadow-[0_10px_24px_rgba(15,46,87,0.06)] md:p-8">
+    <div className="mx-auto max-w-[1480px] space-y-6 px-4 pb-52 pt-6 md:px-6 md:pb-36">
+      <section className="rounded-[28px] border border-[var(--p-color-border)] bg-white p-6 shadow-[0_10px_24px_rgba(15,46,87,0.06)] md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <span className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.08em] text-[#164073]">
+            <OperationalChip tone="action" className="uppercase tracking-[0.08em]">
               Passo a passo
-            </span>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[#0F2E57] md:text-5xl">
+            </OperationalChip>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--p-color-brand-600)] md:text-5xl">
               Vamos organizar sua demanda
             </h1>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[#3E4C5F]">
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-[var(--p-color-fg-muted)]">
               Separamos tudo por etapas para você preencher com calma, sem se perder,
               e montar DFDs mais claras.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <Stat label="Itens" value={String(items.length)} />
-            <Stat label="DFDs" value={String(dfdGroups.length)} />
-            <Stat label="GNDs" value={String(globalGndSummary.entries.length)} />
-            <Stat label="Total" value={toCurrency(totalGeral)} />
+            <OperationalKpiCard label="Itens" value={String(items.length)} tone="action" className="min-w-[128px]" />
+            <OperationalKpiCard label="DFDs" value={String(dfdGroups.length)} tone="collab" className="min-w-[128px]" />
+            <OperationalKpiCard label="Classificações" value={String(globalGndSummary.entries.length)} tone="insight" className="min-w-[128px]" />
+            <OperationalKpiCard label="Total" value={toCurrency(totalGeral)} tone="success" className="min-w-[160px]" />
           </div>
         </div>
       </section>
+
+      <div role="status" aria-live="polite" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--p-color-border)] bg-white p-4 text-sm">
+        <div><p className="font-semibold">{draft.loading ? "Carregando rascunho…" : draft.status === "saving" ? "Salvando rascunho…" : draft.status === "error" ? "Não foi possível salvar o rascunho" : draft.status === "saved" ? (draft.location === "local" ? "Rascunho salvo neste navegador" : "Rascunho salvo no PERCATA") : "Preparando rascunho"}</p><p className="mt-1 text-[var(--p-color-fg-muted)]">{draft.location === "local" ? "A cópia local fica disponível neste navegador. Ela ainda não foi enviada para a chefia." : "Salvar o rascunho não envia a solicitação para análise."}</p></div>
+        {draft.status === "error" && <button type="button" onClick={() => void draft.saveImmediate({ groupingMode, groupForms: Object.fromEntries(dfdGroups.map(g => [g.key, g.formData])), cartItems: snapshotDfdDraftCartItems(items), showGuide, savedAt: new Date().toISOString() }, groupingMode)} className="min-h-11 rounded-xl border px-4 font-semibold">Tentar salvar novamente</button>}
+      </div>
 
       <motion.section
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
-        className="overflow-hidden rounded-[24px] border border-[#C7D7EA] bg-[#F7FBFF] shadow-[0_10px_24px_rgba(15,46,87,0.05)]"
+        className="overflow-hidden rounded-[24px] border border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] shadow-[0_10px_24px_rgba(15,46,87,0.05)]"
       >
         <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:p-5">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#164073] text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--p-color-brand-500)] text-white">
               <Info size={18} weight="bold" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-[#164073]">
+              <h2 className="text-base font-semibold text-[var(--p-color-brand-500)]">
                 Você não precisa lembrar tudo de uma vez
               </h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-[#52627A]">
+              <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--p-color-fg-muted)]">
                 Primeiro complete os dados principais. Ao finalizar, você pode escolher:
                 salvar como rascunho ou já encaminhar para a chefia.
               </p>
@@ -1299,7 +1393,7 @@ export default function NovaDFDPage() {
           <button
             type="button"
             onClick={() => setShowGuide((value) => !value)}
-            className="h-9 rounded-xl border border-[#C7D7EA] bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#164073] hover:bg-[#EAF2FF]"
+            className="h-9 rounded-xl border border-[var(--p-color-info-border)] bg-white px-3 type-caption font-semibold uppercase tracking-[0.1em] text-[var(--p-color-brand-500)] hover:bg-[var(--p-color-info-bg)]"
           >
             {showGuide ? "Ocultar guia" : "Ver guia"}
           </button>
@@ -1312,65 +1406,114 @@ export default function NovaDFDPage() {
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="border-t border-[#D9E0E8]"
+              className="border-t border-[var(--p-color-border)]"
             >
               <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-5">
-                <div className="grid gap-2 md:grid-cols-4">
-                  {DFD_PROCESS_STEPS.map((step, index) => (
-                    <div key={step.id} className="rounded-2xl border border-[#D9E0E8] bg-white p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E8EDF2] text-xs font-bold text-[#164073]">
-                          {index + 1}
-                        </span>
-                        <p className="text-sm font-semibold text-[#164073]">{step.label}</p>
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-[#5B6675]">{step.description}</p>
-                    </div>
-                  ))}
-                </div>
+                <OperationalStepper
+                  currentStep={checklistPendingCount === 0 ? 4 : 1}
+                  steps={DFD_PROCESS_STEPS.map((step) => ({
+                    label: step.label,
+                    helper: step.description,
+                  }))}
+                />
 
-                <div className="rounded-2xl border border-[#D9E0E8] bg-white p-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#164073]">
-                    O que falta para concluir
-                  </p>
-                  <p className="mt-1 text-[11px] text-[#66758A]">
-                    {checklistPendingCount === 0
+                <SkeuoDocumentCard
+                  title="O que falta para concluir"
+                  meta={
+                    checklistPendingCount === 0
                       ? "Tudo certo para concluir."
-                      : `${checklistPendingCount} pendência(s) para liberar a conclusão.`}
+                      : `${checklistPendingCount} pendência(s) para liberar a conclusão.`
+                  }
+                  stamp={checklistPendingCount === 0 ? "OK" : "Pendência"}
+                  tone={checklistPendingCount === 0 ? "success" : "warning"}
+                  className="p-3"
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--p-color-brand-500)]">
+                    Checklist
                   </p>
                   <div className="mt-3 space-y-2">
                     {checklistPreview.map((item) => (
                       <div key={item.id} className="flex items-start gap-2 text-xs">
                         {item.state === "done" ? (
-                          <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0 text-emerald-600" />
+                          <CheckCircle
+                            size={15}
+                            weight="fill"
+                            className="mt-0.5 shrink-0 text-[var(--p-color-success)]"
+                          />
                         ) : (
-                          <WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0 text-amber-600" />
+                          <WarningCircle
+                            size={15}
+                            weight="fill"
+                            className="mt-0.5 shrink-0 text-[var(--p-color-warning)]"
+                          />
                         )}
                         <div>
-                          <p className="font-semibold text-[#2E3A4A]">{item.label}</p>
-                          <p className="text-[#66758A]">{item.helper}</p>
+                          <p className="font-semibold text-[var(--p-color-fg-default)]">{item.label}</p>
+                          <p className="text-[var(--p-color-fg-muted)]">{item.helper}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </SkeuoDocumentCard>
               </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
       </motion.section>
 
-      <section className="rounded-[28px] border border-[#D9E0E8] bg-white p-5 shadow-[0_10px_24px_rgba(15,46,87,0.06)]">
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <SkeuoDocumentCard
+          title="Saúde da solicitação"
+          meta="Um panorama rápido antes de preencher os formulários detalhados."
+          stamp="Prévia"
+          tone="collab"
+        >
+          <SkeuoProgressRail
+            items={[
+              {
+                label: "Checklist concluído",
+                value: checklistPreview.length
+                  ? (checklistPreview.filter((item) => item.state === "done").length / checklistPreview.length) * 100
+                  : 0,
+                tone: "success",
+              },
+              {
+                label: "Itens distribuídos",
+                value: items.length ? Math.min(100, (dfdGroups.length / Math.max(1, items.length)) * 100) : 0,
+                tone: "action",
+              },
+              {
+                label: "Tipos de despesa mapeados",
+                value: items.length ? Math.min(100, (globalGndSummary.entries.length / Math.max(1, items.length)) * 100) : 0,
+                tone: "insight",
+              },
+            ]}
+            className="border-0 p-0 shadow-none"
+          />
+        </SkeuoDocumentCard>
+        <SkeuoDocumentCard
+          title="Próxima melhor ação"
+          meta={
+            checklistPendingCount > 0
+              ? "Resolva os campos marcados no checklist antes de salvar ou enviar."
+              : "Revise os agrupamentos e escolha salvar como rascunho ou encaminhar para chefia."
+          }
+          stamp={checklistPendingCount > 0 ? "Completar" : "Enviar"}
+          tone={checklistPendingCount > 0 ? "warning" : "success"}
+        />
+      </section>
+
+      <section className="rounded-[28px] border border-[var(--p-color-border)] bg-white p-5 shadow-[0_10px_24px_rgba(15,46,87,0.06)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[#164073]">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[var(--p-color-brand-500)]">
               <StackSimple size={16} />
               Organização do carrinho
             </div>
-            <h2 className="mt-2 text-2xl font-semibold text-[#0F2E57]">
+            <h2 className="mt-2 text-2xl font-semibold text-[var(--p-color-brand-600)]">
               Como você quer organizar as DFDs?
             </h2>
-            <p className="mt-1 text-sm leading-6 text-[#5B6675]">
+            <p className="mt-1 text-sm leading-6 text-[var(--p-color-fg-muted)]">
               Recomendamos começar por <b>grupo e-Fisco</b>. Assim você cria uma DFD por família de itens,
               sem misturar custeio com capital. Para demandas em equipe, use o modo coletivo.
             </p>
@@ -1387,22 +1530,22 @@ export default function NovaDFDPage() {
                   className={cn(
                     "min-w-[210px] rounded-2xl border px-4 py-3 text-left transition",
                     active
-                      ? "border-[#164073] bg-[#E8EDF2] shadow-[0_8px_18px_rgba(15,46,87,0.10)]"
-                      : "border-[#D9E0E8] bg-[#FAFBFC] hover:bg-[#F4F7FA]",
+                      ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-surface-subtle)] shadow-[0_8px_18px_rgba(15,46,87,0.10)]"
+                      : "border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] hover:bg-[var(--p-color-surface-muted)]",
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-[#164073]">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--p-color-brand-500)]">
                       <SquaresFour size={16} />
                       {option.title}
                     </span>
                     {option.recommended ? (
-                      <span className="rounded-full bg-[#164073] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-white">
+                      <span className="rounded-full bg-[var(--p-color-brand-500)] px-2 py-0.5 type-kicker font-bold uppercase tracking-[0.08em] text-white">
                         Recomendado
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-[#5B6675]">
+                  <p className="mt-2 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                     {option.description}
                   </p>
                 </button>
@@ -1411,21 +1554,21 @@ export default function NovaDFDPage() {
           </div>
         </div>
         {globalGndSummary.hasMixedExpenseClasses ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D9E0E8] bg-[#F8FAFC] px-4 py-3 text-sm">
-            <div className="flex items-center gap-2 text-[#164073]">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)] px-4 py-3 text-sm">
+            <div className="flex items-center gap-2 text-[var(--p-color-brand-500)]">
               <SquaresFour size={18} />
               <span className="font-semibold">
                 Separação automática por natureza da despesa
               </span>
             </div>
-            <span className="text-xs font-semibold text-[#3E4C5F]">
+            <span className="text-xs font-semibold text-[var(--p-color-fg-muted)]">
               Encontramos custeio e capital no carrinho; separamos para você automaticamente.
             </span>
           </div>
         ) : null}
         {groupingMode === "coletiva" ? (
-            <div className="mt-4 rounded-2xl border border-[#D9E0E8] bg-[#F8FAFC] px-4 py-3 text-sm text-[#3E4C5F]">
-              <p className="font-semibold text-[#164073]">
+            <div className="mt-4 rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)] px-4 py-3 text-sm text-[var(--p-color-fg-muted)]">
+              <p className="font-semibold text-[var(--p-color-brand-500)]">
                 Modo coletivo ativo
               </p>
               <p className="mt-1 text-xs leading-5">
@@ -1438,26 +1581,26 @@ export default function NovaDFDPage() {
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="space-y-4 xl:sticky xl:top-24">
-          <div className="rounded-[28px] border border-[#A7B1BD]/25 bg-white/90 p-5 shadow-[0_10px_28px_rgba(15,46,87,0.05)]">
-            <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[#164073]">
+          <div className="rounded-[28px] border border-[var(--p-color-border-strong)]/25 bg-white/90 p-5 shadow-[0_10px_28px_rgba(15,46,87,0.05)]">
+            <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[var(--p-color-brand-500)]">
               Resumo
             </h3>
             <div className="mt-3 space-y-2 text-sm">
-              <p className="flex items-center justify-between text-[#3E4C5F]">
+              <p className="flex items-center justify-between text-[var(--p-color-fg-muted)]">
                 <span>Itens mapeados</span>
-                <b className="text-[#164073]">{items.length}</b>
+                <b className="text-[var(--p-color-brand-500)]">{items.length}</b>
               </p>
-              <p className="flex items-center justify-between text-[#3E4C5F]">
+              <p className="flex items-center justify-between text-[var(--p-color-fg-muted)]">
                 <span>DFDs previstas</span>
-                <b className="text-[#164073]">{dfdGroups.length}</b>
+                <b className="text-[var(--p-color-brand-500)]">{dfdGroups.length}</b>
               </p>
-              <p className="flex items-center justify-between text-[#3E4C5F]">
+              <p className="flex items-center justify-between text-[var(--p-color-fg-muted)]">
                 <span>Total estimado</span>
-                <b className="text-[#164073]">{toCurrency(totalGeral)}</b>
+                <b className="text-[var(--p-color-brand-500)]">{toCurrency(totalGeral)}</b>
               </p>
             </div>
             {blockingErrors.length > 0 ? (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <div className="mt-4 rounded-xl border border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] px-3 py-2 text-xs text-[var(--p-color-warning)]">
                 <p className="font-semibold">
                   Faltam {pendingChecklistLabels.length || blockingErrors.length} campo(s):
                 </p>
@@ -1468,58 +1611,58 @@ export default function NovaDFDPage() {
                     <li key={label}>{label}</li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[11px] text-amber-800">
+                <p className="mt-2 type-caption text-[var(--p-color-warning)]">
                   Exemplo: {blockingErrors[0]}
                 </p>
               </div>
             ) : (
-              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              <div className="mt-4 rounded-xl border border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)] px-3 py-2 text-xs text-[var(--p-color-success)]">
                 Tudo pronto para concluir ou encaminhar à chefia.
               </div>
             )}
           </div>
 
-          <div className="rounded-[28px] border border-[#A7B1BD]/25 bg-white/90 p-5 shadow-[0_10px_28px_rgba(15,46,87,0.05)]">
-            <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[#164073]">
-              Mapa GND
+          <div className="rounded-[28px] border border-[var(--p-color-border-strong)]/25 bg-white/90 p-5 shadow-[0_10px_28px_rgba(15,46,87,0.05)]">
+            <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[var(--p-color-brand-500)]">
+              Mapa de tipos de despesa
             </h3>
             <div className="mt-3 space-y-2">
               {globalGndSummary.entries.slice(0, 4).map((entry) => (
                 <div
                   key={`global-gnd-${entry.gnd}`}
-                  className="rounded-xl border border-[#D9E0E8] bg-[#F8FAFC] px-3 py-2"
+                  className="rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)] px-3 py-2"
                 >
                   <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-bold text-[#164073]">{entry.gnd}</span>
-                    <span className="font-semibold text-[#5B6675]">
+                    <span className="font-bold text-[var(--p-color-brand-500)]">{entry.expenseLabel}</span>
+                    <span className="font-semibold text-[var(--p-color-fg-muted)]">
                       {entry.itemCount} item(ns)
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-[#5B6675]">
+                  <p className="mt-1 type-caption text-[var(--p-color-fg-muted)]">
                     {entry.expenseLabel} · {entry.elementLabel}
                   </p>
                 </div>
               ))}
               {globalGndSummary.entries.length === 0 ? (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Nenhum GND identificado no carrinho.
+                <p className="rounded-xl border border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] px-3 py-2 text-xs text-[var(--p-color-warning)]">
+                  Nenhum tipo de despesa identificado no carrinho.
                 </p>
               ) : null}
             </div>
             {globalGndSummary.hasMixedExpenseClasses ? (
-              <p className="mt-3 rounded-xl border border-[#D9E0E8] bg-[#F8FAFC] px-3 py-2 text-xs leading-5 text-[#164073]">
+              <p className="mt-3 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--p-color-brand-500)]">
                 Custeio e capital detectados no carrinho. A tela separa automaticamente as
                 DFDs por natureza.
               </p>
             ) : globalGndSummary.warnings.length > 0 ? (
-              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+              <p className="mt-3 rounded-xl border border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] px-3 py-2 text-xs leading-5 text-[var(--p-color-warning)]">
                 {globalGndSummary.warnings[0]}
               </p>
             ) : null}
           </div>
 
-          <div className="rounded-[28px] border border-[#A7B1BD]/25 bg-white/90 p-5 shadow-[0_10px_28px_rgba(15,46,87,0.05)]">
-            <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[#164073]">
+          <div className="rounded-[28px] border border-[var(--p-color-border-strong)]/25 bg-white/90 p-5 shadow-[0_10px_28px_rgba(15,46,87,0.05)]">
+            <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[var(--p-color-brand-500)]">
               Navegação
             </h3>
             <div className="mt-3 grid gap-2">
@@ -1527,7 +1670,7 @@ export default function NovaDFDPage() {
                 <a
                   key={`${group.key}-nav-${index}`}
                   href={`#grupo-${index + 1}`}
-                  className="rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] px-3 py-2 text-sm font-semibold text-[#164073] transition hover:bg-[#E8EDF2]"
+                  className="rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] px-3 py-2 text-sm font-semibold text-[var(--p-color-brand-500)] transition hover:bg-[var(--p-color-surface-subtle)]"
                 >
                   {group.label}
                 </a>
@@ -1538,10 +1681,10 @@ export default function NovaDFDPage() {
 
         <section className="grid gap-6">
           {blockingErrors.length > 0 && (
-            <section className="rounded-[28px] border border-amber-200 bg-amber-50/70 px-4 py-3">
+            <section className="rounded-[28px] border border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)]/80 px-4 py-3">
               <div className="flex items-start gap-2">
-                <WarningCircle size={18} className="mt-0.5 text-amber-700" />
-                <div className="text-sm text-amber-900">
+                <WarningCircle size={18} className="mt-0.5 text-[var(--p-color-warning)]" />
+                <div className="text-sm text-[var(--p-color-warning)]">
                   <p className="font-semibold">
                     {blockingErrors.length} ajuste(s) pendente(s)
                   </p>
@@ -1577,26 +1720,26 @@ export default function NovaDFDPage() {
               <section
                 id={`grupo-${gIdx + 1}`}
                 key={`${group.key}-${gIdx}`}
-                className="overflow-hidden rounded-[30px] border border-[#A7B1BD]/25 bg-white/90 shadow-[0_10px_28px_rgba(15,46,87,0.05)]"
+                className="overflow-hidden rounded-[30px] border border-[var(--p-color-border-strong)]/25 bg-white/90 shadow-[0_10px_28px_rgba(15,46,87,0.05)]"
               >
-                <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E8EDF2] px-5 py-4">
+                <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--p-color-surface-subtle)] px-5 py-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#7D98B8]">
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--p-color-fg-subtle)]">
                       {groupingModeLabel(group.mode)}
                     </p>
-                    <h2 className="text-2xl font-semibold text-[#164073]">{group.label}</h2>
-                    <p className="mt-1 text-sm text-[#5B6675]">
-                      Preencha título, local de uso, justificativas e detalhes dos itens.
+                    <h2 className="text-2xl font-semibold text-[var(--p-color-brand-500)]">{group.label}</h2>
+                    <p className="mt-1 text-sm text-[var(--p-color-fg-muted)]">
+                      Revise o pedido, explique a necessidade e confirme os dados dos itens.
                     </p>
                   </div>
-                  <span className="inline-flex items-center rounded-full border border-[#C7D7EA] bg-[#E8EDF2] px-3 py-1 text-xs font-bold text-[#164073]">
+                  <span className="inline-flex items-center rounded-full border border-[var(--p-color-info-border)] bg-[var(--p-color-surface-subtle)] px-3 py-1 text-xs font-bold text-[var(--p-color-brand-500)]">
                     {group.items.length} item(ns) • {toCurrency(groupTotal)}
                   </span>
                 </header>
 
                 <div className="space-y-5 p-5">
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-                    <Field className="xl:col-span-12" label="Objeto da contratação">
+                    <Field className="xl:col-span-12" label="O que você precisa contratar?">
                       <input
                         type="text"
                         value={group.formData.objeto}
@@ -1630,7 +1773,7 @@ export default function NovaDFDPage() {
 
                     <Field
                       className="xl:col-span-6"
-                      label="Local de uso"
+                      label="Onde isso será usado?"
                       icon={<Buildings size={14} />}
                     >
                       <select
@@ -1669,7 +1812,7 @@ export default function NovaDFDPage() {
 
                     <Field
                       className="xl:col-span-6"
-                      label="Responsável pela análise"
+                      label="Quem deve analisar?"
                       icon={<Buildings size={14} />}
                     >
                       <select
@@ -1696,7 +1839,7 @@ export default function NovaDFDPage() {
                           </option>
                         ))}
                       </select>
-                      <p className="mt-1 text-[11px] text-[#7D98B8]">
+                      <p className="mt-1 type-caption text-[var(--p-color-fg-subtle)]">
                         Use este campo quando o item será usado em laboratório, mas a decisão pertence ao curso ou setor.
                       </p>
                     </Field>
@@ -1720,7 +1863,7 @@ export default function NovaDFDPage() {
                       <GndBudgetPanel summary={groupGndSummary} />
                     </div>
 
-                    <Field className="xl:col-span-3" label="Quando você espera receber?">
+                    <Field className="xl:col-span-3" label="Quando precisa receber?">
                       <div className="m3-date-shell">
                         <input
                           id={`previsao-data-${gIdx}`}
@@ -1754,29 +1897,13 @@ export default function NovaDFDPage() {
                           <Calendar size={15} />
                         </button>
                       </div>
-                      <p className="mt-1 text-[11px] text-[#7D98B8]">
+                      <p className="mt-1 type-caption text-[var(--p-color-fg-subtle)]">
                         Informe uma data prevista (a partir de{" "}
                         {formatIsoDateToPtBr(NEXT_YEAR_MIN_DATE)}).
                       </p>
                     </Field>
 
-                    <Field className="xl:col-span-5" label="Por que essa unidade vai analisar?">
-                      <input
-                        type="text"
-                        value={group.formData.analysis_routing_reason}
-                        onChange={(event) =>
-                          updateGroupForm(
-                            gIdx,
-                            "analysis_routing_reason",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                        placeholder="Ex.: o uso é do laboratório, mas a aprovação precisa ser da coordenação do curso."
-                      />
-                    </Field>
-
-                    <Field className="xl:col-span-7" label="Justificativa da necessidade">
+                    <Field className="xl:col-span-12" label="Por que isso é necessário?">
                       <textarea
                         rows={6}
                         value={group.formData.justificativa_contratacao}
@@ -1788,13 +1915,13 @@ export default function NovaDFDPage() {
                           )
                         }
                         className={textareaClass}
-                        placeholder="Descreva a necessidade institucional, finalidade e impacto esperado desta contratação."
+                        placeholder="Conte o problema, a finalidade e o impacto esperado."
                       />
                     </Field>
 
                     <Field
-                      className="xl:col-span-5"
-                      label="Como você definiu as quantidades?"
+                      className="xl:col-span-12"
+                      label="Como chegou nessa quantidade?"
                       icon={<Info size={14} />}
                     >
                       <textarea
@@ -1808,21 +1935,14 @@ export default function NovaDFDPage() {
                           )
                         }
                         className={textareaClass}
-                        placeholder="Explique o cálculo: número de turmas, pessoas atendidas, consumo médio e período de uso."
+                        placeholder="Explique o cálculo: turmas, pessoas atendidas, consumo médio, estoque atual e período de uso."
                       />
                     </Field>
-
-                    <div className="xl:col-span-12 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 py-2 text-[12px] leading-5 text-[#3E4C5F]">
-                      <b className="text-[#164073]">Como preencher:</b> a{" "}
-                      <b>justificativa da necessidade (DFD)</b> explica o problema
-                      institucional do agrupamento inteiro. A <b>justificativa do item</b>{" "}
-                      descreve a aplicação técnica específica de cada item.
-                    </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-[#D9E0E8] bg-[#F4F7FA] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#7D98B8]">
-                      Itens da DFD
+                  <div className="rounded-[22px] border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--p-color-fg-subtle)]">
+                      O que entra nesta DFD
                     </p>
 
                     <div className="mt-3 grid gap-3">
@@ -1847,22 +1967,21 @@ export default function NovaDFDPage() {
                             className={cn(
                               "rounded-2xl border bg-white p-4",
                               justOk
-                                ? "border-[#D9E0E8]"
-                                : "border-[#C9A646]/45 bg-[#FFFDF2]",
+                                ? "border-[var(--p-color-border)]"
+                                : "border-[var(--p-color-warning)]/45 bg-[var(--p-color-warning-bg)]",
                             )}
                           >
                             <div className="mb-3 flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-xs font-semibold text-[#7D98B8]">
+                                <p className="text-xs font-semibold text-[var(--p-color-fg-subtle)]">
                                   Código e-Fisco: {item.item_efisco.codigo_tce}
                                 </p>
-                                <h3 className="text-sm font-semibold text-[#164073]">
+                                <h3 className="text-sm font-semibold text-[var(--p-color-brand-500)]">
                                   {item.item_efisco.descricao}
                                 </h3>
-                                <p className="text-xs text-[#5B6675]">
+                                <p className="text-xs text-[var(--p-color-fg-muted)]">
                                   Grupo: {item.item_efisco?.nome_grupo || "-"} | Classe:{" "}
-                                  {item.item_efisco?.nome_classe || item.item_efisco?.classe || "-"} | GND:{" "}
-                                  {item.item_efisco.gnd || "-"}
+                                  {item.item_efisco?.nome_classe || item.item_efisco?.classe || "-"}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   <GndPill classification={gndInfo} />
@@ -1870,7 +1989,7 @@ export default function NovaDFDPage() {
                               </div>
                               <button
                                 onClick={() => removeItem(item.uid)}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--p-color-danger-border)] bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)] transition hover:bg-[var(--p-color-danger-bg)]/80"
                                 aria-label="Remover item"
                               >
                                 <Trash size={14} />
@@ -1932,7 +2051,10 @@ export default function NovaDFDPage() {
                                 />
                               </Field>
 
-                              <Field className="xl:col-span-6" label="Referência técnica (link)">
+                              <Field
+                                className="xl:col-span-6"
+                                label="Link usado para preço ou especificação"
+                              >
                                 <input
                                   type="url"
                                   inputMode="url"
@@ -1953,7 +2075,10 @@ export default function NovaDFDPage() {
                                 />
                               </Field>
 
-                              <Field className="xl:col-span-12" label="Justificativa do item">
+                              <Field
+                                className="xl:col-span-12"
+                                label="Por que este item entra no pedido?"
+                              >
                                 <textarea
                                   rows={3}
                                   value={item.justificativa_item}
@@ -1967,9 +2092,9 @@ export default function NovaDFDPage() {
                                   }
                                   className={cn(
                                     textareaClass,
-                                    !justOk && "border-[#C9A646]/50 bg-[#FFF8E6]",
+                                    !justOk && "border-[var(--p-color-warning)]/50 bg-[var(--p-color-warning-bg)]",
                                   )}
-                                  placeholder="Descreva a aplicação do item, o contexto de uso e o motivo técnico da necessidade."
+                                  placeholder="Explique onde o item será usado, por quem e por que ele é necessário."
                                 />
                               </Field>
                             </div>
@@ -1978,14 +2103,16 @@ export default function NovaDFDPage() {
                               <p
                                 className={cn(
                                   "font-semibold",
-                                  justOk ? "text-emerald-700" : "text-amber-700",
+                                  justOk
+                                    ? "text-[var(--p-color-success)]"
+                                    : "text-[var(--p-color-warning)]",
                                 )}
                               >
                                 {justOk
                                   ? "Justificativa técnica válida."
                                   : `Mínimo de ${MIN_ITEM_JUSTIFICATIVA_CHARS} caracteres (${justLen}/${MIN_ITEM_JUSTIFICATIVA_CHARS}).`}
                               </p>
-                              <p className="font-semibold text-[#164073]">
+                              <p className="font-semibold text-[var(--p-color-brand-500)]">
                                 Subtotal: {toCurrency(subtotal)}
                               </p>
                             </div>
@@ -2002,12 +2129,12 @@ export default function NovaDFDPage() {
       </div>
 
       <section className="fixed bottom-4 left-0 right-0 z-40 px-4 md:px-6">
-        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 rounded-2xl border border-[#D9E0E8] bg-white/95 p-3 shadow-lg backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto flex max-w-[1480px] flex-col gap-3 rounded-2xl border border-[var(--p-color-border)] bg-white/95 p-3 shadow-lg backdrop-blur md:flex-row md:items-center md:justify-between">
           <div className="text-sm">
-            <span className="font-semibold text-[#164073]">
+            <span className="font-semibold text-[var(--p-color-brand-500)]">
               Total: {toCurrency(totalGeral)}
             </span>
-            <span className="ml-2 text-[#5B6675]">
+            <span className="ml-2 text-[var(--p-color-fg-muted)]">
               | {dfdGroups.length} DFD(s) por{" "}
               {groupingMode === "livre"
                 ? "modo livre"
@@ -2017,11 +2144,11 @@ export default function NovaDFDPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={() => router.back()}
               variant="ghost"
-              className="h-10 rounded-lg border border-[#D9E0E8] px-4 text-[#3E4C5F] hover:bg-[#F4F7FA]"
+              className="h-10 rounded-lg border border-[var(--p-color-border)] px-4 text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-muted)]"
             >
               <ArrowLeft size={14} className="mr-1" />
               Voltar
@@ -2033,12 +2160,12 @@ export default function NovaDFDPage() {
               }}
               disabled={loading || blockingErrors.length > 0}
               className={cn(
-                "h-10 rounded-lg border border-[#D9E0E8] bg-white px-4 text-[#164073] hover:bg-[#F4F7FA]",
+                "h-10 rounded-lg border border-[var(--p-color-border)] bg-white px-4 text-[var(--p-color-brand-500)] hover:bg-[var(--p-color-surface-muted)]",
                 loading || blockingErrors.length > 0 ? "opacity-70" : "",
               )}
             >
               <span className="flex items-center gap-2">
-                Concluir rascunhos
+                Salvar como rascunho
                 <ArrowRight size={14} />
               </span>
             </Button>
@@ -2051,10 +2178,10 @@ export default function NovaDFDPage() {
               className={cn(
                 "h-10 rounded-lg px-5 text-white",
                 loading
-                  ? "bg-[#2D5D94]"
+                  ? "bg-[var(--p-color-brand-400)]"
                   : blockingErrors.length > 0
-                    ? "cursor-not-allowed bg-[#7D98B8]"
-                    : "attention-pulse-soft bg-[#164073] hover:bg-[#0F2E57]",
+                    ? "cursor-not-allowed bg-[var(--p-color-fg-subtle)]"
+                    : "attention-pulse-soft bg-[var(--p-color-brand-500)] hover:bg-[var(--p-color-brand-600)]",
               )}
             >
               {loading ? (
@@ -2064,7 +2191,7 @@ export default function NovaDFDPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Encaminhar à chefia
+                  Finalizar e enviar à chefia
                   <ArrowRight size={14} />
                 </span>
               )}
@@ -2079,7 +2206,7 @@ export default function NovaDFDPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0F2E57]/35 px-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--p-color-brand-600)]/35 px-4 backdrop-blur-sm"
           >
             <motion.div
               initial={{ scale: 0.96, y: 8 }}
@@ -2087,16 +2214,12 @@ export default function NovaDFDPage() {
               exit={{ scale: 0.98, y: 8 }}
               className="w-full max-w-sm rounded-3xl border border-white/40 bg-white p-5 text-center shadow-2xl"
             >
-              <CircleNotch size={28} className="mx-auto animate-spin text-[#164073]" />
-              <h3 className="mt-3 text-lg font-semibold text-[#164073]">
-                {finalizeMode === "triagem"
-                  ? "Criando e encaminhando para a chefia"
-                  : "Criando seus rascunhos"}
+              <CircleNotch size={28} className="mx-auto animate-spin text-[var(--p-color-brand-500)]" />
+              <h3 className="mt-3 text-lg font-semibold text-[var(--p-color-brand-500)]">
+                {finalizationCopy.progressTitle}
               </h3>
-              <p className="mt-2 text-sm leading-6 text-[#5B6675]">
-                {finalizeMode === "triagem"
-                  ? "Estamos salvando os itens e enviando para a fila de análise."
-                  : "Estamos salvando itens e informações de análise."}{" "}
+              <p className="mt-2 text-sm leading-6 text-[var(--p-color-fg-muted)]">
+                {finalizationCopy.progressDescription}{" "}
                 Deixe esta tela aberta até terminar.
               </p>
             </motion.div>
@@ -2105,23 +2228,18 @@ export default function NovaDFDPage() {
       </AnimatePresence>
 
       <Dialog open={showFinalizeFlow} onOpenChange={setShowFinalizeFlow}>
-        <DialogContent className="max-h-[90vh] max-w-[560px] overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
-          <DialogHeader className="border-b border-[#E8EDF2] p-5 pr-12">
-            <DialogTitle className="text-xl font-semibold text-[#164073]">
-              {finalizeMode === "triagem"
-                ? "Confirmar encaminhamento à chefia"
-                : "Confirmar conclusão dos rascunhos"}
+        <DialogContent className="max-h-[90vh] max-w-[560px] overflow-hidden rounded-2xl border border-[var(--p-color-border)] bg-white p-0 text-[var(--p-color-fg-default)]">
+          <DialogHeader className="border-b border-[var(--p-color-surface-subtle)] p-5 pr-12">
+            <DialogTitle className="text-xl font-semibold text-[var(--p-color-brand-500)]">
+              {finalizationCopy.confirmationTitle}
             </DialogTitle>
-            <DialogDescription className="mt-2 text-sm text-[#5B6675]">
-              Ao continuar, vamos criar {dfdGroups.length} rascunho(s) no modo{" "}
-              <b>{GROUPING_OPTIONS.find((option) => option.value === groupingMode)?.title}</b>
-              {finalizeMode === "triagem"
-                ? " e encaminhar imediatamente para análise da chefia."
-                : "."}
+            <DialogDescription className="mt-2 text-sm text-[var(--p-color-fg-muted)]">
+              {finalizationCopy.description} Serão {dfdGroups.length} DFD(s) no modo{" "}
+              <b>{GROUPING_OPTIONS.find((option) => option.value === groupingMode)?.title}</b>.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[52vh] space-y-3 overflow-y-auto px-5 pb-5 pt-2 text-sm text-[#3E4C5F]">
+          <div className="max-h-[52vh] space-y-3 overflow-y-auto px-5 pb-5 pt-2 text-sm text-[var(--p-color-fg-muted)]">
             <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
               {dfdGroups.map((group, index) => {
                 const local = userUnits.find(
@@ -2134,11 +2252,11 @@ export default function NovaDFDPage() {
                 return (
                   <div
                     key={`review-${group.key}-${index}`}
-                    className="rounded-xl border border-[#D9E0E8] bg-white px-3 py-2"
+                    className="rounded-xl border border-[var(--p-color-border)] bg-white px-3 py-2"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-[#164073]">{group.label}</p>
-                      <span className="rounded-full bg-[#E8EDF2] px-2 py-0.5 text-[11px] font-bold text-[#164073]">
+                      <p className="font-semibold text-[var(--p-color-brand-500)]">{group.label}</p>
+                      <span className="rounded-full bg-[var(--p-color-surface-subtle)] px-2 py-0.5 type-caption font-bold text-[var(--p-color-brand-500)]">
                         {purposeLabel(group.formData.finalidade)} ·{" "}
                         {contextLabel(group.formData.contexto_academico)}
                       </span>
@@ -2152,7 +2270,7 @@ export default function NovaDFDPage() {
                       </p>
                     </div>
                     {routing ? (
-                      <p className="mt-2 text-xs leading-5 text-[#5B6675]">
+                      <p className="mt-2 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                         {routing.reason}
                       </p>
                     ) : null}
@@ -2160,7 +2278,7 @@ export default function NovaDFDPage() {
                 );
               })}
             </div>
-            <p className="font-semibold text-[#164073]">O que acontece depois</p>
+            <p className="font-semibold text-[var(--p-color-brand-500)]">O que acontece depois</p>
             {finalizeMode === "triagem" ? (
               <>
                 <p>1. As DFDs são criadas e enviadas para a fila da chefia.</p>
@@ -2176,12 +2294,12 @@ export default function NovaDFDPage() {
             )}
           </div>
 
-          <DialogFooter className="border-t border-[#E8EDF2] bg-[#FAFBFC] p-4">
+          <DialogFooter className="border-t border-[var(--p-color-surface-subtle)] bg-[var(--p-color-bg-elevated)] p-4">
             <Button
               variant="ghost"
               onClick={() => setShowFinalizeFlow(false)}
               disabled={loading}
-              className="h-10 rounded-lg border border-[#D9E0E8] px-4 text-[#3E4C5F] hover:bg-[#F4F7FA]"
+              className="h-10 rounded-lg border border-[var(--p-color-border)] px-4 text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-muted)]"
             >
               Voltar e revisar
             </Button>
@@ -2191,7 +2309,7 @@ export default function NovaDFDPage() {
                 await handleFinalize(finalizeMode);
               }}
               disabled={loading}
-              className="h-10 rounded-lg bg-[#164073] px-5 text-white hover:bg-[#0F2E57]"
+              className="h-10 rounded-lg bg-[var(--p-color-brand-500)] px-5 text-white hover:bg-[var(--p-color-brand-600)]"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -2200,9 +2318,7 @@ export default function NovaDFDPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  {finalizeMode === "triagem"
-                    ? "Confirmar e encaminhar"
-                    : "Confirmar e concluir"}
+                  {finalizationCopy.confirmLabel}
                   <ArrowRight size={14} />
                 </span>
               )}
@@ -2224,21 +2340,21 @@ function GndBudgetPanel({ summary }: { summary: GndDistributionSummary }) {
       className={cn(
         "rounded-2xl border px-4 py-3",
         summary.warnings.length > 0
-          ? "border-amber-200 bg-amber-50"
-          : "border-[#D9E0E8] bg-[#F8FAFC]",
+          ? "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)]"
+          : "border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)]",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-[#164073]">
-            Leitura orçamentária por GND
+          <p className="text-sm font-bold text-[var(--p-color-brand-500)]">
+            Conferência orçamentária
           </p>
-          <p className="mt-1 text-xs leading-5 text-[#5B6675]">
-            Use este resumo para evitar mistura de naturezas e fortalecer a justificativa.
+          <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">
+            Use este resumo para evitar mistura de naturezas de despesa e deixar a DFD mais clara.
           </p>
         </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#164073]">
-          {summary.entries.length} GND(s)
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[var(--p-color-brand-500)]">
+          {summary.entries.length} tipo(s)
         </span>
       </div>
 
@@ -2247,24 +2363,24 @@ function GndBudgetPanel({ summary }: { summary: GndDistributionSummary }) {
           {summary.entries.map((entry) => (
             <div
               key={entry.gnd}
-              className="rounded-xl border border-[#D9E0E8] bg-white px-3 py-2"
+              className="rounded-xl border border-[var(--p-color-border)] bg-white px-3 py-2"
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-[#164073]">{entry.gnd}</p>
+                <p className="text-sm font-bold text-[var(--p-color-brand-500)]">{entry.expenseLabel}</p>
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                    "rounded-full px-2 py-0.5 type-caption font-bold",
                     gndClassBadgeStyle(entry.expenseClass),
                   )}
                 >
                   {entry.expenseLabel}
                 </span>
               </div>
-              <p className="mt-1 text-xs font-semibold text-[#3E4C5F]">
+              <p className="mt-1 text-xs font-semibold text-[var(--p-color-fg-muted)]">
                 {entry.elementLabel}
               </p>
-              <p className="mt-1 text-xs leading-5 text-[#5B6675]">{entry.guidance}</p>
-              <p className="mt-2 text-xs font-semibold text-[#164073]">
+              <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">{entry.guidance}</p>
+              <p className="mt-2 text-xs font-semibold text-[var(--p-color-brand-500)]">
                 {entry.itemCount} item(ns) · {toCurrency(entry.total)}
               </p>
             </div>
@@ -2277,7 +2393,7 @@ function GndBudgetPanel({ summary }: { summary: GndDistributionSummary }) {
           {summary.warnings.map((warning) => (
             <p
               key={warning}
-              className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs leading-5 text-amber-800"
+              className="rounded-xl border border-[var(--p-color-warning-border)] bg-white px-3 py-2 text-xs leading-5 text-[var(--p-color-warning)]"
             >
               {warning}
             </p>
@@ -2291,8 +2407,8 @@ function GndBudgetPanel({ summary }: { summary: GndDistributionSummary }) {
 function GndPill({ classification }: { classification: ReturnType<typeof classifyGnd> }) {
   if (!classification) {
     return (
-      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800">
-        GND não identificado
+      <span className="rounded-full border border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] px-2 py-1 text-xs font-bold text-[var(--p-color-warning)]">
+        Tipo de despesa não identificado
       </span>
     );
   }
@@ -2307,7 +2423,7 @@ function GndPill({ classification }: { classification: ReturnType<typeof classif
       >
         {classification.expenseLabel}
       </span>
-      <span className="rounded-full bg-[#F4F7FA] px-2 py-1 text-xs font-bold text-[#3E4C5F]">
+      <span className="rounded-full bg-[var(--p-color-surface-muted)] px-2 py-1 text-xs font-bold text-[var(--p-color-fg-muted)]">
         {classification.elementLabel}
       </span>
     </>
@@ -2315,85 +2431,85 @@ function GndPill({ classification }: { classification: ReturnType<typeof classif
 }
 
 function gndClassBadgeStyle(expenseClass: string) {
-  if (expenseClass === "investimento") return "bg-[#E8EDF2] text-[#164073]";
-  if (expenseClass === "custeio") return "bg-emerald-50 text-emerald-700";
-  return "bg-slate-100 text-slate-600";
+  if (expenseClass === "investimento") return "bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)]";
+  if (expenseClass === "custeio") return "bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]";
+  return "bg-[var(--p-color-surface-muted)] text-[var(--p-color-fg-muted)]";
 }
 
 function purposeTone(value: DfdPurpose) {
   if (value === "ensino") {
     return {
       activeCard:
-        "border-[#2A6EC8] bg-[#F2F8FF] shadow-[0_8px_18px_rgba(42,110,200,0.12)]",
-      idleCard: "border-[#D9E0E8] bg-white hover:border-[#BFD3EE] hover:bg-[#F8FBFF]",
-      iconActive: "bg-[#E2EEFF] text-[#1F5DAF]",
-      iconIdle: "bg-[#EAF1FB] text-[#1F5DAF]",
-      selectedTag: "bg-[#EAF3FF] text-[#1F5DAF]",
+        "border-[var(--p-color-action)] bg-[var(--p-color-info-bg)] shadow-sm",
+      idleCard: "border-[var(--p-color-border)] bg-white hover:border-[var(--p-color-info-border)] hover:bg-[var(--p-color-info-bg)]",
+      iconActive: "bg-[var(--p-color-info-bg)] text-[var(--p-color-action)]",
+      iconIdle: "bg-[var(--p-color-info-bg)] text-[var(--p-color-action)]",
+      selectedTag: "bg-[var(--p-color-info-bg)] text-[var(--p-color-action)]",
     };
   }
   if (value === "pesquisa") {
     return {
       activeCard:
-        "border-[#1A8F88] bg-[#F0FCFA] shadow-[0_8px_18px_rgba(26,143,136,0.12)]",
-      idleCard: "border-[#D9E0E8] bg-white hover:border-[#BEE3DF] hover:bg-[#F7FDFC]",
-      iconActive: "bg-[#DBF4F1] text-[#146D68]",
-      iconIdle: "bg-[#E6F5F3] text-[#146D68]",
-      selectedTag: "bg-[#E8F8F6] text-[#146D68]",
+        "border-[var(--p-color-collab)] bg-[var(--p-color-collab-bg)] shadow-sm",
+      idleCard: "border-[var(--p-color-border)] bg-white hover:border-[var(--p-color-collab-border)] hover:bg-[var(--p-color-collab-bg)]",
+      iconActive: "bg-[var(--p-color-collab-bg)] text-[var(--p-color-collab)]",
+      iconIdle: "bg-[var(--p-color-collab-bg)] text-[var(--p-color-collab)]",
+      selectedTag: "bg-[var(--p-color-collab-bg)] text-[var(--p-color-collab)]",
     };
   }
   if (value === "extensao") {
     return {
       activeCard:
-        "border-[#8D5BD1] bg-[#FAF6FF] shadow-[0_8px_18px_rgba(141,91,209,0.12)]",
-      idleCard: "border-[#D9E0E8] bg-white hover:border-[#D8C6F2] hover:bg-[#FCFAFF]",
-      iconActive: "bg-[#F0E7FF] text-[#6C42A8]",
-      iconIdle: "bg-[#F3ECFF] text-[#6C42A8]",
-      selectedTag: "bg-[#F3ECFF] text-[#6C42A8]",
+        "border-[var(--p-color-insight)] bg-[var(--p-color-insight-bg)] shadow-sm",
+      idleCard: "border-[var(--p-color-border)] bg-white hover:border-[var(--p-color-insight-border)] hover:bg-[var(--p-color-insight-bg)]",
+      iconActive: "bg-[var(--p-color-insight-bg)] text-[var(--p-color-insight)]",
+      iconIdle: "bg-[var(--p-color-insight-bg)] text-[var(--p-color-insight)]",
+      selectedTag: "bg-[var(--p-color-insight-bg)] text-[var(--p-color-insight)]",
     };
   }
   return {
     activeCard:
-      "border-[#C9852B] bg-[#FFF9F1] shadow-[0_8px_18px_rgba(201,133,43,0.12)]",
-    idleCard: "border-[#D9E0E8] bg-white hover:border-[#E8D2B5] hover:bg-[#FFFCF6]",
-    iconActive: "bg-[#FCEEDB] text-[#9D651A]",
-    iconIdle: "bg-[#FBF1E4] text-[#9D651A]",
-    selectedTag: "bg-[#FBF1E4] text-[#9D651A]",
+      "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] shadow-sm",
+    idleCard: "border-[var(--p-color-border)] bg-white hover:border-[var(--p-color-warning-border)] hover:bg-[var(--p-color-warning-bg)]",
+    iconActive: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    iconIdle: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    selectedTag: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
   };
 }
 
 function contextTone(value: AcademicContext) {
   if (value === "disciplina") {
     return {
-      activeCard: "border-[#2A6EC8] bg-[#F2F8FF]",
-      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#BFD3EE] hover:bg-[#F8FBFF]",
-      badge: "bg-[#EAF3FF] text-[#1F5DAF]",
+      activeCard: "border-[var(--p-color-action)] bg-[var(--p-color-info-bg)]",
+      idleCard: "border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] hover:border-[var(--p-color-info-border)] hover:bg-[var(--p-color-info-bg)]",
+      badge: "bg-[var(--p-color-info-bg)] text-[var(--p-color-action)]",
     };
   }
   if (value === "laboratorio_sem_disciplina") {
     return {
-      activeCard: "border-[#1A8F88] bg-[#F0FCFA]",
-      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#BEE3DF] hover:bg-[#F7FDFC]",
-      badge: "bg-[#E8F8F6] text-[#146D68]",
+      activeCard: "border-[var(--p-color-collab)] bg-[var(--p-color-collab-bg)]",
+      idleCard: "border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] hover:border-[var(--p-color-collab-border)] hover:bg-[var(--p-color-collab-bg)]",
+      badge: "bg-[var(--p-color-collab-bg)] text-[var(--p-color-collab)]",
     };
   }
   if (value === "projeto") {
     return {
-      activeCard: "border-[#8D5BD1] bg-[#FAF6FF]",
-      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#D8C6F2] hover:bg-[#FCFAFF]",
-      badge: "bg-[#F3ECFF] text-[#6C42A8]",
+      activeCard: "border-[var(--p-color-insight)] bg-[var(--p-color-insight-bg)]",
+      idleCard: "border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] hover:border-[var(--p-color-insight-border)] hover:bg-[var(--p-color-insight-bg)]",
+      badge: "bg-[var(--p-color-insight-bg)] text-[var(--p-color-insight)]",
     };
   }
   if (value === "rotina_administrativa") {
     return {
-      activeCard: "border-[#C9852B] bg-[#FFF9F1]",
-      idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#E8D2B5] hover:bg-[#FFFCF6]",
-      badge: "bg-[#FBF1E4] text-[#9D651A]",
+      activeCard: "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)]",
+      idleCard: "border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] hover:border-[var(--p-color-warning-border)] hover:bg-[var(--p-color-warning-bg)]",
+      badge: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
     };
   }
   return {
-    activeCard: "border-[#2C7FA8] bg-[#F1FAFF]",
-    idleCard: "border-[#D9E0E8] bg-[#FAFBFC] hover:border-[#C7DFEC] hover:bg-[#F7FCFF]",
-    badge: "bg-[#EAF7FF] text-[#1C5F80]",
+    activeCard: "border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)]",
+    idleCard: "border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] hover:border-[var(--p-color-info-border)] hover:bg-[var(--p-color-info-bg)]",
+    badge: "bg-[var(--p-color-info-bg)] text-[var(--p-color-info)]",
   };
 }
 
@@ -2412,11 +2528,11 @@ function VisualOptionGroup({
 }) {
   const selectedTone = value ? purposeTone(value) : null;
   return (
-    <div className="rounded-2xl border border-[#D9E0E8] bg-[#F8FAFC] p-3">
+    <div className="rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-bold text-[#164073]">{title}</p>
-          <p className="text-xs leading-5 text-[#5B6675]">{description}</p>
+          <p className="text-sm font-bold text-[var(--p-color-brand-500)]">{title}</p>
+          <p className="text-xs leading-5 text-[var(--p-color-fg-muted)]">{description}</p>
         </div>
         {value ? (
           <span
@@ -2453,8 +2569,8 @@ function VisualOptionGroup({
               >
                 <Icon size={18} weight="bold" />
               </span>
-              <p className="mt-2 text-sm font-bold text-[#164073]">{option.title}</p>
-              <p className="mt-1 text-xs leading-5 text-[#5B6675]">
+              <p className="mt-2 text-sm font-bold text-[var(--p-color-brand-500)]">{option.title}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                 {option.description}
               </p>
             </button>
@@ -2473,12 +2589,12 @@ function ContextOptionGroup({
   onChange: (value: AcademicContext) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-[#D9E0E8] bg-white p-3">
+    <div className="rounded-2xl border border-[var(--p-color-border)] bg-white p-3">
       <div className="flex items-center gap-2">
-        <Target size={16} className="text-[#164073]" />
+        <Target size={16} className="text-[var(--p-color-brand-500)]" />
         <div>
-          <p className="text-sm font-bold text-[#164073]">Contexto de uso</p>
-          <p className="text-xs leading-5 text-[#5B6675]">
+          <p className="text-sm font-bold text-[var(--p-color-brand-500)]">Contexto de uso</p>
+          <p className="text-xs leading-5 text-[var(--p-color-fg-muted)]">
             Esta escolha define se a demanda vai para departamento ou laboratório.
           </p>
         </div>
@@ -2499,13 +2615,13 @@ function ContextOptionGroup({
             >
               <span
                 className={cn(
-                  "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                  "inline-flex rounded-full px-2 py-0.5 type-caption font-semibold",
                   tone.badge,
                 )}
               >
                 {option.title}
               </span>
-              <p className="mt-1 text-xs leading-5 text-[#5B6675]">
+              <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                 {option.description}
               </p>
             </button>
@@ -2537,7 +2653,7 @@ function RoutingPreview({
 }) {
   if (!routing) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#C7D7EA] bg-[#F8FAFC] px-4 py-3 text-sm text-[#5B6675]">
+      <div className="rounded-2xl border border-dashed border-[var(--p-color-info-border)] bg-[var(--p-color-surface-soft)] px-4 py-3 text-sm text-[var(--p-color-fg-muted)]">
         Selecione finalidade, contexto e local de uso para visualizar o encaminhamento.
       </div>
     );
@@ -2548,28 +2664,28 @@ function RoutingPreview({
       className={cn(
         "rounded-2xl border px-4 py-3",
         routing.requiresAttention || mismatch
-          ? "border-amber-200 bg-amber-50"
-          : "border-emerald-200 bg-emerald-50",
+          ? "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)]"
+          : "border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)]",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-[#164073]">Encaminhamento sugerido</p>
-          <p className="mt-1 text-xs leading-5 text-[#3E4C5F]">{routing.reason}</p>
+          <p className="text-sm font-bold text-[var(--p-color-brand-500)]">Encaminhamento sugerido</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">{routing.reason}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-          <span className="rounded-full bg-white px-3 py-1 text-[#164073]">
+          <span className="rounded-full bg-white px-3 py-1 text-[var(--p-color-brand-500)]">
             Uso: {selectedUnitName || "-"} · {unitTypeLabel(selectedUnitType)}
           </span>
-          <ArrowRight size={14} className="text-[#7D98B8]" />
-          <span className="rounded-full bg-white px-3 py-1 text-[#164073]">
+          <ArrowRight size={14} className="text-[var(--p-color-fg-subtle)]" />
+          <span className="rounded-full bg-white px-3 py-1 text-[var(--p-color-brand-500)]">
             Análise: {selectedAnalysisName || recommendedName || "-"} ·{" "}
             {unitTypeLabel(selectedAnalysisType || routing.analysisUnitType)}
           </span>
         </div>
       </div>
       {mismatch ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-amber-800">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--p-color-warning-border)] bg-white px-3 py-2 text-xs text-[var(--p-color-warning)]">
           <span>
             A unidade selecionada não segue a recomendação. Preferência:{" "}
             {unitTypeLabel(routing.analysisUnitType)}
@@ -2578,21 +2694,12 @@ function RoutingPreview({
           <button
             type="button"
             onClick={onApply}
-            className="rounded-lg bg-[#164073] px-3 py-1.5 font-bold text-white hover:bg-[#0F2E57]"
+            className="rounded-lg bg-[var(--p-color-brand-500)] px-3 py-1.5 font-bold text-white hover:bg-[var(--p-color-brand-600)]"
           >
             Aplicar recomendação
           </button>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-[110px] rounded-lg border border-[#D9E0E8] bg-[#FAFBFC] px-3 py-2">
-      <p className="text-[10px] font-semibold text-[#7D98B8]">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-[#164073]">{value}</p>
     </div>
   );
 }

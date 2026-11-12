@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { XIcon } from "lucide-react";
+import { XIcon } from "@/components/icons/lucide/exports/XIcon";
 // Central hook respeita prefers-reduced-motion + data-reduced-motion +
 // data-show-animations, com precedência única (ver lib/use-reduced-motion.ts).
 import { useReducedMotion } from "@/lib/use-reduced-motion";

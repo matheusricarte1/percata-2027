@@ -1,3 +1,4 @@
+import { deleteCollectiveRoom, RoomDeletionError } from "@/lib/collective-room-deletion";
 import { NextRequest, NextResponse } from "next/server";
 import {
   actorIsChefiaForUnit,
@@ -16,6 +17,7 @@ import {
   sanitizeText,
 } from "@/lib/collective-room-api";
 import { canEditCollectiveRoom, type CollectiveRoomStatus } from "@/lib/collective-dfd";
+import { sanitizePlanningSubsidies } from "@/lib/dfd-planning";
 import { toPublicSiteUrl } from "@/lib/site-url";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -78,14 +80,40 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (!title) return apiError("Informe o titulo da DFD coletiva.", 400);
       patch.title = title;
     }
-    if ("description" in body) patch.description = sanitizeLongText(body.description, 4000);
-    if ("scope" in body) patch.scope = sanitizeLongText(body.scope, 4000);
+    if ("description" in body) {
+      const description = sanitizeLongText(body.description, 4000);
+      if (!description) return apiError("Explique por que esta sala existe.", 400);
+      patch.description = description;
+    }
+    if ("scope" in body) {
+      const scope = sanitizeLongText(body.scope, 4000);
+      if (!scope) return apiError("Informe o que entra, o que fica fora e como contribuir.", 400);
+      patch.scope = scope;
+    }
+    if ("planning_subsidies" in body) {
+      const planningSubsidies = sanitizePlanningSubsidies(body.planning_subsidies);
+      patch.planning_subsidies = planningSubsidies;
+    }
     if ("status" in body) {
       if (!isChefia) return apiError("Somente a chefia pode alterar o estado da sala.", 403);
       const status = normalizeRoomStatus(body.status);
       if (!status || status === "convertida") return apiError("Status invalido.", 400);
       if (!isAllowedStatusTransition(room.status, status)) {
         return apiError("Transicao de status invalida para esta sala.", 409);
+      }
+      if (status === "pronta_para_conversao") {
+        const { count: returnedCount, error: returnedError } = await admin
+          .from("dfd_collective_contributions")
+          .select("id", { count: "exact", head: true })
+          .eq("room_id", room.id)
+          .eq("status", "devolvida");
+        if (returnedError) throw returnedError;
+        if (Number(returnedCount || 0) > 0) {
+          return apiError(
+            "Corrija ou confirme os itens devolvidos antes de abrir a prévia.",
+            409,
+          );
+        }
       }
       patch.status = status;
       if (room.status === "proposta" && status === "aberta") {
@@ -207,5 +235,33 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ room: updated });
   } catch (error: any) {
     return apiError(error?.message || "Erro ao atualizar DFD coletiva.", 500);
+  }
+}
+
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  try {
+    const actor = await requireCollectiveRoomActor();
+    if (!actor) return apiError("Usuário não autenticado.", 401);
+    const { id } = await context.params;
+    const body = await request.json().catch(() => ({}));
+    const admin = createSupabaseAdminClient();
+    const result = await deleteCollectiveRoom({
+      role: actor.role, confirmation: String(body.confirmation || ""),
+      findRoom: () => loadRoomOrNull(admin, id),
+      hasLinkedDfds: async () => {
+        const { count, error } = await admin.from("dfd_collective_room_dfds").select("dfd_id", { head: true, count: "exact" }).eq("room_id", id);
+        if (error) throw error;
+        return Number(count || 0) > 0;
+      },
+      removeRoom: async (room) => {
+        const { data, error } = await admin.from("dfd_collective_rooms").delete().eq("id", room.id).eq("status", room.status).eq("title", room.title).select("id");
+        if (error) throw error;
+        return data?.length === 1;
+      },
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    return apiError(error instanceof Error ? error.message : "Erro ao excluir sala coletiva.", error instanceof RoomDeletionError ? error.status : 500);
   }
 }

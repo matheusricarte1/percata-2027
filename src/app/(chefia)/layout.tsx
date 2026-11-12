@@ -49,7 +49,7 @@ export default function TriagemLayout({
           ? "Análise de Solicitações (Visão Superadmin)"
           : "Análise da Chefia"
       }
-      titleClassName="text-[#164073]"
+      titleClassName="text-[var(--p-color-brand-500)]"
       searchPlaceholder="Buscar solicitações para análise..."
     >
       {children}

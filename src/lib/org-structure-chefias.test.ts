@@ -36,16 +36,16 @@ describe("buildChefiaAssignmentMap", () => {
       ],
     );
 
-    assert.deepEqual(map.get("departamento:dept-1"), {
+    assert.deepEqual(map.get("departamento:dept-1"), [{
       user_id: "user-1",
       full_name: "Maria Chefia",
       email: "maria@example.edu",
-    });
-    assert.deepEqual(map.get("laboratorio:lab-1"), {
+    }]);
+    assert.deepEqual(map.get("laboratorio:lab-1"), [{
       user_id: "user-2",
       full_name: "Joao Laboratorio",
       email: "joao@example.edu",
-    });
+    }]);
   });
 
   it("ignores assignments whose stored unit_type does not match the requested unit", () => {
@@ -56,5 +56,19 @@ describe("buildChefiaAssignmentMap", () => {
     );
 
     assert.equal(map.size, 0);
+  });
+
+  it("retains every chefia of a unit and deduplicates repeated memberships", () => {
+    const map = buildChefiaAssignmentMap(
+      [{ id: "dept-1", type: "departamento" }],
+      ["user-1", "user-2", "user-1"].map((user_id) => ({
+        unit_type: "departamento", unit_id: "dept-1", user_id,
+      })),
+      [
+        { id: "user-1", full_name: "Maria", email: "maria@example.edu" },
+        { id: "user-2", full_name: "João", email: "joao@example.edu" },
+      ],
+    );
+    assert.deepEqual(map.get("departamento:dept-1")?.map((person) => person.user_id), ["user-1", "user-2"]);
   });
 });

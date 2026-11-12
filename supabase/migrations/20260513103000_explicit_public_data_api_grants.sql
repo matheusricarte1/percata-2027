@@ -36,7 +36,11 @@ DECLARE
     'dfd_collective_room_dfds',
     'dfd_collective_room_events',
     'app_system_settings',
-    'governanca_ciclos'
+    'governanca_ciclos',
+    'catalog_search_clicks',
+    'catalog_search_logs',
+    'catalog_search_overrides',
+    'dfd_collective_dfd_authors'
   ];
   read_tables TEXT[] := ARRAY[
     'catalogo',

@@ -31,7 +31,19 @@ export function GlobalRouteFrame({ children }: { children: ReactNode }) {
   const reduceMotion = useReducedMotion();
 
   if (isShellRoute(pathname)) {
-    return <>{children}</>;
+    return (
+      <motion.div
+        key={pathname}
+        data-animate-page
+        data-animate-auto
+        className="micro-page-enter"
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {children}
+      </motion.div>
+    );
   }
 
   return (
@@ -50,4 +62,3 @@ export function GlobalRouteFrame({ children }: { children: ReactNode }) {
     </AnimatePresence>
   );
 }
-

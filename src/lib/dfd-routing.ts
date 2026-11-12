@@ -21,6 +21,18 @@ export type DfdRoutingResult = {
   requiresAttention: boolean;
 };
 
+export function buildCollectiveDfdRoutingFields(params: {
+  unitId: string;
+  unitType: UnitType;
+}) {
+  return {
+    analysis_unidade_id: params.unitId,
+    analysis_tipo_unidade: params.unitType,
+    analysis_routing_reason:
+      "DFD coletiva convertida: analise encaminhada para a unidade responsavel pela sala coletiva.",
+  };
+}
+
 export function resolveDfdRouting({
   purpose,
   context,

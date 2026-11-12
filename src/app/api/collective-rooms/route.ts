@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   actorHasUnit,
-  actorIsChefiaForUnit,
   apiError,
   assertCanSeeRoom,
   buildRoomDetail,
@@ -14,6 +13,7 @@ import {
   sanitizeText,
   sanitizeUuid,
 } from "@/lib/collective-room-api";
+import { sanitizePlanningSubsidies } from "@/lib/dfd-planning";
 import { toPublicSiteUrl } from "@/lib/site-url";
 
 export async function GET(request: NextRequest) {
@@ -69,17 +69,19 @@ export async function POST(request: NextRequest) {
     const title = sanitizeText(body?.title, 160);
     const description = sanitizeLongText(body?.description, 4000);
     const scope = sanitizeLongText(body?.scope, 4000);
+    const planningSubsidies = sanitizePlanningSubsidies(body?.planning_subsidies);
     const unitId = sanitizeUuid(body?.unit_id);
     const unitType = body?.unit_type === "laboratorio" ? "laboratorio" : "departamento";
     const cycleYear = Math.max(2000, Math.min(2100, Number(body?.cycle_year || new Date().getFullYear())));
 
     if (!title) return apiError("Informe o titulo da DFD coletiva.", 400);
+    if (!description) return apiError("Explique por que esta sala existe.", 400);
+    if (!scope) return apiError("Informe o que entra, o que fica fora e como contribuir.", 400);
     if (!unitId) return apiError("Informe a unidade da DFD coletiva.", 400);
     if (!actorHasUnit(actor, unitId, unitType)) {
       return apiError("Voce nao possui vinculo com esta unidade.", 403);
     }
-    const isChefia = actorIsChefiaForUnit(actor, unitId);
-    const status = isChefia ? "aberta" : "proposta";
+    const status = "aberta";
 
     const admin = createSupabaseAdminClient();
     const { data: room, error } = await admin
@@ -88,13 +90,14 @@ export async function POST(request: NextRequest) {
         title,
         description,
         scope,
+        planning_subsidies: planningSubsidies,
         status,
         unit_id: unitId,
         unit_type: unitType,
         campus_id: actor.campus_id,
         created_by: actor.id,
-        published_at: isChefia ? new Date().toISOString() : null,
-        published_by: isChefia ? actor.id : null,
+        published_at: new Date().toISOString(),
+        published_by: actor.id,
         cycle_year: cycleYear,
       })
       .select("*")
@@ -104,10 +107,8 @@ export async function POST(request: NextRequest) {
     await insertRoomEvent(admin, {
       roomId: room.id,
       actorId: actor.id,
-      eventType: isChefia ? "room_published" : "room_proposed",
-      message: isChefia
-        ? "DFD coletiva aberta pela chefia."
-        : "Proposta de DFD coletiva enviada para publicacao da chefia.",
+      eventType: "room_opened",
+      message: "DFD coletiva aberta para contribuicoes pela unidade.",
     });
 
     const roomUrl = toPublicSiteUrl(`/dfds-coletivas/${room.id}`, request.nextUrl.origin).toString();
@@ -115,69 +116,30 @@ export async function POST(request: NextRequest) {
       "/email/events/coauthorship-opened.png",
       request.nextUrl.origin,
     ).toString();
-    if (isChefia) {
-      const unitMemberIds = await loadUnitRecipientUserIds(admin, {
-        unitId,
-        unitType,
-      });
-      await createNotifications(
-        admin,
-        unitMemberIds
-          .filter((userId) => userId !== actor.id)
-          .map((userId) => ({
-            user_id: userId,
-            title: "DFD coletiva publicada",
-            message: JSON.stringify({
-              kind: "rich_notification",
-              template_key: "coauthorship_opened",
-              heading: `Sala coletiva publicada: ${title}`,
-              context_label: "DFD coletiva",
-              status_label: "Aberta para contribuição",
-              status_tone: "info",
-              body: `A sala coletiva "${title}" foi publicada para contribuições do setor.`,
-              cta_label: "Abrir sala coletiva",
-              cta_url: roomUrl,
-              image_url: coauthorshipOpenedImage,
-              facts: [
-                { label: "Sala", value: title },
-                { label: "Status", value: "Aberta" },
-              ],
-            }),
-            type: "info" as const,
-          })),
-      );
-    } else {
-      const chefiaIds = await loadUnitRecipientUserIds(admin, {
-        unitId,
-        unitType,
-        roleInUnit: "chefia",
-      });
-      await createNotifications(
-        admin,
-        chefiaIds
-          .filter((userId) => userId !== actor.id)
-          .map((userId) => ({
-            user_id: userId,
-            title: "Nova proposta de DFD coletiva",
-            message: JSON.stringify({
-              kind: "rich_notification",
-              template_key: "generic",
-              heading: `Nova proposta de sala: ${title}`,
-              context_label: "DFD coletiva",
-              status_label: "Aguardando publicação",
-              status_tone: "info",
-              body: `${actor.full_name || "Um membro da unidade"} propôs a sala "${title}" e aguarda publicação da chefia.`,
-              cta_label: "Revisar proposta",
-              cta_url: roomUrl,
-              facts: [
-                { label: "Sala", value: title },
-                { label: "Proponente", value: actor.full_name || actor.email || "Usuário" },
-              ],
-            }),
-            type: "info" as const,
-          })),
-      );
-    }
+    const unitMemberIds = await loadUnitRecipientUserIds(admin, { unitId, unitType });
+    await createNotifications(
+      admin,
+      unitMemberIds
+        .filter((userId) => userId !== actor.id)
+        .map((userId) => ({
+          user_id: userId,
+          title: "Nova DFD coletiva aberta",
+          message: JSON.stringify({
+            kind: "rich_notification",
+            template_key: "coauthorship_opened",
+            heading: `Sala coletiva aberta: ${title}`,
+            context_label: "DFD coletiva",
+            status_label: "Aberta para contribuição",
+            status_tone: "info",
+            body: `${actor.full_name || "Um membro da unidade"} abriu esta sala para contribuições da unidade.`,
+            cta_label: "Abrir sala coletiva",
+            cta_url: roomUrl,
+            image_url: coauthorshipOpenedImage,
+            facts: [{ label: "Sala", value: title }, { label: "Status", value: "Aberta" }],
+          }),
+          type: "info" as const,
+        })),
+    );
 
     return NextResponse.json({ room }, { status: 201 });
   } catch (error: any) {

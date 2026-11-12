@@ -6,6 +6,9 @@ import Typesense from "typesense";
 const PROJECT_ROOT = process.cwd();
 const BATCH_SIZE = Number(process.env.CATALOG_TYPESENSE_BATCH_SIZE || 1000);
 const COLLECTION_NAME = process.env.TYPESENSE_CATALOG_COLLECTION || "catalogo_efisco";
+const CATALOG_SOURCE_VIEW = "catalogo_efisco_v2";
+const CATALOG_SELECT_COLUMNS =
+  "id,codigo_efisco,descricao,tipo,categoria,grupo,classe,tipo_objeto,codigo_grupo,nome_grupo,codigo_classe,nome_classe,codigo_material_servico,nome_material_servico,codigo_natureza_preferencial,gnd_preferencial,natureza_count,has_mixed_expense_classes,has_missing_natureza,gnds,naturezas,unidade_medida";
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -76,6 +79,10 @@ function buildDocument(row) {
     codigo_natureza_preferencial: cleanText(row.codigo_natureza_preferencial),
     gnd_preferencial: cleanText(row.gnd_preferencial),
     natureza_count: Number(row.natureza_count || 0),
+    has_mixed_expense_classes: Boolean(row.has_mixed_expense_classes),
+    has_missing_natureza: Boolean(row.has_missing_natureza),
+    gnds: Array.isArray(row.gnds) ? row.gnds.map(cleanText).filter(Boolean) : [],
+    naturezas: Array.isArray(row.naturezas) ? row.naturezas.map(cleanText).filter(Boolean) : [],
     unidade_medida: cleanText(row.unidade_medida || "UN"),
   };
 }
@@ -102,6 +109,10 @@ const schema = {
     { name: "codigo_natureza_preferencial", type: "string", optional: true, facet: true },
     { name: "gnd_preferencial", type: "string", optional: true, facet: true },
     { name: "natureza_count", type: "int32", optional: true },
+    { name: "has_mixed_expense_classes", type: "bool", optional: true, facet: true },
+    { name: "has_missing_natureza", type: "bool", optional: true, facet: true },
+    { name: "gnds", type: "string[]", optional: true, facet: true },
+    { name: "naturezas", type: "string[]", optional: true, facet: true },
     { name: "unidade_medida", type: "string", optional: true, facet: true },
   ],
   default_sorting_field: "catalog_id",
@@ -132,12 +143,37 @@ const typesense = new Typesense.Client({
 
 async function ensureCollection() {
   try {
-    await typesense.collections(COLLECTION_NAME).retrieve();
-    return;
+    const collection = await typesense.collections(COLLECTION_NAME).retrieve();
+    const existingFields = new Set((collection.fields || []).map((field) => field.name));
+    const missingFields = schema.fields.filter((field) => !existingFields.has(field.name));
+    if (missingFields.length === 0) return;
+
+    if (process.env.CATALOG_TYPESENSE_RESET === "1") {
+      console.log(
+        `Resetting ${COLLECTION_NAME}; missing schema fields: ${missingFields
+          .map((field) => field.name)
+          .join(", ")}`,
+      );
+      await typesense.collections(COLLECTION_NAME).delete();
+      await typesense.collections().create(schema);
+      return;
+    }
+
+    throw new Error(
+      `${COLLECTION_NAME} exists but is missing schema fields: ${missingFields
+        .map((field) => field.name)
+        .join(", ")}. Run with CATALOG_TYPESENSE_RESET=1 to recreate the collection.`,
+    );
   } catch (error) {
     if (error?.httpStatus !== 404) throw error;
   }
-  await typesense.collections().create(schema);
+
+  try {
+    await typesense.collections().create(schema);
+    return;
+  } catch (error) {
+    if (error?.httpStatus !== 409) throw error;
+  }
 }
 
 async function importBatch(rows) {
@@ -163,10 +199,8 @@ async function main() {
   let total = 0;
   while (true) {
     const { data, error } = await supabase
-      .from("catalogo")
-      .select(
-        "id,codigo_efisco,descricao,tipo,categoria,grupo,classe,tipo_objeto,codigo_grupo,nome_grupo,codigo_classe,nome_classe,codigo_material_servico,nome_material_servico,codigo_natureza_preferencial,gnd_preferencial,natureza_count,unidade_medida",
-      )
+      .from(CATALOG_SOURCE_VIEW)
+      .select(CATALOG_SELECT_COLUMNS)
       .in("tipo_objeto", ["MATERIAL", "SERVIÇO"])
       .order("id", { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);
@@ -178,12 +212,14 @@ async function main() {
     await importBatch(rows);
     total += rows.length;
     offset += rows.length;
-    console.log(`Indexed ${total} catalog items...`);
+    console.log(`Indexed ${total} catalog items from ${CATALOG_SOURCE_VIEW}...`);
 
     if (rows.length < BATCH_SIZE) break;
   }
 
-  console.log(`Typesense catalog index complete: ${total} documents in ${COLLECTION_NAME}.`);
+  console.log(
+    `Typesense catalog index complete: ${total} documents from ${CATALOG_SOURCE_VIEW} in ${COLLECTION_NAME}.`,
+  );
 }
 
 main().catch((error) => {

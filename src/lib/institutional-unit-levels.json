@@ -1,0 +1,302 @@
+[
+  {
+    "id": "c550e850-5c52-4efa-8931-5b7ace86b86e",
+    "nome": "Almoxarifado",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "242293d6-7df2-4967-9bd6-06abd81bb4fd",
+    "nome": "Aplicação – Direção e Coordenação",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "868aedd8-9c00-4098-a9f3-7820d44e3f18",
+    "nome": "Aplicação – Secretaria",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "d1f3429a-cd8e-4632-b5cb-df400322d8ce",
+    "nome": "Apoio Técnico aos Laboratórios",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "e951dd17-8899-4c2c-a6ee-c655d3651644",
+    "nome": "Auditório",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "9ead65c4-f895-4820-9060-d46531f2b166",
+    "nome": "Biblioteca",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "2ea1054d-4600-471d-971a-cb44ba717b32",
+    "nome": "Biblioteca",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "938fc07d-d148-41fd-9cb4-d25db8285805",
+    "nome": "Cantina",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "21ef8e13-61ed-4b5f-976b-285b0dc3d018",
+    "nome": "Colegiado de Biologia",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "b0d263e7-e678-420e-8016-f3ba366695b7",
+    "nome": "Colegiado de Enfermagem",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "0f94f3c5-297a-4208-96a5-b051d03c0c58",
+    "nome": "Colegiado de Fisioterapia",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "fcf4f791-9edb-46d4-bab6-890400e51dff",
+    "nome": "Colegiado de Geografia",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "2fdf1fd2-3329-4989-849a-ac2a21f9e308",
+    "nome": "Colegiado de História",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "2a327574-92cd-4fa9-92fe-bb36b992f524",
+    "nome": "Colegiado de Letras Português/Espanhol",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "c1d39d23-204e-4a16-bd1c-35a5615e4b8d",
+    "nome": "Colegiado de Letras Português/Inglês",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "a0d87fe3-0ae2-4889-b099-fc8faed1d36b",
+    "nome": "Colegiado de Matemática",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "b0f5e1b7-9f7e-48da-96ed-7b7b069e7b36",
+    "nome": "Colegiado de Nutrição",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "889743e5-368c-4b07-aa95-f7a93da2d1c8",
+    "nome": "Colegiado de Pedagogia",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "curso"
+  },
+  {
+    "id": "62cc320f-c59e-41c6-905a-58ddf30666bc",
+    "nome": "Coordenação Administrativa e Planejamento",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "26f951c4-2634-444d-9691-6f50abf44242",
+    "nome": "Coordenação de Apoio às atividades acadêmicas",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "30041e26-a5ee-4c4c-b11c-d4e3c65b60a9",
+    "nome": "Coordenação de Extensão e Cultura",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "45de7831-b106-4f02-a2e5-9348ccddee41",
+    "nome": "Coordenação de Graduação",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "3c545ac6-3a9c-4b6f-8fb7-82b5d27ac00f",
+    "nome": "Coordenação de Planejamento e Financeiro / Contabilidade",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "59b91d8f-ea12-443b-ac68-2235faa93576",
+    "nome": "Coordenação de Pós-Graduação, Pesquisa e Inovação",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "9a450338-7a58-476f-8665-2fb10babcb44",
+    "nome": "Coordenação do Curso de Enfermagem",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "curso"
+  },
+  {
+    "id": "530c305d-de46-40e7-be3b-1d54526f529b",
+    "nome": "Departamento de Educação",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "72e03dae-452f-47d8-bd1e-79afc8ca6f89",
+    "nome": "Departamento de Engenharia",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "4eb81321-11fc-4382-9944-999dfee3a69c",
+    "nome": "Departamento de Saúde",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "7d25d310-b6ea-4d38-9ded-8eae148143ae",
+    "nome": "Depósito de Materiais",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "fc84f90e-85cc-40a5-8952-482c68d37cd0",
+    "nome": "Direção",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "22e952e3-d33e-466d-abd2-c5b2a4c8e3e3",
+    "nome": "Diretoria – Diretora",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "5c693417-4d2a-4069-9d5a-6e0014a1e8cc",
+    "nome": "Diretoria – Secretaria",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "05aab269-903e-4bfe-ac12-43fac8ee10da",
+    "nome": "Diretoria – Vice-Diretora",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "5ca6cd7d-fe4d-4180-bb7b-277210342c41",
+    "nome": "Escolaridade",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "d5b5bd74-254b-4761-800d-c27bd7b3264a",
+    "nome": "Escolaridade",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "8d68d5d1-d1ba-4c75-9581-3c0ea5daf262",
+    "nome": "Espaço de Convivência Discente",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "fca33158-bdd0-4540-ae5b-6e0286c6c5e7",
+    "nome": "NCTI",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "5efcffbd-c791-425c-ad30-30df4b8a0f4c",
+    "nome": "Núcleo de Estágio",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "4e26209f-ac13-4b33-a8be-5c1254fa3f2f",
+    "nome": "Patrimônio",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "81f0a9d5-bbc1-4d18-bd47-072dbdeb1597",
+    "nome": "Planejamento / Administração / Compras",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "ef26fae8-8eb9-413a-b846-37896b957ce0",
+    "nome": "Programas de Pós-Graduação Stricto Sensu",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "b70df5c2-0645-486f-a544-8a6420535fd3",
+    "nome": "Recepção / Atendimento",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "ceb3a7b2-b766-483e-b198-86c6c9c1b59e",
+    "nome": "Recursos Humanos",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "f1ec5e5a-c7af-4975-8cba-99891988b02b",
+    "nome": "Sala Docente",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "52e9190e-3f7d-4ae0-be1b-3069dc8a6ae1",
+    "nome": "Sanitário Feminino",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "a101beaf-e59c-4d89-bc9c-c7f736eaa176",
+    "nome": "Sanitário Masculino",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "f5520d3f-7370-4e07-8ad8-f53be607eb06",
+    "nome": "Secretaria dos Colegiados",
+    "campus_id": "3e2e3885-80f2-4207-abb0-5fc891dd666c",
+    "group": "administrativo"
+  },
+  {
+    "id": "00c92862-36b3-4df1-8521-565ce99d987f",
+    "nome": "Setor de Almoxarifado e Materiais",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "df2bc875-0758-40a8-b908-90f8d5aaa7e4",
+    "nome": "Setor de Gestão de Pessoas",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  },
+  {
+    "id": "19e0cf76-39cf-48a4-9a08-08c4ed554f91",
+    "nome": "Setor de Patrimônio",
+    "campus_id": "0b8daa36-0a77-4432-9482-b9bc44852fb0",
+    "group": "administrativo"
+  }
+]

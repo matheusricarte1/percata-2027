@@ -1,20 +1,31 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  Users,
-  UserPlus,
-  Gear,
-  DotsThreeVertical,
-  MagnifyingGlass,
-  X,
-  CaretDown,
-} from "@phosphor-icons/react";
+import { Users } from "@/components/icons/phosphor/exports/Users";
+import { UserPlus } from "@/components/icons/phosphor/exports/UserPlus";
+import { Gear } from "@/components/icons/phosphor/exports/Gear";
+import { DotsThreeVertical } from "@/components/icons/phosphor/exports/DotsThreeVertical";
+import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";
+import { X } from "@/components/icons/phosphor/exports/X";
+import { CaretDown } from "@/components/icons/phosphor/exports/CaretDown";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  OperationalAccordion,
+  OperationalChip,
+  OperationalEmptyState,
+  OperationalKpiCard,
+  OperationalTimeline,
+  SkeuoDocumentCard,
+  SkeuoPaperStack,
+  SkeuoProgressRail,
+} from "@/components/ui/operational";
 import { normalizeRole, type UserRole } from "@/lib/access";
 import { sanitizeEmail, sanitizePlainText } from "@/lib/settings-sanitize";
+import { getFriendlyErrorMessage, UX_SUCCESS } from "@/lib/ux-feedback";
+import { SubmissionPermissionPanel } from "@/components/dfd/SubmissionPermissionPanel";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type RowRole = UserRole | "legado" | "pendente";
 
@@ -30,8 +41,12 @@ interface UserRow {
   campus_sigla: string | null;
   departamento_id: string | null;
   laboratorio_id: string | null;
+  departamento_role?: "membro" | "chefia" | null;
+  laboratorio_role?: "membro" | "chefia" | null;
   departamento_nome: string | null;
   laboratorio_nome: string | null;
+  departamentos: Array<{ id: string; role: "membro" | "chefia"; nome: string }>;
+  laboratorios: Array<{ id: string; role: "membro" | "chefia"; nome: string }>;
   source: "perfil" | "legado" | "auth";
   last_sign_in_at: string | null;
   created_at: string | null;
@@ -108,6 +123,33 @@ interface LoginEventRow {
   created_at: string;
 }
 
+function hasChefiaUnit(user: Pick<UserRow, "departamentos" | "laboratorios">) {
+  return user.departamentos.some((departamento) => departamento.role === "chefia") || user.laboratorios.some((laboratorio) => laboratorio.role === "chefia");
+}
+
+function getUnitScope(user: Pick<UserRow, "departamentos" | "laboratorios">) {
+  return {
+    chiefDepartments: user.departamentos.filter((departamento) => departamento.role === "chefia"),
+    chiefLaboratories: user.laboratorios.filter((laboratorio) => laboratorio.role === "chefia"),
+    memberDepartments: user.departamentos.filter((departamento) => departamento.role !== "chefia"),
+    memberLaboratories: user.laboratorios.filter((laboratorio) => laboratorio.role !== "chefia"),
+  };
+}
+
+function formatUnitCount(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function hasMemberUnit(user: Pick<UserRow, "departamentos" | "laboratorios">) {
+  return Boolean(user.departamentos.length || user.laboratorios.length > 0);
+}
+
+function hasPendingUnitDefinition(user: UserRow) {
+  if (user.role !== "solicitante" && user.role !== "chefia") return false;
+  if (!hasMemberUnit(user)) return true;
+  return user.role === "chefia" && !hasChefiaUnit(user);
+}
+
 export default function AdminUsuarios() {
   const [usuarios, setUsuarios] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,12 +161,19 @@ export default function AdminUsuarios() {
   const [departamentos, setDepartamentos] = useState<UnitOption[]>([]);
   const [laboratorios, setLaboratorios] = useState<UnitOption[]>([]);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [exceptionUser, setExceptionUser] = useState<UserRow | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingCampusId, setEditingCampusId] = useState<string>("__none__");
   const [editingDepartamentoId, setEditingDepartamentoId] =
     useState<string>("__none__");
-  const [editingLaboratorioId, setEditingLaboratorioId] =
-    useState<string>("__none__");
+  const [editingLaboratorios, setEditingLaboratorios] = useState<
+    Array<{ id: string; role: "membro" | "chefia" }>
+  >([]);
+  const [editingDepartamentoRole, setEditingDepartamentoRole] =
+    useState<"membro" | "chefia">("membro");
+  const [editingDepartamentos, setEditingDepartamentos] = useState<Array<{ id: string; role: "membro" | "chefia" }>>([]);
+  const [showLaboratoryCatalog, setShowLaboratoryCatalog] = useState(false);
+  const [laboratorySearch, setLaboratorySearch] = useState("");
   const [actionUser, setActionUser] = useState<UserRow | null>(null);
   const [savingAction, setSavingAction] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -204,8 +253,7 @@ export default function AdminUsuarios() {
         supabase
           .from("user_units")
           .select("user_id,unit_type,unit_id,role_in_unit")
-          .in("unit_type", ["departamento", "laboratorio"])
-          .or("role_in_unit.eq.membro,role_in_unit.is.null"),
+           .in("unit_type", ["departamento", "laboratorio"]),
         fetch("/api/admin/users/auth-users?limit=3000"),
       ]);
 
@@ -230,7 +278,7 @@ export default function AdminUsuarios() {
       const labById = new Map(laboratorioRows.map((row) => [row.id, row]));
       const unitByUserId = new Map<
         string,
-        { departamento_id: string | null; laboratorio_id: string | null }
+         { departamento_id: string | null; laboratorio_id: string | null; departamento_role: "membro" | "chefia" | null; laboratorio_role: "membro" | "chefia" | null; departamentos: Array<{ id: string; role: "membro" | "chefia" }>; laboratorios: Array<{ id: string; role: "membro" | "chefia" }> }
       >();
       ((userUnitsResult.data || []) as UserUnitMembership[]).forEach((unit) => {
         const userId = String(unit.user_id || "");
@@ -239,12 +287,26 @@ export default function AdminUsuarios() {
         const current = unitByUserId.get(userId) || {
           departamento_id: null,
           laboratorio_id: null,
+          departamento_role: null,
+          laboratorio_role: null,
+          departamentos: [],
+          laboratorios: [],
         };
-        if (unit.unit_type === "departamento" && !current.departamento_id) {
-          current.departamento_id = unitId;
+        if (unit.unit_type === "departamento") {
+          const role = unit.role_in_unit === "chefia" ? "chefia" : "membro";
+          current.departamentos.push({ id: unitId, role });
+          if (!current.departamento_id) {
+            current.departamento_id = unitId;
+            current.departamento_role = role;
+          }
         }
-        if (unit.unit_type === "laboratorio" && !current.laboratorio_id) {
-          current.laboratorio_id = unitId;
+        if (unit.unit_type === "laboratorio") {
+          const role = unit.role_in_unit === "chefia" ? "chefia" : "membro";
+          current.laboratorios.push({ id: unitId, role });
+          if (!current.laboratorio_id) {
+            current.laboratorio_id = unitId;
+            current.laboratorio_role = role;
+          }
         }
         unitByUserId.set(userId, current);
       });
@@ -271,8 +333,10 @@ export default function AdminUsuarios() {
         .filter((profile: any) => Boolean(profile.email))
         .map((profile: any) => ({
           ...(unitByUserId.get(String(profile.id)) || {
-            departamento_id: null,
-            laboratorio_id: null,
+          departamento_id: null,
+          laboratorio_id: null,
+          departamentos: [],
+          laboratorios: [],
           }),
           id: profile.id,
           auth_user_id: profile.id,
@@ -292,6 +356,14 @@ export default function AdminUsuarios() {
           laboratorio_nome: (unitByUserId.get(String(profile.id))?.laboratorio_id
             ? labById.get(String(unitByUserId.get(String(profile.id))?.laboratorio_id || ""))?.nome
             : null) || null,
+          departamentos: (unitByUserId.get(String(profile.id))?.departamentos || []).map((departamento) => ({
+            ...departamento,
+            nome: deptById.get(departamento.id)?.nome || "Setor não localizado",
+          })),
+          laboratorios: (unitByUserId.get(String(profile.id))?.laboratorios || []).map((laboratorio) => ({
+            ...laboratorio,
+            nome: labById.get(laboratorio.id)?.nome || "Laboratório não localizado",
+          })),
           source: "perfil",
           last_sign_in_at:
             authByEmail.get(String(profile.email).toLowerCase())?.last_sign_in_at ||
@@ -335,6 +407,8 @@ export default function AdminUsuarios() {
             laboratorio_id: null,
             departamento_nome: null,
             laboratorio_nome: null,
+            departamentos: [],
+            laboratorios: [],
             source: authUser ? "auth" : "legado",
             last_sign_in_at: authUser?.last_sign_in_at || null,
             created_at: authUser?.created_at || null,
@@ -364,6 +438,8 @@ export default function AdminUsuarios() {
             laboratorio_id: null,
             departamento_nome: null,
             laboratorio_nome: null,
+            departamentos: [],
+            laboratorios: [],
             source: "auth",
             last_sign_in_at: authUser.last_sign_in_at,
             created_at: authUser.created_at,
@@ -378,7 +454,12 @@ export default function AdminUsuarios() {
 
       setUsuarios(merged);
     } catch (error: any) {
-      toast.error("Erro ao carregar usuários: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos carregar os usuários agora. Tente atualizar em instantes.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -398,7 +479,12 @@ export default function AdminUsuarios() {
       }
       setAuditLogs((payload?.data || []) as AdminAuditRow[]);
     } catch (error: any) {
-      toast.error("Erro ao carregar trilha de auditoria: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos carregar a trilha de auditoria agora.",
+        ),
+      );
       setAuditLogs([]);
     } finally {
       setLoadingAudit(false);
@@ -423,7 +509,12 @@ export default function AdminUsuarios() {
       }
       setLoginEvents((payload?.data || []) as LoginEventRow[]);
     } catch (error: any) {
-      toast.error("Erro ao carregar eventos de login: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos carregar os eventos de login agora.",
+        ),
+      );
       setLoginEvents([]);
     } finally {
       setLoadingLoginEvents(false);
@@ -462,7 +553,10 @@ export default function AdminUsuarios() {
       setPendingLegacyLinks((data || []) as PendingLegacyLinkRow[]);
     } catch (error: any) {
       toast.error(
-        "Erro ao carregar vínculos legados pendentes: " + error.message,
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos carregar os vínculos pendentes agora.",
+        ),
       );
       setPendingLegacyLinks([]);
     } finally {
@@ -499,10 +593,15 @@ export default function AdminUsuarios() {
         throw new Error(payload?.error || "Falha ao atualizar papel.");
       }
 
-      toast.success(`Papel do usuário atualizado para ${newRole}.`);
+      toast.success(UX_SUCCESS.saved);
       await Promise.all([fetchUsuarios(), fetchAuditLogs()]);
     } catch (error: any) {
-      toast.error("Erro ao atualizar papel: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos atualizar o perfil deste usuário agora.",
+        ),
+      );
     }
   };
 
@@ -517,7 +616,9 @@ export default function AdminUsuarios() {
     );
     setEditingCampusId(campus?.id || "__none__");
     setEditingDepartamentoId(user.departamento_id || "__none__");
-    setEditingLaboratorioId(user.laboratorio_id || "__none__");
+    setEditingDepartamentos(user.departamentos.map(({ id, role }) => ({ id, role })));
+    setEditingLaboratorios(user.laboratorios.map(({ id, role }) => ({ id, role })));
+    setEditingDepartamentoRole(user.departamento_role || "membro");
   };
 
   const saveUserConfig = async () => {
@@ -534,19 +635,25 @@ export default function AdminUsuarios() {
           campus_id: editingCampusId === "__none__" ? null : editingCampusId,
           departamento_id:
             editingDepartamentoId === "__none__" ? null : editingDepartamentoId,
-          laboratorio_id:
-            editingLaboratorioId === "__none__" ? null : editingLaboratorioId,
+          departamentos: editingDepartamentos,
+          laboratorios: editingLaboratorios,
+          departamento_role: editingDepartamentoRole,
         }),
       });
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload?.error || "Falha ao salvar configuração.");
       }
-      toast.success("Configurações do usuário atualizadas.");
+      toast.success(UX_SUCCESS.saved);
       setEditingUser(null);
       await Promise.all([fetchUsuarios(), fetchAuditLogs()]);
     } catch (error: any) {
-      toast.error("Erro ao salvar configurações: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos salvar as configurações deste usuário agora.",
+        ),
+      );
     } finally {
       setSavingAction(false);
     }
@@ -578,7 +685,12 @@ export default function AdminUsuarios() {
       toast.success("Notificação e e-mail enfileirados para o usuário.");
       await fetchAuditLogs();
     } catch (error: any) {
-      toast.error("Falha ao enviar aviso: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos enviar o aviso agora. Tente novamente em instantes.",
+        ),
+      );
     } finally {
       setSavingAction(false);
     }
@@ -612,7 +724,12 @@ export default function AdminUsuarios() {
       setActionUser(null);
       await Promise.all([fetchUsuarios(), fetchAuditLogs()]);
     } catch (error: any) {
-      toast.error("Erro ao redefinir onboarding: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos redefinir o onboarding agora.",
+        ),
+      );
     } finally {
       setSavingAction(false);
     }
@@ -628,7 +745,7 @@ export default function AdminUsuarios() {
   const submitInvite = async () => {
     const email = sanitizeEmail(inviteEmail);
     if (!email) {
-      toast.error("Informe um e-mail válido para enviar o convite.");
+      toast.error("Esse e-mail não parece correto. Revise o endereço antes de enviar o convite.");
       return;
     }
     if (inviteRole === "admin" && currentUserRole !== "superadmin") {
@@ -658,7 +775,12 @@ export default function AdminUsuarios() {
       resetInviteForm();
       await Promise.all([fetchUsuarios(), fetchAuditLogs()]);
     } catch (error: any) {
-      toast.error("Erro ao convidar usuário: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos enviar o convite agora. Revise os dados e tente novamente.",
+        ),
+      );
     } finally {
       setInviting(false);
     }
@@ -681,7 +803,12 @@ export default function AdminUsuarios() {
       );
       await Promise.all([fetchUsuarios(), fetchLoginEvents(), fetchAuditLogs()]);
     } catch (error: any) {
-      toast.error("Erro ao sincronizar perfis: " + error.message);
+      toast.error(
+        getFriendlyErrorMessage(
+          error,
+          "Não conseguimos sincronizar os perfis agora.",
+        ),
+      );
     } finally {
       setSyncingAuthProfiles(false);
     }
@@ -690,11 +817,12 @@ export default function AdminUsuarios() {
   const filtered = useMemo(() => {
     const roleFilterMap: Record<string, RowRole | null> = {
       todos: null,
-      solicitantes: "solicitante",
+      solicitantes: null,
+      chefias: "chefia",
       gestores: "chefia",
       admin: "admin",
       superadmin: "superadmin",
-      pendentes: "pendente",
+      pendentes: null,
       legado: "legado",
       "ativos importados": "legado",
     };
@@ -703,10 +831,36 @@ export default function AdminUsuarios() {
     return usuarios.filter((user) => {
       const text = `${user.full_name} ${user.email}`.toLowerCase();
       const matchesSearch = text.includes(search.toLowerCase());
+      const normalizedFilter = filterRole.toLowerCase();
       const matchesRole = !selectedRole || user.role === selectedRole;
-      return matchesSearch && matchesRole;
+      const matchesView =
+        normalizedFilter !== "chefias" && normalizedFilter !== "solicitantes" && normalizedFilter !== "pendentes"
+          ? true
+          : normalizedFilter === "chefias"
+            ? user.role === "chefia"
+            : normalizedFilter === "solicitantes"
+              ? user.role === "solicitante" || user.role === "chefia"
+              : hasPendingUnitDefinition(user);
+      return matchesSearch && matchesRole && matchesView;
     });
   }, [usuarios, search, filterRole]);
+
+  const userKpis = useMemo(() => {
+    const activeProfiles = usuarios.filter((user) => user.source === "perfil").length;
+    const chiefs = usuarios.filter((user) => user.role === "chefia").length;
+    const admins = usuarios.filter((user) => user.role === "admin" || user.role === "superadmin").length;
+    const pending = usuarios.filter((user) => user.role === "pendente").length;
+    const imported = usuarios.filter((user) => user.source === "legado").length;
+    return {
+      total: usuarios.length,
+      activeProfiles,
+      chiefs,
+      admins,
+      pending,
+      imported,
+      pendingLegacy: pendingLegacyLinks.length,
+    };
+  }, [usuarios, pendingLegacyLinks.length]);
 
   const filteredDepartamentos = useMemo(() => {
     if (editingCampusId === "__none__") return [] as UnitOption[];
@@ -722,10 +876,24 @@ export default function AdminUsuarios() {
     );
   }, [laboratorios, editingCampusId]);
 
+  const visibleLaboratorios = useMemo(() => {
+    const term = laboratorySearch.trim().toLocaleLowerCase("pt-BR");
+    if (!showLaboratoryCatalog) {
+      return filteredLaboratorios.filter((laboratorio) =>
+        editingLaboratorios.some((membership) => membership.id === laboratorio.id),
+      );
+    }
+    return filteredLaboratorios.filter((laboratorio) =>
+      !term || laboratorio.nome.toLocaleLowerCase("pt-BR").includes(term),
+    );
+  }, [editingLaboratorios, filteredLaboratorios, laboratorySearch, showLaboratoryCatalog]);
+
   useEffect(() => {
     if (editingCampusId === "__none__") {
       setEditingDepartamentoId("__none__");
-      setEditingLaboratorioId("__none__");
+      setEditingDepartamentoRole("membro");
+      setEditingDepartamentos([]);
+      setEditingLaboratorios([]);
       return;
     }
 
@@ -733,28 +901,34 @@ export default function AdminUsuarios() {
       (item) => item.id === editingDepartamentoId,
     );
     if (!deptStillValid) setEditingDepartamentoId("__none__");
+    if (!deptStillValid) setEditingDepartamentoRole("membro");
 
-    const labStillValid = filteredLaboratorios.some(
-      (item) => item.id === editingLaboratorioId,
+    setEditingDepartamentos((current) =>
+      current.filter((departamento) => filteredDepartamentos.some((item) => item.id === departamento.id)),
     );
-    if (!labStillValid) setEditingLaboratorioId("__none__");
+
+    setEditingLaboratorios((current) =>
+      current.filter((laboratorio) =>
+        filteredLaboratorios.some((item) => item.id === laboratorio.id),
+      ),
+    );
   }, [
     editingCampusId,
     editingDepartamentoId,
-    editingLaboratorioId,
+    editingDepartamentos,
     filteredDepartamentos,
     filteredLaboratorios,
   ]);
 
   return (
-    <div className="p-8 bg-[#F3F2F1] min-h-screen space-y-8">
-      <div className="flex justify-between items-center bg-white p-8 rounded-[40px] border border-[#D2D0CE] shadow-sm">
+    <div className="p-8 bg-[var(--p-color-bg-muted)] min-h-screen space-y-8">
+      <div className="flex justify-between items-center bg-white p-8 rounded-[40px] border border-[var(--p-color-border)] shadow-sm">
         <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-[#164073] text-white rounded-3xl flex items-center justify-center text-3xl shadow-lg">
+          <div className="w-16 h-16 bg-[var(--p-color-brand-500)] text-white rounded-3xl flex items-center justify-center text-3xl shadow-lg">
             <Users weight="fill" />
           </div>
           <div>
-            <h1 className="font-display text-4xl font-semibold text-[#164073] tracking-tighter uppercase">
+            <h1 className="font-display text-4xl font-semibold text-[var(--p-color-brand-500)] tracking-tighter uppercase">
               Pessoas e Permissões
             </h1>
             <p className="text-black/40 text-sm font-medium">
@@ -762,20 +936,29 @@ export default function AdminUsuarios() {
             </p>
           </div>
         </div>
+        <SkeuoPaperStack
+          title="Fichário de acessos"
+          subtitle={`${userKpis.activeProfiles} perfis locais, ${userKpis.imported} importados e ${userKpis.pendingLegacy} vínculos legados pendentes.`}
+          stamp={userKpis.pending + userKpis.pendingLegacy > 0 ? "Revisar" : "Regular"}
+          tone={userKpis.pending + userKpis.pendingLegacy > 0 ? "warning" : "success"}
+          className="hidden 2xl:block"
+        />
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={syncAuthProfiles}
-            disabled={syncingAuthProfiles}
-            className="flex items-center gap-2 border border-[#D2D0CE] bg-white text-[#3E4C5F] px-4 py-3 rounded-2xl font-semibold text-[10px] uppercase tracking-widest hover:bg-[#F3F2F1] transition-all disabled:opacity-70"
-          >
-            <Users size={16} weight="bold" />
-            {syncingAuthProfiles ? "Sincronizando..." : "Sincronizar acessos"}
-          </button>
+          {currentUserRole === "superadmin" && (
+            <button
+              type="button"
+              onClick={syncAuthProfiles}
+              disabled={syncingAuthProfiles}
+              className="flex items-center gap-2 border border-[var(--p-color-border)] bg-white text-[var(--p-color-fg-muted)] px-4 py-3 rounded-2xl font-semibold type-kicker uppercase tracking-widest hover:bg-[var(--p-color-bg-muted)] transition-all disabled:opacity-70"
+            >
+              <Users size={16} weight="bold" />
+              {syncingAuthProfiles ? "Sincronizando..." : "Sincronizar acessos"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setInviteOpen(true)}
-            className="flex items-center gap-3 bg-[#164073] text-white px-8 py-4 rounded-3xl font-semibold text-xs uppercase tracking-widest shadow-2xl shadow-upe-accent-washed-blue/60 hover:scale-105 active:scale-95 transition-all"
+            className="flex items-center gap-3 bg-[var(--p-color-brand-500)] text-white px-8 py-4 rounded-3xl font-semibold text-xs uppercase tracking-widest shadow-2xl shadow-upe-accent-washed-blue/60 hover:scale-105 active:scale-95 transition-all"
           >
             <UserPlus size={20} weight="bold" />
             Convidar Servidor
@@ -784,10 +967,105 @@ export default function AdminUsuarios() {
       </div>
 
       {currentUserRole === "superadmin" && (
-        <div className="rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-upe-blue-upe">
+        <div className="rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 px-4 py-3 type-caption font-bold uppercase tracking-widest text-upe-blue-upe">
           Sessão superadmin: acesso completo para configurar perfis.
         </div>
       )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <OperationalKpiCard
+          label="Pessoas listadas"
+          value={loading ? "..." : userKpis.total}
+          icon={<Users size={17} weight="duotone" />}
+          tone="action"
+        />
+        <OperationalKpiCard
+          label="Perfis ativos"
+          value={loading ? "..." : userKpis.activeProfiles}
+          icon={<UserPlus size={17} weight="duotone" />}
+          tone="success"
+          helper="Com cadastro local"
+        />
+        <OperationalKpiCard
+          label="Chefias"
+          value={loading ? "..." : userKpis.chiefs}
+          icon={<Gear size={17} weight="duotone" />}
+          tone="collab"
+          helper="Também solicitantes"
+        />
+        <OperationalKpiCard
+          label="Admins"
+          value={loading ? "..." : userKpis.admins}
+          icon={<DotsThreeVertical size={17} weight="duotone" />}
+          tone="insight"
+          helper="Admin/superadmin"
+        />
+        <OperationalKpiCard
+          label="Pendências"
+          value={loading ? "..." : userKpis.pending + userKpis.pendingLegacy}
+          icon={<CaretDown size={17} weight="duotone" />}
+          tone="warning"
+          helper="Perfil ou vínculo"
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <OperationalAccordion
+          items={[
+            {
+              title: "Perfis e permissões",
+              badge: <OperationalChip tone="action">Referência</OperationalChip>,
+              defaultOpen: true,
+              content: (
+                <div className="flex flex-wrap gap-2">
+                  <OperationalChip tone="neutral">Solicitante</OperationalChip>
+                  <OperationalChip tone="collab">Chefia + Solicitante</OperationalChip>
+                  <OperationalChip tone="insight">Admin</OperationalChip>
+                  <OperationalChip tone="warning">Pendente</OperationalChip>
+                </div>
+              ),
+            },
+          ]}
+        />
+        <div className="rounded-2xl border border-[var(--p-color-border)] bg-white p-4 shadow-sm">
+          <p className="mb-3 text-sm font-semibold text-[var(--p-color-brand-500)]">Como os acessos são administrados</p>
+          <OperationalTimeline
+            items={[
+              { title: "Sincronizar acessos", description: "Cria ou vincula perfis locais a contas autenticadas.", tone: "action" },
+              { title: "Ajustar permissões", description: "Mudanças de papel e vínculo geram trilha de auditoria.", tone: "collab" },
+              { title: "Convidar servidor", description: "Cria o perfil inicial e registra o convite na trilha administrativa.", tone: "success" },
+            ]}
+          />
+        </div>
+      </div>
+
+      <SkeuoDocumentCard
+        title="Saúde cadastral"
+        meta="Distribuição da base entre perfis ativos, chefias e pendências."
+        stamp="Base"
+        tone="collab"
+      >
+        <SkeuoProgressRail
+          items={[
+            {
+              label: "Perfis ativos",
+              value: userKpis.total ? (userKpis.activeProfiles / userKpis.total) * 100 : 0,
+              tone: "success",
+            },
+            {
+              label: "Chefias",
+              value: userKpis.total ? (userKpis.chiefs / userKpis.total) * 100 : 0,
+              tone: "collab",
+            },
+            {
+              label: "Pendências",
+              value: userKpis.total ? ((userKpis.pending + userKpis.pendingLegacy) / userKpis.total) * 100 : 0,
+              tone: "warning",
+            },
+          ]}
+          className="border-0 p-0 shadow-none"
+        />
+      </SkeuoDocumentCard>
 
       <CollapsibleSection
         title="Vínculos Legados Pendentes"
@@ -797,7 +1075,7 @@ export default function AdminUsuarios() {
           <button
             type="button"
             onClick={fetchPendingLegacyLinks}
-            className="h-9 rounded-xl border border-black/10 bg-[#F3F2F1] px-3 text-[10px] font-semibold uppercase tracking-widest text-[#3E4C5F] hover:bg-[#EBE9E8]"
+            className="h-9 rounded-xl border border-black/10 bg-[var(--p-color-bg-muted)] px-3 type-kicker font-semibold uppercase tracking-widest text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-border-muted)]"
           >
             Atualizar validação
           </button>
@@ -820,29 +1098,31 @@ export default function AdminUsuarios() {
             ))}
 
           {!loadingPendingLegacyLinks && pendingLegacyLinks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-[#D2D0CE] p-5 text-center text-xs font-semibold uppercase tracking-widest text-black/35">
-              Nenhum vínculo pendente no momento.
-            </div>
+            <OperationalEmptyState
+              title="Nenhum vínculo pendente"
+              description="Os cadastros legados disponíveis já foram vinculados ou não exigem ação agora."
+              className="p-6"
+            />
           )}
 
           {!loadingPendingLegacyLinks &&
             pendingLegacyLinks.map((row) => (
               <div
                 key={row.legacy_email}
-                className="rounded-xl border border-black/5 bg-[#FAFBFC] px-3 py-2.5"
+                className="rounded-xl border border-black/5 bg-[var(--p-color-bg-elevated)] px-3 py-2.5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-[#323130]">
+                    <p className="text-sm font-semibold text-[var(--p-color-fg-strong)]">
                       {row.legacy_name || "Servidor legado"}
                     </p>
-                    <p className="text-xs font-semibold text-[#605E5C]">
+                    <p className="text-xs font-semibold text-[var(--p-color-fg-muted)]">
                       {row.legacy_email}
                     </p>
                   </div>
 
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest ${
+                    className={`rounded-full px-2.5 py-1 type-kicker font-semibold uppercase tracking-widest ${
                       row.validation_status === "email_duplicado_em_profiles"
                         ? "bg-red-50 text-red-700"
                         : row.validation_status === "pendente_de_confirmacao"
@@ -858,8 +1138,8 @@ export default function AdminUsuarios() {
                   </span>
                 </div>
 
-                <p className="mt-1 text-xs text-[#5B6675]">{row.validation_note}</p>
-                <p className="mt-1 text-[11px] font-semibold text-[#3E4C5F]">
+                <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">{row.validation_note}</p>
+                <p className="mt-1 type-caption font-semibold text-[var(--p-color-fg-muted)]">
                   Sugestão de conta: {row.suggested_profile_email || "não encontrada"} •
                   vínculos em demandas: {row.demand_links_count}
                 </p>
@@ -868,8 +1148,13 @@ export default function AdminUsuarios() {
         </div>
       </CollapsibleSection>
 
-      <div className="bg-white p-6 rounded-[32px] border border-[#D2D0CE] shadow-sm flex flex-wrap gap-4 items-center">
-        <div className="relative flex-1 min-w-[300px]">
+      <CollapsibleSection
+        title="Usuários cadastrados"
+        description="Abra para buscar, filtrar e administrar os perfis do sistema."
+        defaultOpen={false}
+      >
+      <div className="bg-white p-6 rounded-[24px] border border-[var(--p-color-border)] shadow-sm flex flex-wrap gap-4 items-center">
+        <div className="relative min-w-0 basis-full flex-1 sm:min-w-[300px] sm:basis-auto">
           <MagnifyingGlass
             className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20"
             size={18}
@@ -879,54 +1164,65 @@ export default function AdminUsuarios() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por nome ou e-mail..."
-            className="w-full pl-12 pr-4 py-3 bg-[#F3F2F1] border border-[#D2D0CE] rounded-2xl text-sm font-medium focus:ring-2 focus:ring-upe-accent-washed-blue/70 transition-all outline-none"
+            aria-label="Buscar usuários por nome ou e-mail"
+            className="w-full pl-12 pr-4 py-3 bg-[var(--p-color-bg-muted)] border border-[var(--p-color-border)] rounded-2xl text-sm font-medium focus:ring-2 focus:ring-upe-accent-washed-blue/70 transition-all outline-none"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
-            "Todos",
-            "Solicitantes",
-            "Gestores",
-            "Admin",
-            "Superadmin",
-            "Pendentes",
-            "Ativos importados",
-          ].map(
-            (label) => (
+            { label: "Todos", count: userKpis.total, tone: "action" as const },
+            { label: "Solicitantes", count: usuarios.filter((user) => user.role === "solicitante" || user.role === "chefia").length, tone: "neutral" as const },
+            { label: "Chefias", count: userKpis.chiefs, tone: "collab" as const },
+            { label: "Admin", count: usuarios.filter((user) => user.role === "admin").length, tone: "insight" as const },
+            { label: "Superadmin", count: usuarios.filter((user) => user.role === "superadmin").length, tone: "insight" as const },
+            { label: "Pendentes", count: usuarios.filter(hasPendingUnitDefinition).length + userKpis.pending, tone: "warning" as const },
+            { label: "Ativos importados", count: userKpis.imported, tone: "success" as const },
+          ].map(({ label, count, tone }) => (
               <button
                 key={label}
+                type="button"
+                aria-pressed={filterRole === label}
                 onClick={() => setFilterRole(label)}
-                className={`px-6 py-2.5 rounded-2xl text-[10px] font-semibold uppercase tracking-widest transition-all ${filterRole === label ? "bg-[#164073] text-white shadow-xl" : "bg-[#F3F2F1] text-[#605E5C] border border-[#D2D0CE] hover:bg-[#EBE9E8]"}`}
+                className="rounded-full transition hover:-translate-y-0.5"
               >
-                {label}
+                <OperationalChip tone={tone} active={filterRole === label} className="min-h-10 px-4 uppercase tracking-widest">
+                  {label} ({count})
+                </OperationalChip>
               </button>
-            ),
-          )}
+          ))}
         </div>
 
-        <div className="w-full rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] px-3 py-2 text-[11px] font-semibold text-[#3E4C5F]">
+        <div className="w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] px-3 py-2 type-caption font-semibold text-[var(--p-color-fg-muted)]">
           Regra de acesso: perfil <b>Chefia</b> mantém as funções de <b>Solicitante</b> (catálogo, nova DFD e minhas DFDs).
           {" "}Cadastros importados são tratados como ativos e passam a operar como perfil local após sincronização.
         </div>
       </div>
 
-      <div className="bg-white rounded-[40px] border border-[#D2D0CE] shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse text-sm">
+      <p className="px-2 text-xs text-[var(--p-color-fg-muted)] md:hidden">Deslize a tabela para ver lotação, perfil e ações.</p>
+      <div className="overflow-x-auto rounded-[24px] border border-[var(--p-color-border)] bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2" role="region" aria-label="Tabela de usuários cadastrados" tabIndex={0}>
+        <table className="min-w-[1040px] w-full table-fixed border-collapse text-left text-sm">
+          <colgroup>
+            <col className="w-[21%]" />
+            <col className="w-[24%]" />
+            <col className="w-[26%]" />
+            <col className="w-[17%]" />
+            <col className="w-[12%]" />
+          </colgroup>
           <thead>
-            <tr className="bg-[#F3F2F1] text-[#605E5C]">
-              <th className="p-8 font-semibold uppercase tracking-[0.2em] text-[10px]">
+            <tr className="bg-[var(--p-color-bg-muted)] text-[var(--p-color-fg-muted)]">
+              <th className="px-5 py-4 font-semibold uppercase tracking-[0.2em] type-kicker">
                 Servidor
               </th>
-              <th className="p-8 font-semibold uppercase tracking-[0.2em] text-[10px]">
+              <th className="px-5 py-4 font-semibold uppercase tracking-[0.2em] type-kicker">
                 E-mail
               </th>
-              <th className="p-8 font-semibold uppercase tracking-[0.2em] text-[10px]">
+              <th className="px-5 py-4 font-semibold uppercase tracking-[0.2em] type-kicker">
                 Lotação
               </th>
-              <th className="p-8 font-semibold uppercase tracking-[0.2em] text-[10px]">
+              <th className="px-5 py-4 font-semibold uppercase tracking-[0.2em] type-kicker">
                 Perfil
               </th>
-              <th className="p-8 font-semibold uppercase tracking-[0.2em] text-[10px] text-right">
+              <th className="px-5 py-4 font-semibold uppercase tracking-[0.2em] type-kicker text-right">
                 Ações
               </th>
             </tr>
@@ -943,25 +1239,34 @@ export default function AdminUsuarios() {
               : filtered.map((user) => {
                   const isProtectedSuperadmin = user.role === "superadmin";
                   const isLegacyOnly = user.source === "legado";
+                  const unitScope = getUnitScope(user);
+                  const chiefSummary = [
+                    formatUnitCount(unitScope.chiefDepartments.length, "setor", "setores"),
+                    formatUnitCount(unitScope.chiefLaboratories.length, "laboratório", "laboratórios"),
+                  ];
+                  const memberSummary = [
+                    ...unitScope.memberDepartments.map((departamento) => `Setor: ${departamento.nome}`),
+                    ...unitScope.memberLaboratories.map((laboratorio) => `Laboratório: ${laboratorio.nome}`),
+                  ];
 
                   return (
                     <tr
                       key={user.id}
-                      className="hover:bg-[#F3F2F1] transition-colors group"
+                      className="hover:bg-[var(--p-color-bg-muted)] transition-colors group"
                     >
-                      <td className="p-8">
-                        <div className="flex items-center gap-4">
+                      <td className="px-5 py-4 align-middle">
+                        <div className="flex min-w-0 items-center gap-3">
                           <UserAvatar
                             name={user.full_name}
                             avatarUrl={user.avatar_url}
-                            sizeClassName="h-12 w-12 group-hover:scale-110 transition-transform"
+                            sizeClassName="h-10 w-10 shrink-0 group-hover:scale-105 transition-transform"
                             textClassName="text-xs"
                           />
-                          <div>
-                            <div className="font-semibold text-[#323130] uppercase tracking-tight">
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-[var(--p-color-fg-strong)] uppercase tracking-tight" title={user.full_name}>
                               {user.full_name}
                             </div>
-                            <div className="text-[10px] font-semibold uppercase tracking-widest text-black/25">
+                            <div className="type-kicker font-semibold uppercase tracking-widest text-black/25">
                               {user.source === "perfil"
                                 ? "Perfil ativo"
                                 : user.source === "auth"
@@ -971,12 +1276,12 @@ export default function AdminUsuarios() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-8">
-                        <div>
-                          <span className="text-sm font-semibold text-[#605E5C]">
+                      <td className="px-5 py-4 align-middle">
+                        <div className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-[var(--p-color-fg-muted)]" title={user.email}>
                             {user.email}
                           </span>
-                          <div className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-black/35">
+                          <div className="mt-1 type-kicker font-semibold uppercase tracking-widest text-black/35">
                             Último acesso:{" "}
                             {user.last_sign_in_at
                               ? new Date(user.last_sign_in_at).toLocaleString(
@@ -986,72 +1291,88 @@ export default function AdminUsuarios() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-8">
-                        <div className="font-semibold text-[#605E5C] uppercase tracking-widest text-[10px]">
+                      <td className="px-5 py-4 align-middle">
+                        <div className="truncate font-semibold text-[var(--p-color-fg-muted)] uppercase tracking-widest type-kicker" title={user.campus_nome || "Não vinculado"}>
                           {user.campus_nome || "Não vinculado"}
                         </div>
-                        <div className="text-[9px] uppercase font-semibold text-black/20 tracking-tighter">
+                        <div className="type-micro uppercase font-semibold text-black/20 tracking-tighter">
                           SIGLA: {user.campus_sigla || "N/A"}
                         </div>
-                        <div className="mt-1 text-[10px] text-[#5B6675]">
-                          Setor: {user.departamento_nome || "não vinculado"}
-                        </div>
-                        <div className="text-[10px] text-[#5B6675]">
-                          Laboratório: {user.laboratorio_nome || "não vinculado"}
+                        <div className="mt-2 space-y-1.5 text-[var(--p-color-fg-muted)]">
+                          <p className="type-kicker font-semibold leading-4">
+                            <span className="mr-1 uppercase tracking-widest text-emerald-700">Chefia:</span>
+                            {hasChefiaUnit(user)
+                              ? chiefSummary.join(" · ")
+                              : "Nenhuma unidade definida"}
+                          </p>
+                          <p className="line-clamp-2 type-kicker font-semibold leading-4" title={memberSummary.join(" · ") || "Nenhuma unidade como membro"}>
+                            <span className="mr-1 uppercase tracking-widest text-sky-700">Membro:</span>
+                            {memberSummary.length ? memberSummary.join(" · ") : "Nenhuma unidade como membro"}
+                          </p>
+                          {hasPendingUnitDefinition(user) && (
+                            <OperationalChip tone="warning" className="w-fit px-2 py-0.5 type-micro uppercase tracking-widest">
+                              Vínculo pendente
+                            </OperationalChip>
+                          )}
                         </div>
                       </td>
-                      <td className="p-8">
-                        {isLegacyOnly ? (
-                          <div className="inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest bg-[#F3F2F1] text-[#605E5C] ring-1 ring-[#D2D0CE]">
-                            ATIVO IMPORTADO
-                          </div>
-                        ) : user.role === "pendente" ? (
-                          <div className="inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                            PENDENTE PERFIL
-                          </div>
-                        ) : isProtectedSuperadmin ? (
-                          <div className="inline-flex items-center px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest bg-upe-accent-washed-blue/25 text-upe-blue-upe ring-1 ring-upe-accent-washed-blue/70">
-                            SUPERADMIN
-                          </div>
-                        ) : (
-                          <select
-                            value={user.role}
-                            onChange={(event) =>
-                              handleUpdateRole(user, event.target.value)
-                            }
-                            className={`px-4 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-widest border-none ring-1 appearance-none cursor-pointer focus:ring-4 transition-all ${
-                              user.role === "admin"
-                                ? "bg-red-50 text-red-600 ring-red-100"
-                                : user.role === "chefia"
-                                  ? "bg-emerald-50 text-emerald-600 ring-emerald-100"
-                                  : "bg-blue-50 text-blue-600 ring-blue-100"
-                            }`}
-                          >
-                            <option value="solicitante">SOLICITANTE</option>
-                            <option value="chefia">CHEFIA + SOLICITANTE</option>
-                            {currentUserRole === "superadmin" && (
-                              <option value="admin">ADMIN PROPLAN</option>
-                            )}
-                          </select>
-                        )}
+                      <td className="px-4 py-4 align-middle">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {isLegacyOnly ? (
+                            <OperationalChip tone="success" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                              Ativo importado
+                            </OperationalChip>
+                          ) : user.role === "pendente" ? (
+                            <OperationalChip tone="warning" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                              Pendente perfil
+                            </OperationalChip>
+                          ) : isProtectedSuperadmin ? (
+                            <OperationalChip tone="insight" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                              Superadmin
+                            </OperationalChip>
+                          ) : user.role === "chefia" ? (
+                            <>
+                              <OperationalChip tone="success" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                                Chefia
+                              </OperationalChip>
+                              <OperationalChip tone="action" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                                Solicitante
+                              </OperationalChip>
+                            </>
+                          ) : user.role === "admin" ? (
+                            <OperationalChip tone="danger" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                              Admin
+                            </OperationalChip>
+                          ) : (
+                            <OperationalChip tone="action" className="px-3 py-1.5 type-kicker uppercase tracking-widest">
+                              Solicitante
+                            </OperationalChip>
+                          )}
+                        </div>
                       </td>
-                      <td className="p-8 text-right">
-                        <div className="relative flex justify-end gap-2">
+                      <td className="px-3 py-4 align-middle text-right">
+                        <div className="relative flex min-w-[88px] justify-end gap-2">
                           <button
+                            type="button"
                             onClick={() => openEditPanel(user)}
-                            className="p-3 bg-black/5 hover:bg-black/10 rounded-xl text-black/40 hover:text-slate-800 transition-all shadow-sm"
+                            aria-label={`Editar ${user.full_name}`}
+                            title="Editar perfil e vínculos"
+                            className="rounded-xl bg-black/5 p-2.5 text-black/40 shadow-sm transition-all hover:bg-black/10 hover:text-slate-800"
                           >
-                            <Gear size={20} weight="fill" />
+                            <Gear size={19} weight="fill" />
                           </button>
                           <button
+                            type="button"
                             onClick={() =>
                               setActionUser((prev) =>
                                 prev?.id === user.id ? null : user,
                               )
                             }
-                            className="p-3 bg-black/5 hover:bg-black/10 rounded-xl text-black/40 hover:text-slate-800 transition-all shadow-sm"
+                            aria-label={`Mais ações para ${user.full_name}`}
+                            title="Mais ações"
+                            className="rounded-xl bg-black/5 p-2.5 text-black/40 shadow-sm transition-all hover:bg-black/10 hover:text-slate-800"
                           >
-                            <DotsThreeVertical size={24} weight="bold" />
+                            <DotsThreeVertical size={20} weight="bold" />
                           </button>
                           {actionUser?.id === user.id && (
                             <div className="absolute right-0 top-12 z-20 w-60 rounded-2xl border border-black/10 bg-white p-2 shadow-xl">
@@ -1063,6 +1384,9 @@ export default function AdminUsuarios() {
                               >
                                 Enviar aviso de acesso
                               </button>
+                              {currentUserRole === "superadmin" && user.profile_id && (
+                                <button type="button" onClick={() => { setExceptionUser(user); setActionUser(null); }} className="min-h-11 w-full rounded-xl px-3 py-3 text-left text-sm font-semibold text-[var(--semantic-collab)] hover:bg-[var(--p-color-info-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--semantic-action)]">Solicitações fora do prazo</button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => resetUserOnboarding(user)}
@@ -1082,14 +1406,17 @@ export default function AdminUsuarios() {
         </table>
 
         {!loading && filtered.length === 0 && (
-          <div className="py-20 text-center space-y-4 opacity-30">
-            <MagnifyingGlass size={64} weight="thin" className="mx-auto" />
-            <p className="font-display font-semibold text-xl uppercase tracking-widest">
-              Nenhum usuário encontrado
-            </p>
+          <div className="p-8">
+            <OperationalEmptyState
+              icon={<MagnifyingGlass size={34} weight="thin" />}
+              title="Nenhum usuário encontrado"
+              description="Ajuste busca, perfil ou sincronize acessos para atualizar a base."
+              action={(search || filterRole !== "Todos") ? <button type="button" onClick={() => { setSearch(""); setFilterRole("Todos"); }} className="min-h-10 rounded-xl border border-[var(--p-color-border)] px-4 text-sm font-semibold text-[var(--p-color-brand-500)]">Limpar busca e perfil</button> : undefined}
+            />
           </div>
         )}
       </div>
+      </CollapsibleSection>
 
       <CollapsibleSection
         title="Últimas ações administrativas"
@@ -1099,7 +1426,7 @@ export default function AdminUsuarios() {
           <button
             type="button"
             onClick={fetchAuditLogs}
-            className="h-9 rounded-xl border border-black/10 bg-[#F3F2F1] px-3 text-[10px] font-semibold uppercase tracking-widest text-[#3E4C5F] hover:bg-[#EBE9E8]"
+            className="h-9 rounded-xl border border-black/10 bg-[var(--p-color-bg-muted)] px-3 type-kicker font-semibold uppercase tracking-widest text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-border-muted)]"
           >
             Atualizar
           </button>
@@ -1124,17 +1451,17 @@ export default function AdminUsuarios() {
               return (
                 <div
                   key={row.id}
-                  className="rounded-xl border border-black/5 bg-[#FAFBFC] px-3 py-2.5"
+                  className="rounded-xl border border-black/5 bg-[var(--p-color-bg-elevated)] px-3 py-2.5"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[#7D98B8]">
+                    <span className="type-kicker font-semibold uppercase tracking-widest text-[var(--p-color-fg-subtle)]">
                       {actionLabelMap[row.action] || row.action}
                     </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-black/35">
+                    <span className="type-kicker font-semibold uppercase tracking-widest text-black/35">
                       {new Date(row.created_at).toLocaleString("pt-BR")}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-[#3E4C5F]">
+                  <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                     <b>{row.actor_email}</b> ({row.actor_role}) →{" "}
                     <b>{row.target_email}</b>
                   </p>
@@ -1143,9 +1470,11 @@ export default function AdminUsuarios() {
             })}
 
           {!loadingAudit && auditLogs.length === 0 && (
-            <div className="rounded-xl border border-dashed border-[#D2D0CE] p-6 text-center text-xs font-semibold uppercase tracking-widest text-black/35">
-              Sem eventos de auditoria no momento.
-            </div>
+            <OperationalEmptyState
+              title="Sem eventos de auditoria"
+              description="Alterações de perfil, convite e avisos aparecerão aqui."
+              className="p-6"
+            />
           )}
         </div>
       </CollapsibleSection>
@@ -1158,7 +1487,7 @@ export default function AdminUsuarios() {
           <button
             type="button"
             onClick={fetchLoginEvents}
-            className="h-9 rounded-xl border border-black/10 bg-[#F3F2F1] px-3 text-[10px] font-semibold uppercase tracking-widest text-[#3E4C5F] hover:bg-[#EBE9E8]"
+            className="h-9 rounded-xl border border-black/10 bg-[var(--p-color-bg-muted)] px-3 type-kicker font-semibold uppercase tracking-widest text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-border-muted)]"
           >
             Atualizar
           </button>
@@ -1184,30 +1513,32 @@ export default function AdminUsuarios() {
             loginEvents.map((event) => (
               <div
                 key={event.id}
-                className="rounded-xl border border-black/5 bg-[#FAFBFC] px-3 py-2.5"
+                className="rounded-xl border border-black/5 bg-[var(--p-color-bg-elevated)] px-3 py-2.5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-[#323130]">
+                  <p className="text-xs font-semibold text-[var(--p-color-fg-strong)]">
                     {event.full_name || event.email}
                   </p>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-black/35">
+                  <span className="type-kicker font-semibold uppercase tracking-widest text-black/35">
                     {new Date(event.logged_at).toLocaleString("pt-BR")}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-[#3E4C5F]">
+                <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                   {event.email} • provedor:{" "}
                   <b>{event.provider || "não informado"}</b>
                 </p>
-                <p className="mt-1 text-[10px] text-[#5B6675]">
+                <p className="mt-1 type-kicker text-[var(--p-color-fg-muted)]">
                   IP: {event.ip_address || "não informado"}
                 </p>
               </div>
             ))}
 
           {!loadingLoginEvents && loginEvents.length === 0 && (
-            <div className="rounded-xl border border-dashed border-[#D2D0CE] p-6 text-center text-xs font-semibold uppercase tracking-widest text-black/35">
-              Sem eventos de login disponíveis.
-            </div>
+            <OperationalEmptyState
+              title="Sem eventos de login"
+              description="Quando houver acessos recentes, os registros aparecem nesta seção."
+              className="p-6"
+            />
           )}
         </div>
       </CollapsibleSection>
@@ -1217,7 +1548,7 @@ export default function AdminUsuarios() {
           <div className="w-full max-w-xl rounded-[28px] border border-black/10 bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-display text-2xl font-semibold text-[#164073] uppercase tracking-tight">
+                <h3 className="font-display text-2xl font-semibold text-[var(--p-color-brand-500)] uppercase tracking-tight">
                   Convidar Servidor
                 </h3>
                 <p className="mt-1 text-xs text-black/45">
@@ -1234,7 +1565,7 @@ export default function AdminUsuarios() {
             </div>
 
             <div className="mt-5 grid gap-3">
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+              <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
                 E-mail institucional
               </label>
               <input
@@ -1245,7 +1576,7 @@ export default function AdminUsuarios() {
                 className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
               />
 
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+              <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
                 Nome completo (opcional)
               </label>
               <input
@@ -1256,7 +1587,7 @@ export default function AdminUsuarios() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="grid gap-2">
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                  <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
                     Papel inicial
                   </label>
                   <select
@@ -1274,7 +1605,7 @@ export default function AdminUsuarios() {
                   </select>
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+                  <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
                     Campus inicial
                   </label>
                   <select
@@ -1308,7 +1639,7 @@ export default function AdminUsuarios() {
                 type="button"
                 onClick={submitInvite}
                 disabled={inviting}
-                className="h-10 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-widest text-white hover:bg-upe-blue-deep disabled:opacity-70"
+                className="h-10 rounded-xl bg-[var(--p-color-brand-500)] px-4 text-xs font-semibold uppercase tracking-widest text-white hover:bg-upe-blue-deep disabled:opacity-70"
               >
                 {inviting ? "Enviando..." : "Enviar convite"}
               </button>
@@ -1317,15 +1648,21 @@ export default function AdminUsuarios() {
         </div>
       )}
 
+      <Dialog open={Boolean(exceptionUser)} onOpenChange={(open) => { if (!open) setExceptionUser(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto bg-[var(--p-color-bg)] text-[var(--p-color-fg)] sm:max-w-3xl">
+          <DialogHeader><DialogTitle>Liberação individual</DialogTitle><DialogDescription>{exceptionUser?.full_name} · {exceptionUser?.email}</DialogDescription></DialogHeader>
+          {exceptionUser?.profile_id && <SubmissionPermissionPanel userId={exceptionUser.profile_id} />}
+        </DialogContent>
+      </Dialog>
       {editingUser && (
         <div className="fixed inset-0 z-40 bg-black/35 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-[28px] border border-black/10 bg-white p-6 shadow-2xl">
-            <h3 className="font-display text-2xl font-semibold text-[#164073] uppercase tracking-tight">
+            <h3 className="font-display text-2xl font-semibold text-[var(--p-color-brand-500)] uppercase tracking-tight">
               Perfil Completo do Usuário
             </h3>
             <p className="mt-1 text-xs text-black/45">{editingUser.email}</p>
 
-            <div className="mt-4 rounded-2xl border border-black/10 bg-[#F8FAFC] p-4">
+            <div className="mt-4 rounded-2xl border border-black/10 bg-[var(--p-color-surface-soft)] p-4">
               <div className="flex items-center gap-3">
                 <UserAvatar
                   name={editingUser.full_name}
@@ -1334,15 +1671,15 @@ export default function AdminUsuarios() {
                   textClassName="text-sm"
                 />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#323130]">
+                  <p className="truncate text-sm font-semibold text-[var(--p-color-fg-strong)]">
                     {editingUser.full_name}
                   </p>
-                  <p className="truncate text-xs text-[#5B6675]">{editingUser.email}</p>
+                  <p className="truncate text-xs text-[var(--p-color-fg-muted)]">{editingUser.email}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#164073] ring-1 ring-black/10">
-                      {editingUser.role}
+                    <span className="rounded-lg bg-white px-2 py-1 type-kicker font-semibold uppercase tracking-widest text-[var(--p-color-brand-500)] ring-1 ring-black/10">
+                      {editingUser.role === "chefia" ? "Chefia de Unidades" : editingUser.role}
                     </span>
-                    <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-[#5B6675] ring-1 ring-black/10">
+                    <span className="rounded-lg bg-white px-2 py-1 type-kicker font-semibold uppercase tracking-widest text-[var(--p-color-fg-muted)] ring-1 ring-black/10">
                       {editingUser.source === "perfil"
                         ? "Perfil ativo"
                         : editingUser.source === "auth"
@@ -1352,7 +1689,7 @@ export default function AdminUsuarios() {
                   </div>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] text-[#5B6675] md:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 type-caption text-[var(--p-color-fg-muted)] md:grid-cols-2">
                 <p>
                   <b>Último acesso:</b>{" "}
                   {editingUser.last_sign_in_at
@@ -1372,10 +1709,10 @@ export default function AdminUsuarios() {
                   <b>ID perfil:</b> {editingUser.profile_id || "não vinculado"}
                 </p>
                 <p>
-                  <b>Setor atual:</b> {editingUser.departamento_nome || "não vinculado"}
+                  <b>Setores sob responsabilidade:</b> {getUnitScope(editingUser).chiefDepartments.length ? formatUnitCount(getUnitScope(editingUser).chiefDepartments.length, "setor", "setores") : "nenhum"}
                 </p>
                 <p>
-                  <b>Laboratório atual:</b> {editingUser.laboratorio_nome || "não vinculado"}
+                  <b>Laboratórios sob responsabilidade:</b> {getUnitScope(editingUser).chiefLaboratories.length ? formatUnitCount(getUnitScope(editingUser).chiefLaboratories.length, "laboratório", "laboratórios") : "nenhum"}
                 </p>
               </div>
             </div>
@@ -1388,7 +1725,7 @@ export default function AdminUsuarios() {
             )}
 
             <div className="mt-5 grid gap-3">
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+              <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
                 Nome completo
               </label>
               <input
@@ -1398,7 +1735,7 @@ export default function AdminUsuarios() {
                 className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
               />
 
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
+              <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
                 Campus
               </label>
               <select
@@ -1415,39 +1752,81 @@ export default function AdminUsuarios() {
                 ))}
               </select>
 
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
-                Setor (departamento)
+              <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
+                Setores vinculados
               </label>
-              <select
-                value={editingDepartamentoId}
-                onChange={(event) => setEditingDepartamentoId(event.target.value)}
-                disabled={!editingUser.profile_id || editingCampusId === "__none__"}
-                className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
-              >
-                <option value="__none__">Sem setor vinculado</option>
-                {filteredDepartamentos.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.nome}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2 rounded-xl border border-black/10 p-3">
+                {editingDepartamentos.map((membership) => {
+                  const departamento = filteredDepartamentos.find((item) => item.id === membership.id);
+                  return (
+                    <div key={membership.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--p-color-bg-muted)] px-3 py-2">
+                      <span className="text-sm font-semibold text-[var(--p-color-fg-strong)]">{departamento?.nome || "Setor vinculado"}</span>
+                      <div className="flex items-center gap-2">
+                        <select value={membership.role} onChange={(event) => setEditingDepartamentos((current) => current.map((item) => item.id === membership.id ? { ...item, role: event.target.value as "membro" | "chefia" } : item))} className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-semibold">
+                          <option value="membro">Membro</option>
+                          <option value="chefia">Chefia responsável</option>
+                        </select>
+                        <button type="button" onClick={() => setEditingDepartamentos((current) => current.filter((item) => item.id !== membership.id))} className="text-xs font-semibold text-red-700">Remover</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <select value="" onChange={(event) => { const id = event.target.value; if (id && !editingDepartamentos.some((item) => item.id === id)) setEditingDepartamentos((current) => [...current, { id, role: "membro" }]); }} disabled={!editingUser.profile_id || editingCampusId === "__none__"} className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none">
+                  <option value="">Adicionar setor…</option>
+                  {filteredDepartamentos.filter((dept) => !editingDepartamentos.some((item) => item.id === dept.id)).map((dept) => <option key={dept.id} value={dept.id}>{dept.nome}</option>)}
+                </select>
+              </div>
 
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-black/40">
-                Laboratório
+              <label className="type-kicker font-semibold uppercase tracking-widest text-black/40">
+                Laboratórios vinculados
               </label>
-              <select
-                value={editingLaboratorioId}
-                onChange={(event) => setEditingLaboratorioId(event.target.value)}
-                disabled={!editingUser.profile_id || editingCampusId === "__none__"}
-                className="h-11 w-full rounded-xl border border-black/10 px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
-              >
-                <option value="__none__">Sem laboratório vinculado</option>
-                {filteredLaboratorios.map((lab) => (
-                  <option key={lab.id} value={lab.id}>
-                    {lab.nome}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2 rounded-xl border border-black/10 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-[var(--p-color-fg-muted)]">{editingLaboratorios.length} selecionado(s)</span>
+                  <button type="button" onClick={() => setShowLaboratoryCatalog((current) => !current)} className="text-xs font-semibold text-[var(--p-color-brand-500)]">{showLaboratoryCatalog ? "Ocultar catálogo" : "Gerenciar laboratórios"}</button>
+                </div>
+                {showLaboratoryCatalog && <input value={laboratorySearch} onChange={(event) => setLaboratorySearch(event.target.value)} placeholder="Buscar laboratório" className="h-10 w-full rounded-lg border border-black/10 px-3 text-sm" />}
+                {visibleLaboratorios.length === 0 ? (
+                  <p className="text-sm text-[var(--p-color-fg-muted)]">
+                    {editingCampusId === "__none__"
+                      ? "Selecione um campus para listar os laboratórios."
+                      : showLaboratoryCatalog
+                        ? "Nenhum laboratório encontrado neste campus."
+                        : "Nenhum laboratório vinculado."}
+                  </p>
+                ) : (
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">{visibleLaboratorios.map((lab) => {
+                    const membership = editingLaboratorios.find((item) => item.id === lab.id);
+                    return (
+                      <div key={lab.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--p-color-bg-muted)] px-3 py-2">
+                        <label className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--p-color-fg-strong)]">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(membership)}
+                            disabled={!editingUser.profile_id || editingCampusId === "__none__"}
+                            onChange={(event) => setEditingLaboratorios((current) => event.target.checked
+                              ? [...current, { id: lab.id, role: "membro" }]
+                              : current.filter((item) => item.id !== lab.id))}
+                          />
+                          <span>{lab.nome}</span>
+                        </label>
+                        {membership && (
+                          <select
+                            value={membership.role}
+                            onChange={(event) => setEditingLaboratorios((current) => current.map((item) => item.id === lab.id
+                              ? { ...item, role: event.target.value as "membro" | "chefia" }
+                              : item))}
+                            className="h-9 rounded-lg border border-black/10 bg-white px-2 text-xs font-semibold"
+                          >
+                            <option value="membro">Membro</option>
+                            <option value="chefia">Chefia responsável</option>
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}</div>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2">
@@ -1462,9 +1841,9 @@ export default function AdminUsuarios() {
                 type="button"
                 onClick={saveUserConfig}
                 disabled={savingAction || !editingUser.profile_id}
-                className="h-10 rounded-xl bg-[#164073] px-4 text-xs font-semibold uppercase tracking-widest text-white hover:bg-upe-blue-deep"
+                className="h-10 rounded-xl bg-[var(--p-color-brand-500)] px-4 text-xs font-semibold uppercase tracking-widest text-white hover:bg-upe-blue-deep"
               >
-                Salvar alterações
+                    Salvar escopo de atuação
               </button>
             </div>
           </div>
@@ -1490,7 +1869,7 @@ function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="rounded-[24px] border border-[#D2D0CE] bg-white shadow-sm">
+    <section className="rounded-[24px] border border-[var(--p-color-border)] bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 p-5">
         <button
           type="button"
@@ -1499,17 +1878,17 @@ function CollapsibleSection({
           aria-expanded={open}
         >
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#164073] transition-transform ${
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--p-color-info-bg)] text-[var(--p-color-brand-500)] transition-transform ${
               open ? "rotate-0" : "-rotate-90"
             }`}
           >
             <CaretDown size={16} weight="bold" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-semibold uppercase tracking-[0.14em] text-[#164073]">
+            <span className="block text-sm font-semibold uppercase tracking-[0.14em] text-[var(--p-color-brand-500)]">
               {title}
             </span>
-            <span className="mt-1 block text-xs text-[#5B6675]">{description}</span>
+            <span className="mt-1 block text-xs text-[var(--p-color-fg-muted)]">{description}</span>
           </span>
         </button>
         <div className="flex shrink-0 items-center gap-2">{actions}</div>
@@ -1536,7 +1915,7 @@ function UserAvatar({
   if (!avatarUrl || broken) {
     return (
       <div
-        className={`${sizeClassName} rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 text-[#164073] shadow-sm flex items-center justify-center font-semibold ${textClassName}`}
+        className={`${sizeClassName} rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 text-[var(--p-color-brand-500)] shadow-sm flex items-center justify-center font-semibold ${textClassName}`}
       >
         {initial}
       </div>

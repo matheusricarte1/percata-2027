@@ -57,7 +57,7 @@ const baseTheme = createTheme({
     borderRadius: 16,
   },
   typography: {
-    fontFamily: '"Inter", "Outfit", system-ui, -apple-system, sans-serif',
+    fontFamily: "var(--p-font-sans)",
     h1: { fontWeight: 700 },
     h2: { fontWeight: 700 },
     h3: { fontWeight: 700 },
@@ -90,4 +90,3 @@ const baseTheme = createTheme({
 
 export const materialYouTheme = responsiveFontSizes(baseTheme);
 export { MATERIAL_YOU_SEED };
-

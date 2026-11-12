@@ -2,19 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Archive,
-  CaretRight,
-  CircleNotch,
-  ClipboardText,
-  Files,
-  MagnifyingGlass,
-  Package,
-  Plus,
-  Trash,
-} from "@phosphor-icons/react";
+import { Archive } from "@/components/icons/phosphor/exports/Archive";
+import { CaretRight } from "@/components/icons/phosphor/exports/CaretRight";
+import { CircleNotch } from "@/components/icons/phosphor/exports/CircleNotch";
+import { ClipboardText } from "@/components/icons/phosphor/exports/ClipboardText";
+import { Files } from "@/components/icons/phosphor/exports/Files";
+import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";
+import { Package } from "@/components/icons/phosphor/exports/Package";
+import { Plus } from "@/components/icons/phosphor/exports/Plus";
+import { Trash } from "@/components/icons/phosphor/exports/Trash";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { MechanicalValue } from "@/components/ui/MechanicalValue";
 
 type Kit = {
   id: string;
@@ -147,17 +146,14 @@ export default function KitsAdminPage() {
     setSelectedKit(kit);
     setSearch("");
     setSearchResults([]);
-    const { data, error } = await supabase
-      .from("kit_items")
-      .select("*, catalogo(*)")
-      .eq("kit_id", kit.id)
-      .order("created_at", { ascending: true });
-    if (error) {
-      toast.error("Erro ao carregar itens do modelo: " + error.message);
+    const response = await fetch(`/api/admin/kits/items?kitId=${encodeURIComponent(kit.id)}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      toast.error("Erro ao carregar itens do modelo: " + (payload?.error || "erro desconhecido"));
       setKitItems([]);
       return;
     }
-    setKitItems((data || []) as KitItem[]);
+    setKitItems((payload?.items || []) as KitItem[]);
   }
 
   const updateSelectedKit = async (patch: Partial<Kit>) => {
@@ -184,30 +180,38 @@ export default function KitsAdminPage() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("catalogo")
-      .select("*")
-      .or(`descricao.ilike.%${query}%,codigo_efisco.ilike.%${query}%`)
-      .limit(12);
+    const params = new URLSearchParams({
+      q: query,
+      category: "all",
+      limit: "12",
+      context: "admin-kits",
+    });
+    const response = await fetch(`/api/catalog-search?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
 
-    if (error) {
-      toast.error("Erro na busca do catalogo: " + error.message);
+    if (!response.ok) {
+      toast.error("Erro na busca do catálogo: " + (payload?.error || "erro desconhecido"));
       return;
     }
-    setSearchResults((data || []) as CatalogItem[]);
+    setSearchResults((payload?.items || []) as CatalogItem[]);
   };
 
   const addItemToKit = async (item: CatalogItem) => {
     if (!selectedKit) return;
 
-    const { error } = await supabase.from("kit_items").insert({
-      kit_id: selectedKit.id,
-      item_id: item.id,
-      quantidade: 1,
+    const response = await fetch("/api/admin/kits/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kitId: selectedKit.id,
+        codigoEfisco: item.codigo_efisco,
+        quantidade: 1,
+      }),
     });
+    const payload = await response.json().catch(() => ({}));
 
-    if (error) {
-      toast.error("Item ja existe no modelo ou houve erro ao adicionar.");
+    if (!response.ok) {
+      toast.error(payload?.error || "Item já existe no modelo ou houve erro ao adicionar.");
       return;
     }
 
@@ -241,17 +245,17 @@ export default function KitsAdminPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1800px] space-y-5 bg-[#F3F2F1] px-3 py-5 md:px-5">
-      <section className="rounded-[20px] border border-[#C7D7EA] bg-[#F7FBFF] p-6 shadow-sm">
+    <div className="mx-auto max-w-[1800px] space-y-5 bg-[var(--p-color-bg-muted)] px-3 py-5 md:px-5">
+      <section className="rounded-[20px] border border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#47739F]">
+            <p className="type-kicker font-semibold uppercase tracking-[0.18em] text-[var(--p-color-brand-400)]">
               Modelos de DFD
             </p>
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-[#17233C]">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--p-color-fg)]">
               Kits como DFDs pré-prontas
             </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#52627A]">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--p-color-fg-muted)]">
               Kits agora nascem de DFDs reais. Abra uma DFD pronta e use a ação "Marcar como kit" para reaproveitar objeto, justificativa e itens.
             </p>
           </div>
@@ -260,7 +264,7 @@ export default function KitsAdminPage() {
               type="button"
               onClick={handleSeedCusteioKits}
               disabled={seedingCusteio}
-              className="inline-flex h-11 items-center rounded-xl border border-[#C7D7EA] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073] hover:bg-[#EAF2FF] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center rounded-xl border border-[var(--p-color-info-border)] bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--p-color-brand-500)] hover:bg-[var(--p-color-info-bg)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {seedingCusteio ? (
                 <CircleNotch size={16} className="mr-2 animate-spin" />
@@ -271,7 +275,7 @@ export default function KitsAdminPage() {
             </button>
             <Link
               href="/admin/consolidacao"
-              className="inline-flex h-11 items-center rounded-xl bg-[#164073] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#0F2E57]"
+              className="inline-flex h-11 items-center rounded-xl bg-[var(--p-color-brand-500)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[var(--p-color-brand-600)]"
             >
               <Files size={16} weight="bold" className="mr-2" />
               Escolher DFD
@@ -281,28 +285,28 @@ export default function KitsAdminPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-4">
-        <aside className="rounded-[20px] border border-[#D9E0E8] bg-white p-4 shadow-sm">
+        <aside className="rounded-[20px] border border-[var(--p-color-border)] bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#164073]">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--p-color-brand-500)]">
               Biblioteca
             </h2>
-            <span className="rounded-full bg-[#EAF2FF] px-2.5 py-1 text-[10px] font-semibold text-[#164073]">
+            <span className="rounded-full bg-[var(--p-color-info-bg)] px-2.5 py-1 type-kicker font-semibold text-[var(--p-color-brand-500)]">
               {kits.length}
             </span>
           </div>
 
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {loading ? (
-              <div className="rounded-2xl border border-dashed border-[#D9E0E8] p-5 text-sm text-[#52627A]">
+              <div className="rounded-2xl border border-dashed border-[var(--p-color-border)] p-5 text-sm text-[var(--p-color-fg-muted)]">
                 Carregando modelos...
               </div>
             ) : kits.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#D9E0E8] p-6 text-center">
-                <Archive size={28} className="mx-auto text-[#7D98B8]" />
-                <p className="mt-2 text-sm font-semibold text-[#164073]">
+              <div className="rounded-2xl border border-dashed border-[var(--p-color-border)] p-6 text-center">
+                <Archive size={28} className="mx-auto text-[var(--p-color-fg-subtle)]" />
+                <p className="mt-2 text-sm font-semibold text-[var(--p-color-brand-500)]">
                   Nenhum modelo criado
                 </p>
-                <p className="mt-1 text-xs text-[#52627A]">
+                <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                   Abra uma DFD existente e marque como kit para criar o primeiro modelo.
                 </p>
               </div>
@@ -314,20 +318,20 @@ export default function KitsAdminPage() {
                   onClick={() => openKitEditor(kit)}
                   className={`w-full rounded-2xl border p-4 text-left transition ${
                     selectedKit?.id === kit.id
-                      ? "border-[#164073] bg-[#EAF2FF]"
-                      : "border-[#E1E8F0] bg-white hover:bg-[#F7FBFF]"
+                      ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-info-bg)]"
+                      : "border-[var(--p-color-border-muted)] bg-white hover:bg-[var(--p-color-info-bg)]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+                      <p className="type-kicker font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
                         {kit.source_protocol || kit.categoria || "Geral"}
                       </p>
-                      <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-tight text-[#17233C]">
+                      <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-tight text-[var(--p-color-fg)]">
                         {kit.nome}
                       </h3>
                     </div>
-                    <CaretRight size={16} weight="bold" className="mt-1 shrink-0 text-[#7D98B8]" />
+                    <CaretRight size={16} weight="bold" className="mt-1 shrink-0 text-[var(--p-color-fg-subtle)]" />
                   </div>
                 </button>
               ))
@@ -335,31 +339,31 @@ export default function KitsAdminPage() {
           </div>
         </aside>
 
-        <main className="min-h-[680px] rounded-[20px] border border-[#D9E0E8] bg-white shadow-sm">
+        <main className="min-h-[680px] rounded-[20px] border border-[var(--p-color-border)] bg-white shadow-sm">
           {!selectedKit ? (
             <div className="flex h-full min-h-[520px] flex-col items-center justify-center p-10 text-center">
-              <Package size={56} weight="duotone" className="text-[#7D98B8]" />
-              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-[#164073]">
+              <Package size={56} weight="duotone" className="text-[var(--p-color-fg-subtle)]" />
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                 Selecione um modelo
               </h3>
-              <p className="mt-1 max-w-md text-sm text-[#52627A]">
+              <p className="mt-1 max-w-md text-sm text-[var(--p-color-fg-muted)]">
                 O kit deve funcionar como uma DFD pre-preenchida, com objeto, finalidade e itens sugeridos.
               </p>
             </div>
           ) : (
             <div className="grid min-h-[680px] grid-cols-1">
               <section className="space-y-5 p-5 md:p-6">
-                <div className="rounded-2xl border border-[#E1E8F0] bg-[#FAFBFC] p-4">
+                <div className="rounded-2xl border border-[var(--p-color-border-muted)] bg-[var(--p-color-bg-elevated)] p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF2FF] text-[#164073]">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--p-color-info-bg)] text-[var(--p-color-brand-500)]">
                         <ClipboardText size={22} weight="duotone" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
+                        <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-fg-subtle)]">
                           Documento modelo {selectedKit.source_protocol ? `· ${selectedKit.source_protocol}` : ""}
                         </p>
-                        <h2 className="text-xl font-semibold tracking-tight text-[#17233C]">
+                        <h2 className="text-xl font-semibold tracking-tight text-[var(--p-color-fg)]">
                           Estrutura da DFD
                         </h2>
                       </div>
@@ -367,7 +371,7 @@ export default function KitsAdminPage() {
                     <button
                       type="button"
                       onClick={() => handleDeleteKit(selectedKit.id)}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-600 hover:bg-red-100"
+                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 type-kicker font-semibold uppercase tracking-[0.12em] text-red-600 hover:bg-red-100"
                     >
                       <Trash size={14} />
                       Remover
@@ -382,7 +386,7 @@ export default function KitsAdminPage() {
                           setSelectedKit({ ...selectedKit, nome: event.target.value })
                         }
                         onBlur={() => updateSelectedKit({ nome: selectedKit.nome })}
-                        className="h-11 w-full rounded-xl border border-[#D9E0E8] bg-white px-3 text-sm font-semibold text-[#17233C] outline-none focus:border-[#164073]"
+                        className="h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-white px-3 text-sm font-semibold text-[var(--p-color-fg)] outline-none focus:border-[var(--p-color-brand-500)]"
                       />
                     </Field>
                     <Field label="Justificativa / finalidade padrao">
@@ -394,7 +398,7 @@ export default function KitsAdminPage() {
                         onBlur={() => updateSelectedKit({ descricao: selectedKit.descricao || null })}
                         rows={9}
                         placeholder="Explique quando este modelo deve ser usado e qual necessidade atende."
-                        className="w-full resize-none rounded-xl border border-[#D9E0E8] bg-white px-3 py-3 text-sm text-[#17233C] outline-none focus:border-[#164073]"
+                        className="w-full resize-none rounded-xl border border-[var(--p-color-border)] bg-white px-3 py-3 text-sm text-[var(--p-color-fg)] outline-none focus:border-[var(--p-color-brand-500)]"
                       />
                     </Field>
                     <Field label="Categoria operacional">
@@ -404,10 +408,10 @@ export default function KitsAdminPage() {
                             key={category}
                             type="button"
                             onClick={() => updateSelectedKit({ categoria: category })}
-                            className={`h-9 rounded-xl border px-3 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                            className={`h-9 rounded-xl border px-3 type-kicker font-semibold uppercase tracking-[0.12em] ${
                               selectedKit.categoria === category
-                                ? "border-[#164073] bg-[#164073] text-white"
-                                : "border-[#D9E0E8] bg-white text-[#164073] hover:bg-[#EAF2FF]"
+                                ? "border-[var(--p-color-brand-500)] bg-[var(--p-color-brand-500)] text-white"
+                                : "border-[var(--p-color-border)] bg-white text-[var(--p-color-brand-500)] hover:bg-[var(--p-color-info-bg)]"
                             }`}
                           >
                             {category}
@@ -418,24 +422,24 @@ export default function KitsAdminPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[#E1E8F0] bg-white p-4">
+                <div className="rounded-2xl border border-[var(--p-color-border-muted)] bg-white p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
+                      <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-fg-subtle)]">
                         Itens pre-preenchidos
                       </p>
-                      <h2 className="text-xl font-semibold tracking-tight text-[#164073]">
+                      <h2 className="text-xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                         Composicao do modelo
                       </h2>
                     </div>
-                    <span className="rounded-full bg-[#EAF2FF] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#164073]">
+                    <span className="rounded-full bg-[var(--p-color-info-bg)] px-3 py-1 type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-brand-500)]">
                       {totalItems} itens / {totalQuantity} un.
                     </span>
                   </div>
 
                   <div className="relative mt-4">
                     <MagnifyingGlass
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7D98B8]"
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--p-color-fg-subtle)]"
                       size={18}
                     />
                     <input
@@ -443,60 +447,60 @@ export default function KitsAdminPage() {
                       placeholder="Adicionar item do catalogo por descricao ou codigo e-Fisco"
                       value={search}
                       onChange={(event) => searchItems(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] pl-10 pr-3 text-sm outline-none focus:border-[#164073] focus:bg-white"
+                      className="h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] pl-10 pr-3 text-sm outline-none focus:border-[var(--p-color-brand-500)] focus:bg-white"
                     />
                     {searchResults.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white p-2 shadow-xl">
+                      <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-[var(--p-color-border)] bg-white p-2 shadow-xl">
                         {searchResults.map((item) => (
                           <button
                             key={String(item.id)}
                             type="button"
                             onClick={() => addItemToKit(item)}
-                            className="flex w-full items-center justify-between gap-3 rounded-xl p-3 text-left hover:bg-[#F7FBFF]"
+                            className="flex w-full items-center justify-between gap-3 rounded-xl p-3 text-left hover:bg-[var(--p-color-info-bg)]"
                           >
                             <span className="min-w-0">
-                              <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+                              <span className="block type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
                                 {item.codigo_efisco || "Sem codigo"} · {item.tipo || item.categoria || "Catalogo"}
                               </span>
-                              <span className="mt-1 line-clamp-2 text-sm font-semibold text-[#17233C]">
+                              <span className="mt-1 line-clamp-2 text-sm font-semibold text-[var(--p-color-fg)]">
                                 {item.descricao || "Item sem descricao"}
                               </span>
                             </span>
-                            <Plus size={18} className="shrink-0 text-[#164073]" />
+                            <Plus size={18} className="shrink-0 text-[var(--p-color-brand-500)]" />
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-[#E1E8F0]">
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--p-color-border-muted)]">
                     {kitItems.length === 0 ? (
-                      <div className="flex min-h-[220px] flex-col items-center justify-center bg-[#FAFBFC] p-8 text-center">
-                        <Files size={36} weight="duotone" className="text-[#7D98B8]" />
-                        <p className="mt-3 text-sm font-semibold text-[#164073]">
+                      <div className="flex min-h-[220px] flex-col items-center justify-center bg-[var(--p-color-bg-elevated)] p-8 text-center">
+                        <Files size={36} weight="duotone" className="text-[var(--p-color-fg-subtle)]" />
+                        <p className="mt-3 text-sm font-semibold text-[var(--p-color-brand-500)]">
                           Modelo sem itens
                         </p>
-                        <p className="mt-1 text-xs text-[#52627A]">
+                        <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
                           Adicione itens para que este kit funcione como uma DFD pre-pronta.
                         </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-[#E1E8F0]">
+                      <div className="divide-y divide-[var(--p-color-border-muted)]">
                         {kitItems.map((item, index) => (
                           <div key={item.id} className="grid gap-3 p-3 lg:grid-cols-[44px_minmax(0,1fr)_120px_44px] lg:items-center">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EAF2FF] text-xs font-semibold text-[#164073]">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--p-color-info-bg)] text-xs font-semibold text-[var(--p-color-brand-500)]">
                               {index + 1}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+                              <p className="type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
                                 {item.catalogo?.codigo_efisco || "Sem codigo"} · {item.catalogo?.unidade_medida || "UN"}
                               </p>
-                              <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#17233C]">
+                              <p className="mt-1 line-clamp-2 text-sm font-semibold text-[var(--p-color-fg)]">
                                 {item.catalogo?.descricao || "Item sem descricao"}
                               </p>
                             </div>
                             <div>
-                              <label className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+                              <label className="type-micro font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
                                 Qtd.
                               </label>
                               <input
@@ -504,13 +508,13 @@ export default function KitsAdminPage() {
                                 min={1}
                                 value={getKitItemQuantity(item)}
                                 onChange={(event) => updateItemQuantity(item, Number(event.target.value))}
-                                className="mt-1 h-9 w-full rounded-xl border border-[#D9E0E8] bg-white px-2 text-center text-sm font-semibold text-[#164073] outline-none focus:border-[#164073]"
+                                className="mt-1 h-9 w-full rounded-xl border border-[var(--p-color-border)] bg-white px-2 text-center text-sm font-semibold text-[var(--p-color-brand-500)] outline-none focus:border-[var(--p-color-brand-500)]"
                               />
                             </div>
                             <button
                               type="button"
                               onClick={() => removeItemFromKit(item)}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl text-[#A7B1BD] hover:bg-red-50 hover:text-red-600"
+                              className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--p-color-border-strong)] hover:bg-red-50 hover:text-red-600"
                             >
                               <Trash size={17} />
                             </button>
@@ -522,31 +526,31 @@ export default function KitsAdminPage() {
                 </div>
               </section>
 
-              <aside className="border-t border-[#E1E8F0] bg-[#FAFBFC] p-5">
+              <aside className="border-t border-[var(--p-color-border-muted)] bg-[var(--p-color-bg-elevated)] p-5">
                 <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-                  <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
+                  <div className="rounded-2xl border border-[var(--p-color-border)] bg-white p-4 shadow-sm">
+                    <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-fg-subtle)]">
                       Prontidao do modelo
                     </p>
-                    <p className="mt-2 text-3xl font-semibold tracking-tight text-[#164073]">
+                    <p className="mt-2 text-3xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                       {completeness}%
                     </p>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#EAF2FF]">
-                      <div className="h-full rounded-full bg-[#164073]" style={{ width: `${completeness}%` }} />
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--p-color-info-bg)]">
+                      <div className="h-full rounded-full bg-[var(--p-color-brand-500)]" style={{ width: `${completeness}%` }} />
                     </div>
-                    <p className="mt-3 text-xs leading-5 text-[#52627A]">
+                    <p className="mt-3 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                       Um modelo completo precisa manter o objeto, a justificativa e os itens herdados da DFD original.
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#D9E0E8] bg-white p-4 shadow-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7D98B8]">
+                  <div className="rounded-2xl border border-[var(--p-color-border)] bg-white p-4 shadow-sm">
+                    <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-fg-subtle)]">
                       Previa da DFD
                     </p>
-                    <h3 className="mt-2 text-lg font-semibold leading-tight text-[#17233C]">
+                    <h3 className="mt-2 text-lg font-semibold leading-tight text-[var(--p-color-fg)]">
                       {selectedKit.nome || "Objeto nao informado"}
                     </h3>
-                    <p className="mt-2 line-clamp-5 text-xs leading-5 text-[#52627A]">
+                    <p className="mt-2 line-clamp-5 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                       {selectedKit.descricao || "Justificativa padrao ainda nao informada."}
                     </p>
                     <div className="mt-4 grid grid-cols-2 gap-2">
@@ -569,7 +573,7 @@ export default function KitsAdminPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+      <span className="mb-1.5 block type-kicker font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
         {label}
       </span>
       {children}
@@ -578,12 +582,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function PreviewStat({ label, value }: { label: string; value: string }) {
+  const shouldAnimateValue = /\d/.test(value);
+
   return (
-    <div className="rounded-xl border border-[#E1E8F0] bg-[#FAFBFC] px-3 py-2">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+    <div className="rounded-xl border border-[var(--p-color-border-muted)] bg-[var(--p-color-bg-elevated)] px-3 py-2">
+      <p className="type-micro font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
         {label}
       </p>
-      <p className="mt-1 truncate text-xs font-semibold text-[#164073]">{value}</p>
+      <p className="mt-1 min-w-0 overflow-visible text-xs font-semibold text-[var(--p-color-brand-500)]">
+        {shouldAnimateValue ? <MechanicalValue value={value} /> : value}
+      </p>
     </div>
   );
 }

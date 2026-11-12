@@ -1,9 +1,13 @@
 export const SHELL_APP_BAR_HEIGHT = "72px";
+export const SHELL_APP_BAR_HEIGHT_COMPACT = "64px";
 
 export const SHELL_SIDEBAR_WIDTH = {
   user: "248px",
   chefia: "248px",
   admin: "248px",
+  collapsed: "88px",
+  compact: "224px",
+  compactCollapsed: "76px",
 } as const;
 
 export type ShellRole = "solicitante" | "chefia" | "admin" | "superadmin";

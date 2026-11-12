@@ -2,6 +2,8 @@
 
 Este documento formaliza as regras de design que devem ser seguidas no sistema.
 
+Para comunicações por e-mail, use também o [Guia de Design e Redação de E-mails](./GUIA-DE-DESIGN-E-REDACAO-DE-EMAILS.md). Ele define o padrão de conteúdo, acessibilidade, compatibilidade e validação de entrega específico desse canal.
+
 ## 1. Regra de Cores 60/30/10
 
 A distribuição visual da interface deve respeitar:

@@ -5,6 +5,7 @@ import {
   hasSupabaseAdminCredentials,
 } from "@/lib/supabase-admin";
 import { getEmailProviderStatus } from "@/lib/email";
+import { getRateLimitBackendLabel } from "@/lib/rate-limit";
 
 /**
  * Healthcheck público. Não retorna informação sensível — apenas:
@@ -88,12 +89,9 @@ export async function GET() {
   if (hasSupabaseAdminCredentials()) {
     try {
       const admin = createSupabaseAdminClient();
-      const { error } = await admin
-        .from("audit_log")
-        .select("id")
-        .limit(1);
-      checks.audit_log = error
-        ? { ok: false, reason: error.message.slice(0, 200) }
+      const { data, error } = await admin.rpc("dfd_analysis_health");
+      checks.audit_log = error || data !== true
+        ? { ok: false, reason: "Captura de alterações de DFDs indisponível." }
         : { ok: true };
     } catch (err: any) {
       checks.audit_log = {
@@ -113,9 +111,7 @@ export async function GET() {
   // ============ rate_limit_backend ============
   checks.rate_limit_backend = {
     ok: true,
-    reason: process.env.UPSTASH_REDIS_REST_URL
-      ? "upstash"
-      : "in-memory (fallback; não compartilhado entre instâncias)",
+    reason: getRateLimitBackendLabel(),
   };
 
   // ============ overall ============

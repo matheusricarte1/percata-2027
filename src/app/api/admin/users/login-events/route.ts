@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuthorizedRole } from "@/lib/api-auth";
+import { getAdminCampusUserIds } from "@/lib/admin-campus-scope";
 
 function isMissingLoginTableError(error: any): boolean {
   const text = String(error?.message || error || "").toLowerCase();
@@ -14,20 +15,23 @@ function isMissingLoginTableError(error: any): boolean {
 
 export const GET = withAuthorizedRole(
   ["admin", "superadmin"],
-  async ({ request, supabaseAdmin }) => {
+  async ({ request, supabaseAdmin, user, role }) => {
     const limitParam = Number(request.nextUrl.searchParams.get("limit") || 40);
     const limit = Number.isFinite(limitParam)
       ? Math.max(1, Math.min(limitParam, 200))
       : 40;
 
     const admin = supabaseAdmin!;
-    const { data, error } = await admin
+    const allowed = await getAdminCampusUserIds(admin, user.id, role);
+    if (allowed?.size === 0) return NextResponse.json({ data: [] });
+    let query = admin
       .from("auth_login_events")
       .select(
         "id,email,provider,full_name,ip_address,user_agent,logged_at,created_at",
       )
-      .order("logged_at", { ascending: false })
-      .limit(limit);
+      .order("logged_at", { ascending: false });
+    if (allowed) query = query.in("user_id", [...allowed]);
+    const { data, error } = await query.limit(limit);
 
     if (error) {
       if (isMissingLoginTableError(error)) {

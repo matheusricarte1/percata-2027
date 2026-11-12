@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  ACCESS_DENIED_MESSAGE,
+  getLoginAccessDecision,
+  normalizeLoginEmail,
+  type LoginAccessReason,
+} from "@/lib/login-access";
 
 function extractFullName(metadata: Record<string, any> | undefined): string | null {
   const fullName = String(metadata?.full_name || metadata?.name || "").trim();
@@ -14,40 +20,6 @@ function extractFullName(metadata: Record<string, any> | undefined): string | nu
 function extractAvatarUrl(metadata: Record<string, any> | undefined): string | null {
   const avatar = String(metadata?.avatar_url || metadata?.picture || "").trim();
   return avatar || null;
-}
-
-function normalizeEmail(value: string | null | undefined): string {
-  return String(value || "").trim().toLowerCase();
-}
-
-async function isEmailInSystemList(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  email: string,
-): Promise<boolean> {
-  const normalized = normalizeEmail(email);
-  if (!normalized) return false;
-
-  const [profileCheck, legacyCheck, legacyMapCheck] = await Promise.all([
-    supabase.from("profiles").select("id,is_active").ilike("email", normalized).limit(1),
-    supabase
-      .from("legacy_user_directory")
-      .select("id")
-      .ilike("email", normalized)
-      .limit(1),
-    supabase
-      .from("legacy_user_profile_links")
-      .select("id")
-      .eq("legacy_email", normalized)
-      .limit(1),
-  ]);
-
-  const inProfiles =
-    !profileCheck.error && (profileCheck.data || []).some((row: any) => row.is_active !== false);
-  const inLegacy = !legacyCheck.error && (legacyCheck.data || []).length > 0;
-  const inLegacyMapping =
-    !legacyMapCheck.error && (legacyMapCheck.data || []).length > 0;
-
-  return inProfiles || inLegacy || inLegacyMapping;
 }
 
 async function syncProfileIdentity(
@@ -120,6 +92,17 @@ function getRequestIp(request: Request): string | null {
   );
 }
 
+function maskIpAddress(value: string | null): string | null {
+  if (!value) return null;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) {
+    return value.replace(/\.\d{1,3}$/, ".0");
+  }
+  if (value.includes(":")) {
+    return value.split(":").slice(0, 4).join(":") + "::";
+  }
+  return null;
+}
+
 function isMissingLoginEventsTable(error: any): boolean {
   const text = String(error?.message || error || "").toLowerCase();
   return (
@@ -168,6 +151,46 @@ async function logLoginEvent(
   }
 }
 
+async function logDeniedLoginEvent(
+  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | null,
+  params: {
+    email: string;
+    reason: LoginAccessReason;
+    user: any;
+    request: Request;
+  },
+) {
+  if (!supabaseAdmin || !params.email) return;
+
+  const metadata = (params.user?.user_metadata || {}) as Record<string, any>;
+  const provider =
+    String(
+      params.user?.app_metadata?.provider ||
+        (Array.isArray(params.user?.app_metadata?.providers)
+          ? params.user.app_metadata.providers[0]
+          : ""),
+    ).trim() || null;
+
+  const { error } = await supabaseAdmin.from("auth_login_events").insert({
+    user_id: params.user?.id || null,
+    email: params.email,
+    provider,
+    full_name: extractFullName(metadata),
+    avatar_url: extractAvatarUrl(metadata),
+    ip_address: maskIpAddress(getRequestIp(params.request)),
+    user_agent: params.request.headers.get("user-agent"),
+    metadata: {
+      event: "login_denied",
+      reason: params.reason,
+    },
+    logged_at: new Date().toISOString(),
+  });
+
+  if (error && !isMissingLoginEventsTable(error)) {
+    console.error("Falha ao registrar negativa de login:", error.message || error);
+  }
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const { searchParams, origin } = requestUrl;
@@ -211,7 +234,7 @@ export async function GET(request: Request) {
     if (!error) {
       try {
         const authUser = data?.user || (await supabase.auth.getUser()).data.user;
-        const email = normalizeEmail(authUser?.email);
+        const email = normalizeLoginEmail(authUser?.email);
 
         if (!authUser || !email) {
           await supabase.auth.signOut();
@@ -220,12 +243,18 @@ export async function GET(request: Request) {
           );
         }
 
-        const isAllowed = await isEmailInSystemList(supabase, email);
+        const loginAccess = await getLoginAccessDecision(supabase, email);
 
-        if (!isAllowed) {
+        if (!loginAccess.allowed) {
+          await logDeniedLoginEvent(supabaseAdmin, {
+            email,
+            reason: loginAccess.reason,
+            user: authUser,
+            request,
+          });
           await supabase.auth.signOut();
           return NextResponse.redirect(
-            `${callbackOrigin}/auth/auth-code-error?error=Acesso%20restrito.%20Solicite%20ativação%20prévia%20do%20seu%20usuário%20pela%20administração.`,
+            `${callbackOrigin}/auth/auth-code-error?error=${encodeURIComponent(ACCESS_DENIED_MESSAGE)}`,
           );
         }
 

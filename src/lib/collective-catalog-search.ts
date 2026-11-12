@@ -1,4 +1,12 @@
+import {
+  formatCatalogDisplayText,
+  parseCatalogDescription,
+} from "./catalog-description";
+
 export const COLLECTIVE_CATALOG_SEARCH_LIMIT = 12;
+// Keep the collective panel compact, but rank a wider candidate window before
+// slicing the visible page. This matches the quality of the main catalog.
+export const COLLECTIVE_CATALOG_SEARCH_WINDOW = 50;
 
 const FALLBACK_SEARCH_FIELDS = [
   "descricao",
@@ -37,5 +45,40 @@ export function buildCollectiveCatalogPageState(page: number, rowCount: number) 
     displayPage: safePage + 1,
     hasPrevious: safePage > 0,
     hasNext: rowCount === COLLECTIVE_CATALOG_SEARCH_LIMIT,
+  };
+}
+
+export function summarizeCollectiveCatalogItemForDisplay(item: {
+  id?: string | number | null;
+  codigo_efisco?: string | null;
+  codigo_tce?: string | null;
+  descricao?: string | null;
+  tipo_objeto?: string | null;
+  nome_classe?: string | null;
+  classe?: string | null;
+  nome_grupo?: string | null;
+  grupo?: string | null;
+}) {
+  const rawDescription = String(item.descricao || "Descrição não informada")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parsed = parseCatalogDescription(rawDescription);
+  const term = formatCatalogDisplayText(parsed.term);
+  const details = formatCatalogDisplayText(parsed.details);
+  const code = String(item.codigo_efisco || item.codigo_tce || item.id || "Sem código").trim();
+  const classLabel = String(
+    item.nome_classe || item.classe || item.nome_grupo || item.grupo || "Sem categoria",
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    code,
+    term,
+    details,
+    fullDescription: parsed.hasDetails ? `${term} - ${details}` : term,
+    classLabel,
+    typeLabel: String(item.tipo_objeto || "Item do catálogo e-Fisco").trim(),
+    hasDetails: parsed.hasDetails,
   };
 }

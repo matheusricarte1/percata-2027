@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getEmailProviderStatus, sendSystemEmail } from "@/lib/email";
+import { getEmailProviderStatus, parseEmailTemplateKey, sendSystemEmail } from "@/lib/email";
+import type { EmailTemplateKey } from "@/lib/email";
 import { toPublicSiteUrl } from "@/lib/site-url";
 import { withAuthorizedRole } from "@/lib/api-auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -12,25 +13,7 @@ type NotificationEnvelope = {
   image_url?: string;
   cta_label?: string;
   cta_url?: string;
-  template_key?:
-    | "welcome"
-    | "dfd_submitted"
-    | "dfd_approved"
-    | "dfd_returned"
-    | "dfd_pending"
-    | "admin_summary"
-    | "dfd_sent_to_chefia"
-    | "dfd_consolidated"
-    | "coauthorship_opened"
-    | "coauthorship_closed"
-    | "contribution_submitted"
-    | "contribution_locked"
-    | "dfd_rejected_or_archived"
-    | "triage_conflict"
-    | "sla_reminder"
-    | "broadcast_announcement"
-    | "test"
-    | "generic";
+  template_key?: EmailTemplateKey;
   heading?: string;
   context_label?: string;
   status_label?: string;
@@ -68,7 +51,7 @@ export const POST = withAuthorizedRole(
   ["admin", "superadmin"],
   async ({ request, supabaseAdmin, user }) => {
     // Rate limit defensivo: o dispatch pode ser disparado por cron, mas se
-    // for chamado manualmente em loop, evita esgotar quota do Resend.
+    // for chamado manualmente em loop, evita sobrecarga no SMTP do Gmail.
     const limited = await enforceRateLimit(
       request,
       { bucket: "notif-dispatch", limit: 30, windowSec: 60 },
@@ -136,7 +119,7 @@ export const POST = withAuthorizedRole(
     for (const item of queued) {
       // Idempotência: chave derivada do id da fila. Se o dispatch crashar
       // após o envio mas antes do UPDATE status=sent, a próxima execução
-      // do worker reenvia com mesma key — Resend deduplica server-side.
+      // preserva o mesmo Message-Id para permitir deduplicação pelo MTA.
       const idempotencyKey = `email-queue:${item.id}`;
 
       const envelope = parseNotificationEnvelope(String(item.body || ""));
@@ -146,7 +129,7 @@ export const POST = withAuthorizedRole(
         subject: item.subject,
         text: textBody || "Você recebeu uma atualização no PERCATA.",
         imageUrl: String(envelope?.image_url || "").trim() || undefined,
-        templateKey: envelope?.template_key || undefined,
+        templateKey: parseEmailTemplateKey(envelope?.template_key),
         heading: String(envelope?.heading || "").trim() || undefined,
         contextLabel:
           String(envelope?.context_label || "").trim() ||
@@ -178,23 +161,27 @@ export const POST = withAuthorizedRole(
 
       if (result.ok) {
         sent += 1;
-        await admin
+        const { error: sentUpdateError } = await admin
           .from("email_alert_queue")
           .update({
             status: "sent",
             last_error: null,
             sent_at: new Date().toISOString(),
+            locked_at: null,
           })
           .eq("id", item.id);
+        if (sentUpdateError) throw sentUpdateError;
       } else {
         failed += 1;
-        await admin
+        const { error: failedUpdateError } = await admin
           .from("email_alert_queue")
           .update({
             status: "failed",
             last_error: result.error || "Falha no envio.",
+            locked_at: null,
           })
           .eq("id", item.id);
+        if (failedUpdateError) throw failedUpdateError;
       }
     }
 

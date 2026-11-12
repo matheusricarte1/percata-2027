@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  CheckCircle,
-  SealWarning,
-  ShieldCheck,
-  SpinnerGap,
-} from "@phosphor-icons/react";
+import { CheckCircle } from "@/components/icons/phosphor/exports/CheckCircle";
+import { SealWarning } from "@/components/icons/phosphor/exports/SealWarning";
+import { ShieldCheck } from "@/components/icons/phosphor/exports/ShieldCheck";
+import { SpinnerGap } from "@/components/icons/phosphor/exports/SpinnerGap";
 
 type VerifyPayload = {
   valid: boolean;
@@ -68,25 +66,25 @@ export function VerifyDfdClient() {
   const valid = Boolean(payload?.valid);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4F7FA] p-5">
-      <section className="w-full max-w-3xl overflow-hidden rounded-[24px] border border-[#C7D7EA] bg-white shadow-sm">
-        <div className="bg-[#F7FBFF] p-6 md:p-8">
+    <main className="flex min-h-screen items-center justify-center bg-[var(--p-color-surface-muted)] p-5">
+      <section className="w-full max-w-3xl overflow-hidden rounded-[24px] border border-[var(--p-color-info-border)] bg-white shadow-sm">
+        <div className="bg-[var(--p-color-info-bg)] p-6 md:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+              <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-brand-400)]">
                 Validação pública
               </p>
-              <h1 className="font-display text-2xl font-semibold tracking-tight text-[#17233C] md:text-3xl">
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)] md:text-3xl">
                 Autenticidade da DFD
               </h1>
-              <p className="mt-1 max-w-xl text-sm font-medium text-[#52627A]">
+              <p className="mt-1 max-w-xl text-sm font-medium text-[var(--p-color-fg-muted)]">
                 Conferência criptográfica do documento emitido pelo PERCATA.
               </p>
             </div>
             <div
               className={`inline-flex h-12 items-center gap-2 rounded-2xl px-4 text-xs font-semibold uppercase tracking-[0.12em] ${
                 loading
-                  ? "border border-[#D6E3F2] bg-white text-[#47739F]"
+                  ? "border border-[var(--p-color-info-border)] bg-white text-[var(--p-color-brand-400)]"
                   : valid
                     ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border border-rose-200 bg-rose-50 text-rose-700"
@@ -111,20 +109,20 @@ export function VerifyDfdClient() {
           <Info label="Verificado em" value={formatDate(payload?.checkedAt)} />
         </div>
 
-        <div className="border-t border-[#E1E8F0] bg-[#FAFBFC] p-6 md:p-8">
-          <div className="flex gap-3 rounded-[18px] border border-[#E1E8F0] bg-white p-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FB] text-[#164073]">
+        <div className="border-t border-[var(--p-color-border-muted)] bg-[var(--p-color-bg-elevated)] p-6 md:p-8">
+          <div className="flex gap-3 rounded-[18px] border border-[var(--p-color-border-muted)] bg-white p-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--p-color-info-bg)] text-[var(--p-color-brand-500)]">
               <ShieldCheck size={22} weight="duotone" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[#17233C]">
+              <p className="text-sm font-semibold text-[var(--p-color-fg)]">
                 {loading
                   ? "A assinatura está sendo conferida."
                   : valid
                     ? "A assinatura corresponde ao documento registrado."
                     : "A assinatura não corresponde a uma DFD válida."}
               </p>
-              <p className="mt-1 text-xs leading-5 text-[#52627A]">
+              <p className="mt-1 text-xs leading-5 text-[var(--p-color-fg-muted)]">
                 {payload?.error ||
                   "Qualquer alteração no documento, nos itens ou no status invalida a assinatura apresentada no QR Code."}
               </p>
@@ -138,11 +136,11 @@ export function VerifyDfdClient() {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[18px] border border-[#E1E8F0] bg-[#FAFBFC] px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+    <div className="rounded-[18px] border border-[var(--p-color-border-muted)] bg-[var(--p-color-bg-elevated)] px-4 py-3">
+      <p className="type-kicker font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-[#17233C]">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-[var(--p-color-fg)]">{value}</p>
     </div>
   );
 }

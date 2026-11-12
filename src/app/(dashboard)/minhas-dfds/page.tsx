@@ -1,37 +1,51 @@
 "use client";
+import { useSubmissionPolicy } from "@/lib/use-submission-policy";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  Plus,
-  MagnifyingGlass,
-  Files,
-  CheckCircle,
-  CaretRight,
-  Buildings,
-  CurrencyDollar,
-  Archive,
-  ArrowSquareOut,
-  ClipboardText,
-  FunnelSimple,
-  ChartLineUp,
-  Package,
-  PaperPlaneTilt,
-  CircleNotch,
-  DotsThree,
-  CaretDown,
-  CaretLeft,
-} from "@phosphor-icons/react";
+import { Plus } from "@/components/icons/phosphor/exports/Plus";
+import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";
+import { Files } from "@/components/icons/phosphor/exports/Files";
+import { CheckCircle } from "@/components/icons/phosphor/exports/CheckCircle";
+import { CaretRight } from "@/components/icons/phosphor/exports/CaretRight";
+import { Buildings } from "@/components/icons/phosphor/exports/Buildings";
+import { CurrencyDollar } from "@/components/icons/phosphor/exports/CurrencyDollar";
+import { Archive } from "@/components/icons/phosphor/exports/Archive";
+import { ArrowSquareOut } from "@/components/icons/phosphor/exports/ArrowSquareOut";
+import { ClipboardText } from "@/components/icons/phosphor/exports/ClipboardText";
+import { FunnelSimple } from "@/components/icons/phosphor/exports/FunnelSimple";
+import { ChartLineUp } from "@/components/icons/phosphor/exports/ChartLineUp";
+import { Package } from "@/components/icons/phosphor/exports/Package";
+import { PaperPlaneTilt } from "@/components/icons/phosphor/exports/PaperPlaneTilt";
+import { CircleNotch } from "@/components/icons/phosphor/exports/CircleNotch";
+import { DotsThree } from "@/components/icons/phosphor/exports/DotsThree";
+import { CaretDown } from "@/components/icons/phosphor/exports/CaretDown";
+import { CaretLeft } from "@/components/icons/phosphor/exports/CaretLeft";
+import { FloppyDisk } from "@/components/icons/phosphor/exports/FloppyDisk";
+import { Trash } from "@/components/icons/phosphor/exports/Trash";
 import Link from "next/link";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { DfdCardSkeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { normalizeRole, type UserRole } from "@/lib/access";
-import { getDfdProcessStage } from "@/lib/dfd-process-guide";
+import { DFD_PROCESS_STEPS, getDfdProcessStage } from "@/lib/dfd-process-guide";
 import { DfdSubmissionAnimation } from "@/components/feedback/DfdSubmissionAnimation";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { withLegacyHistoryViewFallback } from "@/lib/legacy-history";
+import { useDfdDraft } from "@/lib/use-dfd-draft";
+import { restoreDfdDraftCartItems } from "@/lib/dfd-draft-cart";
+import {
+  OperationalAccordion,
+  OperationalChip,
+  OperationalEmptyState,
+  OperationalKpiCard,
+  OperationalStepper,
+  OperationalTimeline,
+  SkeuoDocumentCard,
+  SkeuoPaperStack,
+  SkeuoProgressRail,
+} from "@/components/ui/operational";
 
 type DfdStatus =
   | "rascunho"
@@ -84,39 +98,39 @@ const PAGE_SIZE = 8;
 const STATUS_VISUALS: Record<DfdStatus, StatusVisual> = {
   rascunho: {
     label: "Rascunho",
-    badgeClassName: "bg-[#E8EDF2] text-[#3E4C5F]",
-    iconClassName: "bg-[#E8EDF2] text-[#3E4C5F]",
-    borderClassName: "bg-[#A7B1BD]",
+    badgeClassName: "bg-[var(--p-color-surface-subtle)] text-[var(--p-color-fg-muted)]",
+    iconClassName: "bg-[var(--p-color-surface-subtle)] text-[var(--p-color-fg-muted)]",
+    borderClassName: "bg-[var(--p-color-border-strong)]",
   },
   triagem: {
     label: "Em análise",
-    badgeClassName: "bg-[#DCEAF0] text-[#1F6F78]",
-    iconClassName: "bg-[#DCEAF0] text-[#1C5A6B]",
-    borderClassName: "bg-[#1F6F78]",
+    badgeClassName: "bg-[var(--p-color-info-border)] text-[var(--p-color-collab)]",
+    iconClassName: "bg-[var(--p-color-info-border)] text-[var(--p-color-collab)]",
+    borderClassName: "bg-[var(--p-color-collab)]",
   },
   aprovada: {
     label: "Homologada",
-    badgeClassName: "bg-[#E7F0EA] text-[#5F735C]",
-    iconClassName: "bg-[#E7F0EA] text-[#5F735C]",
-    borderClassName: "bg-[#5F735C]",
+    badgeClassName: "bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+    iconClassName: "bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+    borderClassName: "bg-[var(--p-color-success)]",
   },
   devolvida: {
     label: "Devolvida",
-    badgeClassName: "bg-[#FFF3E6] text-[#B9895A]",
-    iconClassName: "bg-[#FFF3E6] text-[#B9895A]",
-    borderClassName: "bg-[#B9895A]",
+    badgeClassName: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    iconClassName: "bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+    borderClassName: "bg-[var(--p-color-warning)]",
   },
   pactuando: {
     label: "Pactuação",
-    badgeClassName: "bg-[#F4F7FA] text-[#2D5D94]",
-    iconClassName: "bg-[#F4F7FA] text-[#2D5D94]",
-    borderClassName: "bg-[#2D5D94]",
+    badgeClassName: "bg-[var(--p-color-surface-muted)] text-[var(--p-color-brand-400)]",
+    iconClassName: "bg-[var(--p-color-surface-muted)] text-[var(--p-color-brand-400)]",
+    borderClassName: "bg-[var(--p-color-brand-400)]",
   },
   concluida: {
     label: "Concluída",
-    badgeClassName: "bg-[#E7F0EA] text-[#5F735C]",
-    iconClassName: "bg-[#E7F0EA] text-[#5F735C]",
-    borderClassName: "bg-[#5F735C]",
+    badgeClassName: "bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+    iconClassName: "bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+    borderClassName: "bg-[var(--p-color-success)]",
   },
 };
 
@@ -127,8 +141,18 @@ function formatCurrency(value: number) {
   });
 }
 
+function formatDraftUpdatedAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "data de atualização indisponível";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function MinhasDFDsPage() {
   const router = useRouter();
+  const currentDraft = useDfdDraft();
   const [dfds, setDfds] = useState<DfdRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterOption>("Todas");
@@ -146,6 +170,32 @@ export default function MinhasDFDsPage() {
   const [finalizingPcaId, setFinalizingPcaId] = useState<string | null>(null);
   const [movingToHistoryId, setMovingToHistoryId] = useState<string | null>(null);
   const [draftActionModal, setDraftActionModal] = useState<DraftActionModalState>(null);
+  const [discardingCurrentDraft, setDiscardingCurrentDraft] = useState(false);
+  const [discardCurrentDraftDialogOpen, setDiscardCurrentDraftDialogOpen] = useState(false);
+
+  const currentDraftItems = useMemo(
+    () => restoreDfdDraftCartItems(currentDraft.draft?.payload.cartItems),
+    [currentDraft.draft],
+  );
+  const currentDraftTotal = useMemo(
+    () => currentDraftItems.reduce(
+      (total, item) => total + Number(item.quantidade || 0) * Number(item.valor_unitario || 0),
+      0,
+    ),
+    [currentDraftItems],
+  );
+
+  const handleDiscardCurrentDraft = async () => {
+    setDiscardingCurrentDraft(true);
+    const discarded = await currentDraft.clear();
+    setDiscardingCurrentDraft(false);
+    if (!discarded) {
+      toast.error(currentDraft.lastError || "Não foi possível descartar o rascunho.");
+      return;
+    }
+    setDiscardCurrentDraftDialogOpen(false);
+    toast.success("Rascunho descartado.");
+  };
 
   const fetchActiveDfds = useCallback(async () => {
     setLoading(true);
@@ -488,6 +538,7 @@ export default function MinhasDFDsPage() {
       legacy: legacyRecords.length,
     };
   }, [dfds, legacyRecords.length]);
+  const submissionPolicy = useSubmissionPolicy();
   const canCreateKits = currentRole === "admin" || currentRole === "superadmin";
 
   const sortedActiveDfds = useMemo(() => {
@@ -556,6 +607,14 @@ export default function MinhasDFDsPage() {
             </p>
           </div>
 
+          <SkeuoPaperStack
+            title="Pasta de demandas"
+            subtitle={`${activeKpis.total} DFDs ativas, ${activeKpis.legacy} registros históricos e ${activeKpis.inReview} em análise.`}
+            stamp={activeKpis.inReview > 0 ? "Em fluxo" : "Organizado"}
+            tone={activeKpis.inReview > 0 ? "collab" : "success"}
+            className="xl:mx-2"
+          />
+
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/catalogo"
@@ -564,29 +623,171 @@ export default function MinhasDFDsPage() {
               <Files size={16} weight="bold" />
               Catálogo
             </Link>
-            <Link
+            {submissionPolicy.canCreate && <Link
               href="/catalogo"
               className="ux-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-xs font-semibold uppercase tracking-[0.12em]"
             >
               <Plus size={16} weight="bold" />
               Nova Demanda
-            </Link>
+            </Link>}
           </div>
         </div>
       </section>
 
+      {!currentDraft.loading && currentDraft.draft && (
+        <section
+          aria-label="Rascunho em andamento"
+          className="rounded-[20px] border border-[var(--p-color-info-border)] bg-[var(--p-color-bg-elevated)] p-4 shadow-sm"
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--p-color-info-border)] text-[var(--semantic-collab)]">
+                <FloppyDisk size={21} weight="duotone" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="ux-title text-lg font-semibold">Rascunho em andamento</h2>
+                  <OperationalChip tone={currentDraft.location === "local" ? "warning" : "collab"}>
+                    {currentDraft.location === "local" ? "Neste navegador" : "Salvo no PERCATA"}
+                  </OperationalChip>
+                </div>
+                <p className="ux-muted mt-1 text-sm">
+                  Ainda não é uma DFD protocolada e não possui destino definido. Atualizado em {formatDraftUpdatedAt(currentDraft.draft.updated_at)}.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium text-[var(--p-color-fg-muted)]">
+                  <span>{currentDraftItems.length} {currentDraftItems.length === 1 ? "item selecionado" : "itens selecionados"}</span>
+                  <span>Total estimado: {formatCurrency(currentDraftTotal)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => router.push("/nova-dfd")}
+                disabled={!submissionPolicy.canCreate}
+                className="ux-btn-primary inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.1em]"
+              >
+                {submissionPolicy.canCreate ? "Continuar preenchimento" : "Rascunho preservado"}
+                <CaretRight size={16} weight="bold" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscardCurrentDraftDialogOpen(true)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--p-color-danger-border)] bg-white px-4 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--p-color-danger)] transition hover:bg-[var(--p-color-danger-bg)]"
+              >
+                <Trash size={16} weight="bold" />
+                Descartar
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <KpiCard label="Total de DFDs" value={String(activeKpis.total)} icon={Files} tone="action" />
-        <KpiCard label="Rascunhos" value={String(activeKpis.drafts)} icon={ClipboardText} tone="neutral" />
-        <KpiCard label="Em análise" value={String(activeKpis.inReview)} icon={FunnelSimple} tone="warning" />
-        <KpiCard label="Concluídas" value={String(activeKpis.done)} icon={CheckCircle} tone="success" />
-        <KpiCard
+        <OperationalKpiCard label="Total de DFDs" value={String(activeKpis.total)} icon={<Files size={17} weight="duotone" />} tone="action" badge="Carteira" />
+        <OperationalKpiCard label="Rascunhos" value={String(activeKpis.drafts)} icon={<ClipboardText size={17} weight="duotone" />} tone="neutral" helper="Editáveis" />
+        <OperationalKpiCard label="Em análise" value={String(activeKpis.inReview)} icon={<FunnelSimple size={17} weight="duotone" />} tone="warning" helper="Com chefia" />
+        <OperationalKpiCard label="Concluídas" value={String(activeKpis.done)} icon={<CheckCircle size={17} weight="duotone" />} tone="success" helper="Homologadas/PCA" />
+        <OperationalKpiCard
           label="Valor estimado"
           value={formatCurrency(activeKpis.totalValue)}
-          icon={ChartLineUp}
+          icon={<ChartLineUp size={17} weight="duotone" />}
           tone="collab"
+          helper="Somatório ativo"
         />
-        <KpiCard label="Legadas" value={String(activeKpis.legacy)} icon={Archive} tone="insight" />
+        <OperationalKpiCard label="Legadas" value={String(activeKpis.legacy)} icon={<Archive size={17} weight="duotone" />} tone="insight" helper="Histórico" />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="ux-panel rounded-[20px] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="ux-title text-lg font-semibold">Fluxo da DFD</h2>
+              <p className="ux-muted text-sm">Use os chips e etapas para identificar a próxima ação.</p>
+            </div>
+          </div>
+          <OperationalStepper
+            currentStep={Math.min(4, Math.max(1, activeKpis.done > 0 ? 4 : activeKpis.inReview > 0 ? 3 : activeKpis.drafts > 0 ? 1 : 2))}
+            steps={DFD_PROCESS_STEPS.map((step) => ({
+              label: step.label,
+              helper: step.description,
+            }))}
+          />
+        </div>
+        <OperationalAccordion
+          items={[
+            {
+              title: "Como interpretar status",
+              badge: <OperationalChip tone="action">Legenda</OperationalChip>,
+              defaultOpen: true,
+              content: (
+                <div className="flex flex-wrap gap-2">
+                  <OperationalChip tone="neutral">Rascunho</OperationalChip>
+                  <OperationalChip tone="warning">Devolvida</OperationalChip>
+                  <OperationalChip tone="collab">Em análise</OperationalChip>
+                  <OperationalChip tone="success">Concluída</OperationalChip>
+                </div>
+              ),
+            },
+            {
+              title: "Linha do tempo resumida",
+              badge: <OperationalChip tone="insight">3 etapas</OperationalChip>,
+              content: (
+                <OperationalTimeline
+                  items={[
+                    { title: "Montagem", description: "Servidor seleciona itens no catálogo.", tone: "neutral" },
+                    { title: "Envio", description: "Demanda segue para análise da chefia.", tone: "collab" },
+                    { title: "Consolidação", description: "Itens homologados alimentam o PCA.", tone: "success" },
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <SkeuoDocumentCard
+          title="Mapa visual da carteira"
+          meta="Distribuição das DFDs ativas por etapa do fluxo."
+          stamp="Resumo"
+          tone="insight"
+        >
+          <SkeuoProgressRail
+            items={[
+              {
+                label: "Rascunhos",
+                value: activeKpis.total ? (activeKpis.drafts / activeKpis.total) * 100 : 0,
+                tone: "neutral",
+              },
+              {
+                label: "Em análise",
+                value: activeKpis.total ? (activeKpis.inReview / activeKpis.total) * 100 : 0,
+                tone: "warning",
+              },
+              {
+                label: "Concluídas",
+                value: activeKpis.total ? (activeKpis.done / activeKpis.total) * 100 : 0,
+                tone: "success",
+              },
+            ]}
+            className="border-0 p-0 shadow-none"
+          />
+        </SkeuoDocumentCard>
+        <SkeuoDocumentCard
+          title="Próxima ação sugerida"
+          meta={
+            currentDraft.draft
+              ? "Há uma seleção salva em andamento. Use Continuar preenchimento para revisar os itens e preparar o envio à chefia."
+              : activeKpis.drafts > 0
+              ? "Revise rascunhos e encaminhe à chefia quando objeto, justificativa e itens estiverem fechados."
+              : activeKpis.inReview > 0
+                ? "Acompanhe os retornos da chefia e mantenha os ajustes prontos."
+                : "A carteira está sem pendência direta de rascunho."
+          }
+          stamp={currentDraft.draft || activeKpis.drafts > 0 ? "Agir" : "Acompanhar"}
+          tone={currentDraft.draft || activeKpis.drafts > 0 ? "warning" : "collab"}
+        />
       </section>
 
       <section className="ux-panel rounded-[20px] p-4">
@@ -594,7 +795,7 @@ export default function MinhasDFDsPage() {
           <div className="relative flex-1">
             <MagnifyingGlass
               size={18}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7D98B8]"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--p-color-fg-subtle)]"
             />
             <input
               type="text"
@@ -605,23 +806,24 @@ export default function MinhasDFDsPage() {
                   ? "Buscar por ano, código legado ou objeto"
                   : "Buscar por protocolo, objeto ou campus"
               }
-              className="h-11 w-full rounded-xl border border-[var(--semantic-neutral-border)] bg-[#FAFBFC] pl-10 pr-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[var(--semantic-collab)] focus:bg-white"
+              className="h-11 w-full rounded-xl border border-[var(--semantic-neutral-border)] bg-[var(--p-color-bg-elevated)] pl-10 pr-3 text-sm text-[var(--p-color-fg-default)] outline-none transition focus:border-[var(--semantic-collab)] focus:bg-white"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5B6675]">Ordenar por:</label>
+            <label htmlFor="request-sort" className="text-sm font-medium text-[var(--p-color-fg-muted)]">Ordenar por:</label>
             <div className="relative">
               <select
+                id="request-sort"
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as SortOption)}
-                className="h-11 min-w-[220px] appearance-none rounded-xl border border-[var(--semantic-neutral-border)] bg-[#FAFBFC] px-4 pr-10 text-sm font-semibold text-[var(--semantic-action)] outline-none transition focus:border-[var(--semantic-collab)] focus:bg-white"
+                className="h-11 min-w-[220px] appearance-none rounded-xl border border-[var(--semantic-neutral-border)] bg-[var(--p-color-bg-elevated)] px-4 pr-10 text-sm font-semibold text-[var(--semantic-action)] outline-none transition focus:border-[var(--semantic-collab)] focus:bg-white"
               >
                 <option value="recentes">Mais recentes</option>
                 <option value="antigas">Mais antigas</option>
                 <option value="maior_valor">Maior valor</option>
                 <option value="menor_valor">Menor valor</option>
               </select>
-              <CaretDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#5B6675]" />
+              <CaretDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--p-color-fg-muted)]" />
             </div>
           </div>
         </div>
@@ -646,7 +848,7 @@ export default function MinhasDFDsPage() {
                 className={`h-11 rounded-xl px-4 text-sm font-semibold transition ${
                   filter === option
                     ? "bg-[var(--semantic-action)] text-white"
-                    : "border border-[var(--semantic-neutral-border)] bg-[var(--semantic-neutral-soft)] text-[#3E4C5F] hover:bg-[#E8EDF2]"
+                    : "border border-[var(--semantic-neutral-border)] bg-[var(--semantic-neutral-soft)] text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-subtle)]"
                 }`}
               >
                 {option} ({count})
@@ -694,34 +896,42 @@ export default function MinhasDFDsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className={`rounded-full px-4 py-1.5 text-sm font-semibold ${visual.badgeClassName}`}>{visual.label}</span>
-                          <span className="ux-chip bg-[var(--semantic-neutral-soft)] px-4 py-1.5 text-sm text-[#5B6675]">
+                          <OperationalChip tone="neutral" className="px-4 py-1.5 text-sm">
                             Etapa {stage.stepIndex}/4
-                          </span>
+                          </OperationalChip>
                           {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
-                            <span className="ux-chip ux-chip-warning px-4 py-1.5 text-sm">
+                            <OperationalChip tone="warning" className="px-4 py-1.5 text-sm">
                               Requer sua ação
-                            </span>
+                            </OperationalChip>
                           )}
                         </div>
                         <h3 className="ux-title mt-4 line-clamp-2 text-[26px] font-semibold">
                           {dfd.objeto_contratacao || "Demanda sem objeto informado"}
                         </h3>
-                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#5B6675]">
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[var(--p-color-fg-muted)]">
                           <span>{campusName}</span>
-                          <span className="text-[#B5BFCC]">•</span>
+                          <span className="text-[var(--p-color-border-strong)]">•</span>
                           <span>{localUso}</span>
-                          <span className="text-[#B5BFCC]">•</span>
+                          <span className="text-[var(--p-color-border-strong)]">•</span>
                           <span>{new Date(dfd.created_at).toLocaleDateString("pt-BR")}</span>
                         </div>
-                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#7B889A]">
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[var(--p-color-fg-subtle)]">
                           <span>{protocol}</span>
+                          <OperationalChip tone="action">{stage.label}</OperationalChip>
                         </div>
+                        <OperationalStepper
+                          currentStep={stage.stepIndex}
+                          className="mt-4 xl:grid-cols-4"
+                          steps={DFD_PROCESS_STEPS.map((step) => ({
+                            label: step.label,
+                          }))}
+                        />
                       </div>
                       <div className="flex min-w-[180px] flex-col items-end gap-6">
                         <button
                           type="button"
                           aria-label="Mais ações"
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#5B6675] hover:bg-[#F4F7FA]"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-muted)]"
                         >
                           <DotsThree size={20} weight="bold" />
                         </button>
@@ -731,9 +941,10 @@ export default function MinhasDFDsPage() {
                       </div>
                     </div>
 
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EDF2] pt-4">
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--p-color-surface-subtle)] pt-4">
                       <div className="flex flex-wrap items-center gap-3">
-                        {(dfd.status === "rascunho" || dfd.status === "devolvida") && (
+                        {dfd.status === "devolvida" && <Link href={`/dfd/${dfd.id}`} className="ux-btn-primary inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold">Corrigir DFD</Link>}
+                        {dfd.status === "rascunho" && submissionPolicy.canCreate && (
                           <>
                             <button
                               type="button"
@@ -824,14 +1035,14 @@ export default function MinhasDFDsPage() {
             })}
 
           {!loading && sortedActiveDfds.length === 0 && (
-            <EmptyState
+            <OperationalEmptyState
               icon={<Files size={30} weight="fill" />}
               title="Nenhum pedido encontrado"
               description="Ajuste os filtros ou inicie uma nova demanda no catálogo."
               action={
                 <Link
                   href="/catalogo"
-                  className="mt-6 inline-flex h-10 items-center rounded-xl border border-[#C7D7EA] bg-[#E8EDF2] px-4 text-sm font-semibold text-[#164073] transition hover:bg-[#DCEAF0]"
+                  className="mt-6 inline-flex h-10 items-center rounded-xl border border-[var(--p-color-info-border)] bg-[var(--p-color-surface-subtle)] px-4 text-sm font-semibold text-[var(--p-color-brand-500)] transition hover:bg-[var(--p-color-info-border)]"
                 >
                   Ir para catálogo
                 </Link>
@@ -851,7 +1062,7 @@ export default function MinhasDFDsPage() {
 
       {isLegacyMode && (
         <section className="space-y-4">
-          <h2 className="text-[34px] font-semibold tracking-tight text-[#172C5A]">Demandas legadas</h2>
+          <h2 className="text-[34px] font-semibold tracking-tight text-[var(--p-color-brand-600)]">Demandas legadas</h2>
           {legacyLoading && (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -871,30 +1082,30 @@ export default function MinhasDFDsPage() {
               >
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E8EDF2] text-[#3E4C5F]">
+                    <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--p-color-surface-subtle)] text-[var(--p-color-fg-muted)]">
                       <Archive size={20} weight="fill" />
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-[#F4F7FA] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#3E4C5F]">
+                        <span className="rounded-full bg-[var(--p-color-surface-muted)] px-3 py-1 type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-muted)]">
                           {legacy.status || "Em pactuação"}
                         </span>
-                        <span className="rounded-full bg-[#E8EDF2] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#164073]">
+                        <span className="rounded-full bg-[var(--p-color-surface-subtle)] px-3 py-1 type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-brand-500)]">
                           {legacy.legacy_year}
                         </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+                        <span className="type-kicker font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
                           {legacy.demand_code}
                         </span>
                       </div>
-                      <h3 className="mt-2 text-lg font-semibold tracking-tight text-[#164073]">
+                      <h3 className="mt-2 text-lg font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                         {legacy.object || "Demanda legada sem descrição"}
                       </h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#5B6675]">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--p-color-fg-muted)]">
                         <span className="inline-flex items-center gap-1">
                           <Buildings size={14} />
                           {legacy.campus || "Campus não informado"}
                         </span>
-                        <span className="text-[#A7B1BD]">•</span>
+                        <span className="text-[var(--p-color-border-strong)]">•</span>
                         <span className="inline-flex items-center gap-1">
                           <Files size={14} />
                           {legacy.items_count || 0} itens
@@ -905,17 +1116,17 @@ export default function MinhasDFDsPage() {
 
                   <div className="flex items-center gap-4">
                     <div className="text-left xl:text-right">
-                      <p className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+                      <p className="inline-flex items-center gap-1 type-kicker font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
                         <CurrencyDollar size={13} />
                         Valor legado
                       </p>
-                      <p className="mt-1 text-2xl font-semibold tracking-tight text-[#164073]">
+                      <p className="mt-1 text-2xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                         {formatCurrency(Number(legacy.total_estimated || 0))}
                       </p>
                     </div>
                     <Link
                       href={`/historico/${encodeURIComponent(String(legacy.legacy_year))}/${encodeURIComponent(legacy.demand_code)}`}
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#C7D7EA] bg-[#E8EDF2] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#164073] hover:bg-[#DCEAF0]"
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--p-color-info-border)] bg-[var(--p-color-surface-subtle)] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--p-color-brand-500)] hover:bg-[var(--p-color-info-border)]"
                     >
                       Ver detalhe
                       <ArrowSquareOut size={15} weight="bold" />
@@ -926,7 +1137,7 @@ export default function MinhasDFDsPage() {
             ))}
 
           {!legacyLoading && sortedLegacy.length === 0 && (
-            <EmptyState
+            <OperationalEmptyState
               icon={<Archive size={30} weight="fill" />}
               title="Nenhuma demanda legada encontrada"
               description="Ajuste o termo de busca para localizar registros de anos anteriores."
@@ -942,20 +1153,51 @@ export default function MinhasDFDsPage() {
           )}
         </section>
       )}
+      <Dialog open={discardCurrentDraftDialogOpen} onOpenChange={setDiscardCurrentDraftDialogOpen}>
+        <DialogContent className="max-w-[480px] rounded-2xl border border-[var(--p-color-border)] bg-white p-0 text-[var(--p-color-fg-default)]">
+          <DialogHeader className="border-b border-[var(--p-color-surface-subtle)] p-5">
+            <DialogTitle className="text-xl font-semibold text-[var(--p-color-brand-500)]">
+              Descartar este rascunho?
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm text-[var(--p-color-fg-muted)]">
+              Os itens e os dados preenchidos serão removidos. Esta ação não cria, altera nem cancela uma DFD formal.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-[var(--p-color-surface-subtle)] bg-[var(--p-color-bg-elevated)] p-4">
+            <button
+              type="button"
+              disabled={discardingCurrentDraft}
+              onClick={() => setDiscardCurrentDraftDialogOpen(false)}
+              className="ux-btn-secondary h-10 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.1em] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Manter rascunho
+            </button>
+            <button
+              type="button"
+              disabled={discardingCurrentDraft}
+              onClick={handleDiscardCurrentDraft}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--p-color-danger)] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {discardingCurrentDraft ? <CircleNotch className="animate-spin" size={16} /> : <Trash size={16} weight="bold" />}
+              Descartar rascunho
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={Boolean(draftActionModal)} onOpenChange={(open) => !open && setDraftActionModal(null)}>
-        <DialogContent className="max-w-[560px] rounded-2xl border border-[#D9E0E8] bg-white p-0 text-[#2E3A4A]">
-          <DialogHeader className="border-b border-[#E8EDF2] p-5">
-            <DialogTitle className="text-xl font-semibold text-[#164073]">
+        <DialogContent className="max-w-[560px] rounded-2xl border border-[var(--p-color-border)] bg-white p-0 text-[var(--p-color-fg-default)]">
+          <DialogHeader className="border-b border-[var(--p-color-surface-subtle)] p-5">
+            <DialogTitle className="text-xl font-semibold text-[var(--p-color-brand-500)]">
               {draftActionModal?.mode === "review" ? "Fiscalizar rascunho" : "Encaminhar à chefia"}
             </DialogTitle>
-            <DialogDescription className="mt-2 text-sm text-[#5B6675]">
+            <DialogDescription className="mt-2 text-sm text-[var(--p-color-fg-muted)]">
               {draftActionModal?.mode === "review"
                 ? "Você vai abrir os detalhes da DFD para revisar itens, justificativas e valores."
                 : "A DFD será enviada para análise da chefia e passará para o status Em análise."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2 px-5 pb-5 pt-3 text-sm text-[#3E4C5F]">
+          <div className="space-y-2 px-5 pb-5 pt-3 text-sm text-[var(--p-color-fg-muted)]">
             <p>
               <b>Protocolo:</b>{" "}
               {draftActionModal?.dfd.numero_protocolo ||
@@ -964,18 +1206,18 @@ export default function MinhasDFDsPage() {
             <p>
               <b>Objeto:</b> {draftActionModal?.dfd.objeto_contratacao || "Demanda sem objeto informado"}
             </p>
-            <p className="rounded-xl border border-[#D9E0E8] bg-[#F8FAFC] px-3 py-2 text-xs leading-5">
+            <p className="rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-soft)] px-3 py-2 text-xs leading-5">
               {draftActionModal?.mode === "review"
                 ? "Depois de revisar, você pode encaminhar para chefia com mais segurança."
                 : "Após o encaminhamento, você acompanha o andamento por aqui em Minhas DFDs."}
             </p>
           </div>
 
-          <DialogFooter className="border-t border-[#E8EDF2] bg-[#FAFBFC] p-4">
+          <DialogFooter className="border-t border-[var(--p-color-surface-subtle)] bg-[var(--p-color-bg-elevated)] p-4">
             <button
               type="button"
               onClick={() => setDraftActionModal(null)}
-              className="h-10 rounded-lg border border-[#D9E0E8] px-4 text-[#3E4C5F] hover:bg-[#F4F7FA]"
+              className="h-10 rounded-lg border border-[var(--p-color-border)] px-4 text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-muted)]"
             >
               Cancelar
             </button>
@@ -984,7 +1226,7 @@ export default function MinhasDFDsPage() {
               onClick={() => {
                 void handleConfirmDraftAction();
               }}
-              className="h-10 rounded-lg bg-[#164073] px-5 text-white hover:bg-[#0F2E57]"
+              className="h-10 rounded-lg bg-[var(--p-color-brand-500)] px-5 text-white hover:bg-[var(--p-color-brand-600)]"
             >
               {draftActionModal?.mode === "review" ? "Abrir rascunho" : "Confirmar encaminhamento"}
             </button>
@@ -997,59 +1239,6 @@ export default function MinhasDFDsPage() {
         onClose={() => setSubmittedDfd(null)}
       />
     </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  tone = "action",
-}: {
-  label: string;
-  value: string;
-  icon: React.ComponentType<any>;
-  tone?: "action" | "collab" | "success" | "warning" | "insight" | "neutral";
-}) {
-  const toneClasses = {
-    action: {
-      icon: "ux-icon-action",
-      value: "text-[var(--semantic-action)]",
-    },
-    collab: {
-      icon: "ux-icon-collab",
-      value: "text-[var(--semantic-collab)]",
-    },
-    success: {
-      icon: "ux-icon-success",
-      value: "text-[var(--semantic-success)]",
-    },
-    warning: {
-      icon: "ux-icon-warning",
-      value: "text-[#8A5A00]",
-    },
-    insight: {
-      icon: "ux-icon-insight",
-      value: "text-[var(--semantic-insight)]",
-    },
-    neutral: {
-      icon: "bg-[var(--semantic-neutral-soft)] text-[#5B6675]",
-      value: "text-[#3E4C5F]",
-    },
-  }[tone];
-
-  return (
-    <article className="ux-panel-soft rounded-2xl p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-[0.14em] text-black/45 font-semibold">
-          {label}
-        </p>
-        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${toneClasses.icon}`}>
-          <Icon size={17} weight="duotone" />
-        </div>
-      </div>
-      <p className={`mt-2 text-2xl font-semibold tracking-tight ${toneClasses.value}`}>{value}</p>
-    </article>
   );
 }
 
@@ -1067,8 +1256,8 @@ function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-[20px] border border-[#D9E0E8] bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-[#5B6675]">
+    <div className="flex flex-col gap-3 rounded-[20px] border border-[var(--p-color-border)] bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[var(--p-color-fg-muted)]">
         {itemLabel} · página {page} de {totalPages}
       </p>
       <div className="flex items-center gap-2">
@@ -1076,7 +1265,7 @@ function Pagination({
           type="button"
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page <= 1}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] px-4 text-sm font-semibold text-[#164073] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] px-4 text-sm font-semibold text-[var(--p-color-brand-500)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <CaretLeft size={14} weight="bold" />
           Anterior
@@ -1085,7 +1274,7 @@ function Pagination({
           type="button"
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page >= totalPages}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#F4F7FA] px-4 text-sm font-semibold text-[#164073] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] px-4 text-sm font-semibold text-[var(--p-color-brand-500)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Próxima
           <CaretRight size={14} weight="bold" />
@@ -1095,25 +1284,3 @@ function Pagination({
   );
 }
 
-function EmptyState({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-[24px] border border-dashed border-[#D9E0E8] bg-white p-14 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#F4F7FA] text-[#7D98B8]">
-        {icon}
-      </div>
-      <h3 className="mt-4 text-lg font-semibold text-[#164073]">{title}</h3>
-      <p className="mt-1 text-sm text-[#5B6675]">{description}</p>
-      {action || null}
-    </div>
-  );
-}

@@ -1,18 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Calendar,
-  Clock,
-  Lock,
-  LockOpen,
-  ShieldCheck,
-  WarningCircle,
-} from "@phosphor-icons/react";
+import { Calendar } from "@/components/icons/phosphor/exports/Calendar";
+import { Clock } from "@/components/icons/phosphor/exports/Clock";
+import { Lock } from "@/components/icons/phosphor/exports/Lock";
+import { LockOpen } from "@/components/icons/phosphor/exports/LockOpen";
+import { ShieldCheck } from "@/components/icons/phosphor/exports/ShieldCheck";
+import { WarningCircle } from "@/components/icons/phosphor/exports/WarningCircle";
 import { getSafeUser, supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { normalizeRole, type UserRole } from "@/lib/access";
+import { MechanicalValue } from "@/components/ui/MechanicalValue";
 import {
   parseLocalDateTimeToIso,
   sanitizeLongText,
@@ -427,10 +426,10 @@ export default function AdminCampanhas() {
   }
 
   return (
-    <div className="p-8 bg-[#F3F2F1] min-h-screen space-y-8 text-[#1C1B1F]">
-      <div className="flex flex-col gap-3 rounded-[32px] border border-[#D2D0CE] bg-white p-8 shadow-sm md:flex-row md:items-center md:justify-between">
+    <div className="p-8 bg-[var(--p-color-bg-muted)] min-h-screen space-y-8 text-[var(--p-color-fg-strong)]">
+      <div className="flex flex-col gap-3 rounded-[32px] border border-[var(--p-color-border)] bg-white p-8 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-[#164073] tracking-tighter uppercase">
+          <h1 className="font-display text-3xl font-semibold text-[var(--p-color-brand-500)] tracking-tighter uppercase">
             Governança do Ciclo PCA
           </h1>
           <p className="text-sm font-medium text-black/50">
@@ -462,18 +461,18 @@ export default function AdminCampanhas() {
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-6">
-          <div className="rounded-[32px] border border-[#D2D0CE] bg-white p-8 shadow-sm">
+          <div className="rounded-[32px] border border-[var(--p-color-border)] bg-white p-8 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold uppercase tracking-tight text-[#164073]">
+              <h2 className="text-lg font-semibold uppercase tracking-tight text-[var(--p-color-brand-500)]">
                 Ciclo Ativo
               </h2>
               {activeCycle?.ativo ? (
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-700">
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 type-kicker font-semibold uppercase tracking-widest text-emerald-700">
                   <LockOpen size={14} weight="fill" />
                   Ativo
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 type-kicker font-semibold uppercase tracking-widest text-slate-500">
                   <Lock size={14} weight="fill" />
                   Sem ciclo ativo
                 </span>
@@ -530,7 +529,7 @@ export default function AdminCampanhas() {
                 {isSuperadmin && (
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 p-4">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-upe-blue-medium">
+                      <p className="type-kicker font-semibold uppercase tracking-widest text-upe-blue-medium">
                         Janela Geral do Ciclo
                       </p>
                       <div className="mt-3 grid gap-3">
@@ -552,7 +551,7 @@ export default function AdminCampanhas() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="mt-3 h-8 rounded-xl text-[10px] uppercase"
+                        className="mt-3 h-8 rounded-xl type-kicker uppercase"
                         onClick={saveActiveWindow}
                         disabled={saving}
                       >
@@ -561,7 +560,7 @@ export default function AdminCampanhas() {
                     </div>
 
                     <div className="rounded-2xl border border-upe-accent-washed-blue/70 bg-upe-accent-washed-blue/25 p-4">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-upe-blue-medium">
+                      <p className="type-kicker font-semibold uppercase tracking-widest text-upe-blue-medium">
                         Janela da Chefia
                       </p>
                       <div className="mt-3 grid gap-3">
@@ -583,7 +582,7 @@ export default function AdminCampanhas() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="mt-3 h-8 rounded-xl text-[10px] uppercase"
+                        className="mt-3 h-8 rounded-xl type-kicker uppercase"
                         onClick={saveChefiaWindow}
                         disabled={saving}
                       >
@@ -600,15 +599,15 @@ export default function AdminCampanhas() {
             )}
           </div>
 
-          <div className="rounded-[32px] border border-[#D2D0CE] bg-white p-8 shadow-sm">
-            <h2 className="text-lg font-semibold uppercase tracking-tight text-[#164073]">
+          <div className="rounded-[32px] border border-[var(--p-color-border)] bg-white p-8 shadow-sm">
+            <h2 className="text-lg font-semibold uppercase tracking-tight text-[var(--p-color-brand-500)]">
               Ciclos Cadastrados
             </h2>
             <div className="mt-4 space-y-3">
               {cycles.map((cycle) => (
                 <div
                   key={cycle.id}
-                  className="rounded-2xl border border-slate-200 bg-[#F3F2F1] p-4"
+                  className="rounded-2xl border border-slate-200 bg-[var(--p-color-bg-muted)] p-4"
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -622,12 +621,12 @@ export default function AdminCampanhas() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                      <span className="rounded-full bg-white px-3 py-1 type-kicker font-semibold uppercase tracking-widest text-slate-500">
                         {STATUS_OPTIONS.find((s) => s.value === cycle.status)
                           ?.label || cycle.status}
                       </span>
                       {cycle.ativo && (
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-700">
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 type-kicker font-semibold uppercase tracking-widest text-emerald-700">
                           Ativo
                         </span>
                       )}
@@ -636,14 +635,14 @@ export default function AdminCampanhas() {
                           <Button
                             type="button"
                             variant="outline"
-                            className="h-8 rounded-xl text-[10px] uppercase"
+                            className="h-8 rounded-xl type-kicker uppercase"
                             disabled={saving}
                             onClick={() => activateCycle(cycle.id)}
                           >
                             Ativar
                           </Button>
                           <select
-                            className="h-8 rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-bold uppercase"
+                            className="h-8 rounded-xl border border-slate-200 bg-white px-2 type-kicker font-bold uppercase"
                             value={cycle.fase_atual}
                             onChange={(e) =>
                               updateCycle(cycle.id, {
@@ -669,7 +668,7 @@ export default function AdminCampanhas() {
                 </div>
               ))}
               {!loading && cycles.length === 0 && (
-                <p className="rounded-2xl bg-[#F3F2F1] p-4 text-sm text-slate-500">
+                <p className="rounded-2xl bg-[var(--p-color-bg-muted)] p-4 text-sm text-slate-500">
                   Nenhum ciclo disponível.
                 </p>
               )}
@@ -677,8 +676,8 @@ export default function AdminCampanhas() {
           </div>
         </div>
 
-        <div className="rounded-[32px] border border-[#D2D0CE] bg-white p-8 shadow-sm">
-          <h2 className="text-lg font-semibold uppercase tracking-tight text-[#164073]">
+        <div className="rounded-[32px] border border-[var(--p-color-border)] bg-white p-8 shadow-sm">
+          <h2 className="text-lg font-semibold uppercase tracking-tight text-[var(--p-color-brand-500)]">
             Novo Ciclo
           </h2>
           <p className="mt-1 text-xs text-slate-500">
@@ -688,7 +687,7 @@ export default function AdminCampanhas() {
 
           <div className="mt-6 space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              <label className="type-kicker font-semibold uppercase tracking-widest text-slate-400">
                 Nome
               </label>
               <input
@@ -704,7 +703,7 @@ export default function AdminCampanhas() {
 
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <label className="type-kicker font-semibold uppercase tracking-widest text-slate-400">
                   Fase
                 </label>
                 <select
@@ -729,7 +728,7 @@ export default function AdminCampanhas() {
 
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1">
-                <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <label className="flex items-center gap-1 type-kicker font-semibold uppercase tracking-widest text-slate-400">
                   <Calendar size={12} />
                   Janela Início
                 </label>
@@ -747,7 +746,7 @@ export default function AdminCampanhas() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <label className="flex items-center gap-1 type-kicker font-semibold uppercase tracking-widest text-slate-400">
                   <Clock size={12} />
                   Janela Fim
                 </label>
@@ -768,7 +767,7 @@ export default function AdminCampanhas() {
 
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1">
-                <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <label className="flex items-center gap-1 type-kicker font-semibold uppercase tracking-widest text-slate-400">
                   <Calendar size={12} />
                   Início Janela Chefia
                 </label>
@@ -786,7 +785,7 @@ export default function AdminCampanhas() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <label className="flex items-center gap-1 type-kicker font-semibold uppercase tracking-widest text-slate-400">
                   <Clock size={12} />
                   Fim Janela Chefia
                 </label>
@@ -806,7 +805,7 @@ export default function AdminCampanhas() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              <label className="type-kicker font-semibold uppercase tracking-widest text-slate-400">
                 Observações
               </label>
               <textarea
@@ -825,7 +824,7 @@ export default function AdminCampanhas() {
             <Button
               onClick={createCycle}
               disabled={!isSuperadmin || saving || !!dbMessage}
-              className="w-full bg-[#164073] hover:bg-upe-blue-deep"
+              className="w-full bg-[var(--p-color-brand-500)] hover:bg-upe-blue-deep"
             >
               {saving ? "Salvando..." : "Criar Ciclo"}
             </Button>
@@ -837,12 +836,16 @@ export default function AdminCampanhas() {
 }
 
 function InfoCard({ label, value }: { label: string; value: string }) {
+  const shouldAnimateValue = /\d/.test(value);
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-[#F3F2F1] p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+    <div className="rounded-2xl border border-slate-200 bg-[var(--p-color-bg-muted)] p-4">
+      <p className="type-kicker font-semibold uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-sm font-bold text-slate-800">{value}</p>
+      <p className="mt-1 min-w-0 overflow-visible text-sm font-bold text-slate-800">
+        {shouldAnimateValue ? <MechanicalValue value={value} /> : value}
+      </p>
     </div>
   );
 }

@@ -2,7 +2,9 @@
 
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Warning, ArrowLeft, House } from "@phosphor-icons/react";
+import { Warning } from "@/components/icons/phosphor/exports/Warning";
+import { ArrowLeft } from "@/components/icons/phosphor/exports/ArrowLeft";
+import { House } from "@/components/icons/phosphor/exports/House";
 
 export default function AuthErrorPage() {
   const router = useRouter();
@@ -11,7 +13,7 @@ export default function AuthErrorPage() {
   const customMessage = errorParam || null;
 
   return (
-    <div className="min-h-screen bg-[#FDFBFF] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[var(--p-color-surface)] flex items-center justify-center p-6">
       <div className="max-w-md w-full glass-card p-10 text-center space-y-6 shadow-2xl">
         <img
           src="/brands/percata-logo.png"
@@ -23,10 +25,10 @@ export default function AuthErrorPage() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="font-display text-2xl font-bold text-[#1C1B1F]">
+          <h1 className="font-display text-2xl font-bold text-[var(--p-color-fg-strong)]">
             Ops! Erro na Autenticação
           </h1>
-          <p className="text-[#625B71] text-sm leading-relaxed">
+          <p className="text-[var(--p-color-fg-muted)] text-sm leading-relaxed">
             {customMessage ||
               "Houve um problema ao processar seu login com o Google. Isso pode acontecer por causa de cookies bloqueados ou expiração da sessão."}
           </p>
@@ -35,7 +37,7 @@ export default function AuthErrorPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => router.push("/login")}
-            className="w-full py-4 rounded-2xl bg-[#2D5D94] text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition-all"
+            className="w-full py-4 rounded-2xl bg-[var(--p-color-brand-400)] text-white font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition-all"
           >
             <ArrowLeft size={20} weight="bold" />
             Tentar Novamente
@@ -50,7 +52,7 @@ export default function AuthErrorPage() {
           </button>
         </div>
 
-        <p className="text-[10px] text-black/20 font-semibold uppercase tracking-widest pt-4">
+        <p className="type-kicker text-black/20 font-semibold uppercase tracking-widest pt-4">
           Token detectado, mas não processado.
         </p>
       </div>

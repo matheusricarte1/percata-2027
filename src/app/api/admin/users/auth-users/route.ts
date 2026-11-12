@@ -28,7 +28,7 @@ function readAvatar(metadata: Record<string, any> | undefined): string | null {
 
 export const GET = withAuthorizedRole(
   ["admin", "superadmin"],
-  async ({ request, supabaseAdmin }) => {
+  async ({ request, supabaseAdmin, user, role }) => {
     const limitParam = Number(request.nextUrl.searchParams.get("limit") || 1000);
     const limit = Number.isFinite(limitParam)
       ? Math.max(1, Math.min(limitParam, 5000))
@@ -44,6 +44,24 @@ export const GET = withAuthorizedRole(
     }
 
     const admin = supabaseAdmin;
+    let allowedUserIds: Set<string> | null = null;
+    if (role === "admin") {
+      const { data: actorProfile, error: actorError } = await admin
+        .from("profiles")
+        .select("campus_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (actorError) throw actorError;
+      if (!actorProfile?.campus_id) {
+        return NextResponse.json({ error: "Administrador sem campus vinculado." }, { status: 403 });
+      }
+      const { data: campusProfiles, error: campusError } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("campus_id", actorProfile.campus_id);
+      if (campusError) throw campusError;
+      allowedUserIds = new Set((campusProfiles || []).map((profile) => profile.id));
+    }
     const perPage = 200;
     const maxPages = Math.ceil(limit / perPage);
     let page = 1;
@@ -55,6 +73,7 @@ export const GET = withAuthorizedRole(
 
       const users = data?.users || [];
       for (const row of users) {
+        if (allowedUserIds && !allowedUserIds.has(String(row.id || ""))) continue;
         const email = String(row.email || "").trim().toLowerCase();
         if (!email) continue;
 
@@ -86,6 +105,5 @@ export const GET = withAuthorizedRole(
 
     return NextResponse.json({ data: snapshots });
   },
-  // requireAdminClient: false porque já tratamos ausência de credenciais
-  // com 200+payload neutro (mantém UX da admin/usuarios).
+  { requireAdminClient: true },
 );

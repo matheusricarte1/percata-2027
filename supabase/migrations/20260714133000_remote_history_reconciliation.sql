@@ -1,0 +1,2 @@
+-- Esta versão já existe no histórico remoto; o conteúdo original não está neste checkout.
+-- Mantido vazio para reconciliar o catálogo local sem reexecutar uma migração aplicada.

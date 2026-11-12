@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isArmamentRelatedCatalogText,
+  normalizeCatalogCategory,
+  sanitizeCatalogSearchInput,
+} from "@/lib/catalog-query-signal";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog-search-learning";
 import { createSupabaseAdminClient, hasSupabaseAdminCredentials } from "@/lib/supabase-admin";
 import { createClient } from "@/utils/supabase/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
 function sanitizeText(value: unknown, maxLength: number) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+  return sanitizeCatalogSearchInput(String(value || ""), maxLength);
 }
 
-function normalizeCategory(value: unknown) {
-  const normalized = sanitizeText(value, 40)
+function normalizeCatalogClickCategory(value: unknown) {
+  const normalized = sanitizeCatalogSearchInput(String(value || ""), 40)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  if (["material", "materiais", "produto", "produtos"].includes(normalized)) return "material";
-  if (["servico", "servicos"].includes(normalized)) return "servico";
   if (["kit", "kits"].includes(normalized)) return "kits";
-  return "all";
+  return normalizeCatalogCategory(normalized);
 }
 
 export async function POST(request: NextRequest) {
@@ -45,12 +48,18 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const actionType = sanitizeText(body?.actionType, 32);
   const queryText = sanitizeText(body?.queryText, 180);
+  const itemDescricao = sanitizeText(body?.itemDescricao, 400);
+
+  if (isArmamentRelatedCatalogText(queryText) || isArmamentRelatedCatalogText(itemDescricao)) {
+    return NextResponse.json({ ok: true, skipped: true });
+  }
+
   const payload = {
     user_id: user.id,
     action_type: actionType,
     query_text: queryText || null,
     query_norm: queryText ? normalizeCatalogSearchQuery(queryText) : null,
-    category: normalizeCategory(body?.category),
+    category: normalizeCatalogClickCategory(body?.category),
     context: sanitizeText(body?.context, 60) || "catalogo",
     source: sanitizeText(body?.source, 40) || "supabase",
     result_position:
@@ -62,7 +71,7 @@ export async function POST(request: NextRequest) {
         ? Number(body.catalogId)
         : null,
     codigo_efisco: sanitizeText(body?.codigoEfisco, 80) || null,
-    item_descricao: sanitizeText(body?.itemDescricao, 400) || null,
+    item_descricao: itemDescricao || null,
   };
 
   if (

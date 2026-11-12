@@ -55,6 +55,7 @@ describe("admin-reports", () => {
         descricao: "-risco",
         quantidade: 2,
         valor_unitario_estimado: 5,
+        justificativa_item: "Uso em sala.\nDistribuicao por usuario: Ana: 1; Bruno: 1",
       },
     ];
 
@@ -62,7 +63,8 @@ describe("admin-reports", () => {
     assert.equal(buildDfdSheetRows(dfds)[0].campus_relatorio, "Campus Teste");
     assert.equal(buildItemSheetRows(items, dfds)[0].protocolo_relatorio, "P-1");
     assert.equal(buildItemSheetRows(items, dfds)[0].valor_total_estimado_relatorio, 10);
-    assert.equal(buildItemSheetRows(items, dfds)[0].descricao, "'-risco");
+    assert.equal(buildItemSheetRows(items, dfds)[0].descricao_relatorio, "'-risco");
+    assert.equal(buildItemSheetRows(items, dfds)[0].distribuicao_usuarios_relatorio, "Ana: 1; Bruno: 1");
   });
 
   it("builds complete denormalized DFD item rows for CSV exports", () => {
@@ -75,6 +77,9 @@ describe("admin-reports", () => {
           descricao: "=risco",
           quantidade: 3,
           valor_unitario_estimado: 7,
+          gnd_derivado: "3.3.90.30",
+          codigo_natureza_despesa: "339030",
+          justificativa_item: "Necessário.\nDistribuicao por usuario: Ana: 2; Bruno: 1",
           raw_extra: { origem: "teste" },
         },
       ],
@@ -88,6 +93,10 @@ describe("admin-reports", () => {
           unidade_nome_relatorio: "Setor",
           solicitante_nome_relatorio: "Pessoa",
           solicitante_email_relatorio: "pessoa@upe.br",
+          planning_subsidies: {
+            expectedResult: "Atender aulas práticas",
+            constraints: "+depende de instalação",
+          },
         },
       ],
     );
@@ -97,9 +106,19 @@ describe("admin-reports", () => {
     assert.equal(rows[0].item_valor_total_estimado, 21);
     assert.equal(rows[0].item_descricao, "'=risco");
     assert.equal(rows[0].item_raw_extra, "{\"origem\":\"teste\"}");
+    assert.equal(rows[0].item_gnd_derivado, "3.3.90.30");
+    assert.equal(rows[0].item_codigo_natureza_despesa, "339030");
+    assert.equal(rows[0].item_distribuicao_usuarios, "Ana: 2; Bruno: 1");
+    assert.equal(rows[0].item_distribuicao_usuarios_total, 3);
+    assert.match(String(rows[0].item_distribuicao_usuarios_json || ""), /"name":"Ana"/);
+    assert.equal(rows[0].dfd_subsidio_etp_tr_resultado_esperado, "Atender aulas práticas");
+    assert.equal(rows[0].dfd_subsidio_etp_tr_cuidados_restricoes, "'+depende de instalação");
+    assert.match(String(rows[0].dfd_subsidios_etp_tr || ""), /Resultado esperado: Atender aulas práticas/);
 
     const headers = collectExportHeaders(rows, FULL_EXPORT_PREFERRED_HEADERS);
     assert(headers.indexOf("dataset") < headers.indexOf("item_descricao"));
+    assert(headers.includes("dfd_subsidios_etp_tr"));
+    assert(headers.includes("item_distribuicao_usuarios"));
     assert(headers.includes("item_raw_extra"));
   });
 
@@ -117,3 +136,4 @@ describe("admin-reports", () => {
     assert.equal(rows[0].dfd_objeto_contratacao, "Sem item");
   });
 });
+

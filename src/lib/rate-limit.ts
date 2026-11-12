@@ -1,6 +1,10 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  createSupabaseAdminClient,
+  hasSupabaseAdminCredentials,
+} from "@/lib/supabase-admin";
 
 /**
  * Rate limiting com janela deslizante (fixed window por simplicidade).
@@ -139,6 +143,62 @@ async function upstashCheck(
   }
 }
 
+async function supabaseTableCheck(
+  key: string,
+  limit: number,
+  windowSec: number,
+): Promise<RateLimitResult> {
+  if (!hasSupabaseAdminCredentials()) {
+    return memoryCheck(key, limit, windowSec * 1000);
+  }
+
+  const admin = createSupabaseAdminClient();
+  const now = Date.now();
+  const windowMs = windowSec * 1000;
+  const resetMs = now + windowMs;
+
+  try {
+    const { data: current, error: currentError } = await admin
+      .from("app_rate_limits")
+      .select("key,count,reset_at")
+      .eq("key", key)
+      .maybeSingle();
+    if (currentError) throw currentError;
+
+    if (!current || new Date(current.reset_at).getTime() <= now) {
+      const { error } = await admin.from("app_rate_limits").upsert({
+        key,
+        count: 1,
+        reset_at: new Date(resetMs).toISOString(),
+        updated_at: new Date(now).toISOString(),
+      });
+      if (error) throw error;
+      return { ok: true, remaining: limit - 1, limit, resetMs };
+    }
+
+    const nextCount = Number(current.count || 0) + 1;
+    const { error } = await admin
+      .from("app_rate_limits")
+      .update({
+        count: nextCount,
+        updated_at: new Date(now).toISOString(),
+      })
+      .eq("key", key);
+    if (error) throw error;
+
+    const currentResetMs = new Date(current.reset_at).getTime();
+    return {
+      ok: nextCount <= limit,
+      remaining: Math.max(0, limit - nextCount),
+      limit,
+      resetMs: currentResetMs,
+    };
+  } catch (err) {
+    console.warn("rate-limit: falha no Supabase store, fallback memory.", err);
+    return memoryCheck(key, limit, windowMs);
+  }
+}
+
 // =======================
 // API pública
 // =======================
@@ -168,7 +228,16 @@ export async function checkRateLimit(
   if (upstashConfigured()) {
     return upstashCheck(key, opts.limit, opts.windowSec);
   }
+  if (hasSupabaseAdminCredentials()) {
+    return supabaseTableCheck(key, opts.limit, opts.windowSec);
+  }
   return memoryCheck(key, opts.limit, opts.windowSec * 1000);
+}
+
+export function getRateLimitBackendLabel() {
+  if (upstashConfigured()) return "upstash";
+  if (hasSupabaseAdminCredentials()) return "supabase-table";
+  return "in-memory (fallback; não compartilhado entre instâncias)";
 }
 
 /**

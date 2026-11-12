@@ -2,24 +2,23 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ClockCounterClockwise,
-  MagnifyingGlass,
-  Calendar,
-  CurrencyCircleDollar,
-  ListNumbers,
-  ArrowUUpLeft,
-  Files,
-  Info,
-  X,
-  Hash,
-} from "@phosphor-icons/react";
+import { ClockCounterClockwise } from "@/components/icons/phosphor/exports/ClockCounterClockwise";
+import { MagnifyingGlass } from "@/components/icons/phosphor/exports/MagnifyingGlass";
+import { Calendar } from "@/components/icons/phosphor/exports/Calendar";
+import { CurrencyCircleDollar } from "@/components/icons/phosphor/exports/CurrencyCircleDollar";
+import { ListNumbers } from "@/components/icons/phosphor/exports/ListNumbers";
+import { ArrowUUpLeft } from "@/components/icons/phosphor/exports/ArrowUUpLeft";
+import { Files } from "@/components/icons/phosphor/exports/Files";
+import { Info } from "@/components/icons/phosphor/exports/Info";
+import { X } from "@/components/icons/phosphor/exports/X";
+import { Hash } from "@/components/icons/phosphor/exports/Hash";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { supabase } from "@/lib/supabase";
 import { ProductSkeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { withLegacyHistoryViewFallback } from "@/lib/legacy-history";
+import { CatalogDescriptionDialog } from "@/components/catalog/CatalogDescriptionDialog";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -133,32 +132,32 @@ export default function HistoricoPage() {
     <div className="p-8 space-y-10 min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-1">
-          <h1 className="font-display text-4xl font-semibold text-[#1C1B1F] tracking-tighter uppercase">
+          <h1 className="font-display text-4xl font-semibold text-[var(--p-color-fg-strong)] tracking-tighter uppercase">
             Histórico de Demandas
           </h1>
-          <p className="text-[#625B71] text-sm font-medium flex items-center gap-2">
+          <p className="text-[var(--p-color-fg-muted)] text-sm font-medium flex items-center gap-2">
             <ClockCounterClockwise
               size={18}
               weight="bold"
-              className="text-[#2D5D94]"
+              className="text-[var(--p-color-brand-400)]"
             />
             Consulta de demandas legadas para referência de planejamento
           </p>
-          <p className="text-[#7D98B8] text-xs font-semibold uppercase tracking-[0.12em]">
+          <p className="text-[var(--p-color-fg-subtle)] text-xs font-semibold uppercase tracking-[0.12em]">
             Também disponível em Minhas DFDs {">"} Legadas
           </p>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-[32px] border border-[#D2D0CE] shadow-sm space-y-6">
+      <div className="bg-white p-6 rounded-[32px] border border-[var(--p-color-border)] shadow-sm space-y-6">
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setSelectedYear("todos")}
             className={cn(
               "px-6 py-2.5 rounded-2xl text-xs font-semibold uppercase tracking-widest transition-all",
               selectedYear === "todos"
-                ? "bg-[#1C1B1F] text-white shadow-lg"
-                : "bg-[#E8EDF2] text-[#2D5D94] hover:bg-[#DCEAF0]",
+                ? "bg-[var(--p-color-fg-strong)] text-white shadow-lg"
+                : "bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-400)] hover:bg-[var(--p-color-info-border)]",
             )}
           >
             Todos os Anos
@@ -170,8 +169,8 @@ export default function HistoricoPage() {
               className={cn(
                 "px-8 py-2.5 rounded-2xl text-xs font-semibold uppercase tracking-widest transition-all",
                 selectedYear === year
-                  ? "bg-[#2D5D94] text-white shadow-lg"
-                  : "bg-white border border-[#D2D0CE] text-[#625B71] hover:border-[#2D5D94]",
+                  ? "bg-[var(--p-color-brand-400)] text-white shadow-lg"
+                  : "bg-white border border-[var(--p-color-border)] text-[var(--p-color-fg-muted)] hover:border-[var(--p-color-brand-400)]",
               )}
             >
               {year}
@@ -181,16 +180,17 @@ export default function HistoricoPage() {
 
         <div className="relative group">
           <MagnifyingGlass
-            className="absolute left-5 top-1/2 -translate-y-1/2 text-[#2D5D94]/40 group-focus-within:text-[#2D5D94] transition-colors"
+            className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--p-color-brand-400)]/40 group-focus-within:text-[var(--p-color-brand-400)] transition-colors"
             size={22}
             weight="bold"
           />
           <input
             type="text"
+            aria-label="Buscar no histórico por objeto, campus ou código"
             placeholder="Pesquise por objeto, campus ou código da demanda..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full pl-14 pr-6 py-4 rounded-2xl bg-[#F3F2F1] border-none focus:ring-2 focus:ring-[#DCEAF0] transition-all font-medium"
+            className="w-full pl-14 pr-6 py-4 rounded-2xl bg-[var(--p-color-bg-muted)] border-none focus:ring-2 focus:ring-[var(--p-color-info-border)] transition-all font-medium"
           />
         </div>
       </div>
@@ -208,14 +208,14 @@ export default function HistoricoPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white border border-[#D2D0CE] rounded-[32px] p-6 xl:sticky xl:top-6 shadow-sm"
+              className="bg-white border border-[var(--p-color-border)] rounded-[32px] p-6 xl:sticky xl:top-6 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-black/30">
+                  <p className="type-kicker font-semibold uppercase tracking-widest text-black/30">
                     Demanda Selecionada
                   </p>
-                  <p className="font-mono text-xs font-bold text-[#2D5D94] mt-1">
+                  <p className="font-mono text-xs font-bold text-[var(--p-color-brand-400)] mt-1">
                     {selectedDemand.demand_code}
                   </p>
                 </div>
@@ -230,7 +230,7 @@ export default function HistoricoPage() {
                 </button>
               </div>
 
-              <h2 className="mt-4 text-lg font-display font-semibold text-[#1C1B1F] leading-tight">
+              <h2 className="mt-4 text-lg font-display font-semibold text-[var(--p-color-fg-strong)] leading-tight">
                 {selectedDemand.object || "Demanda sem descrição"}
               </h2>
 
@@ -259,7 +259,7 @@ export default function HistoricoPage() {
               </div>
 
               <div className="mt-6 pt-6 border-t border-black/5">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-black/30 mb-3">
+                <p className="type-kicker font-semibold uppercase tracking-widest text-black/30 mb-3">
                   Itens Legados
                 </p>
                 <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
@@ -270,15 +270,16 @@ export default function HistoricoPage() {
 
                   {!loadingItems &&
                     selectedItems.map((item) => (
-                      <div key={item.id} className="p-3 rounded-xl border border-[#D2D0CE] bg-[#F3F2F1]">
-                        <div className="flex items-center gap-2 text-[10px] font-semibold text-[#2D5D94] uppercase tracking-wider">
+                      <div key={item.id} className="p-3 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-muted)]">
+                        <div className="flex items-center gap-2 type-kicker font-semibold text-[var(--p-color-brand-400)] uppercase tracking-wider">
                           <Hash size={12} weight="bold" />
                           {item.efisco_code || "Sem código"}
                         </div>
-                        <p className="mt-1 text-xs font-semibold text-[#1C1B1F] line-clamp-2">
+                        <p className="mt-1 text-xs font-semibold text-[var(--p-color-fg-strong)] line-clamp-2">
                           {item.efisco_description || "Descrição não informada"}
                         </p>
-                        <p className="mt-1 text-[11px] text-black/50 font-medium">
+                        <CatalogDescriptionDialog title="Item do histórico" code={item.efisco_code || undefined} description={item.efisco_description || "Descrição não informada"} />
+                        <p className="mt-1 type-caption text-black/50 font-medium">
                           {item.quantity_numeric || item.quantity_text || 0}{" "}
                           {item.unit || ""} •{" "}
                           {Number(item.item_price || 0).toLocaleString("pt-BR", {
@@ -313,38 +314,38 @@ export default function HistoricoPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.03 }}
-                  className="group bg-white border border-[#D2D0CE] rounded-[32px] p-8 flex flex-col md:flex-row gap-8 hover:shadow-xl hover:border-[#2D5D94]/20 transition-all relative overflow-hidden"
+                  className="group bg-white border border-[var(--p-color-border)] rounded-[32px] p-8 flex flex-col md:flex-row gap-8 hover:shadow-xl hover:border-[var(--p-color-brand-400)]/20 transition-all relative overflow-hidden"
                 >
-                  <div className="flex flex-col items-center justify-center bg-[#E8EDF2] w-24 h-24 rounded-2xl shrink-0 group-hover:bg-[#2D5D94] transition-colors duration-500">
-                    <span className="text-[10px] font-semibold uppercase text-[#2D5D94] group-hover:text-white/60 tracking-widest leading-none mb-1">
+                  <div className="flex flex-col items-center justify-center bg-[var(--p-color-surface-subtle)] w-24 h-24 rounded-2xl shrink-0 group-hover:bg-[var(--p-color-brand-400)] transition-colors duration-500">
+                    <span className="type-kicker font-semibold uppercase text-[var(--p-color-brand-400)] group-hover:text-white/60 tracking-widest leading-none mb-1">
                       ANO
                     </span>
-                    <span className="text-2xl font-display font-semibold text-[#2D5D94] group-hover:text-white leading-none">
+                    <span className="text-2xl font-display font-semibold text-[var(--p-color-brand-400)] group-hover:text-white leading-none">
                       {item.legacy_year}
                     </span>
                   </div>
 
                   <div className="flex-1 space-y-4">
                     <div className="flex flex-wrap items-center gap-4">
-                      <span className="font-mono text-xs font-bold text-[#2D5D94]/40">
+                      <span className="font-mono text-xs font-bold text-[var(--p-color-brand-400)]/40">
                         {item.demand_code}
                       </span>
-                      <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-semibold uppercase tracking-widest">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full type-kicker font-semibold uppercase tracking-widest">
                         <Calendar size={14} weight="bold" />
                         {item.status || "Em pactuação"}
                       </div>
                     </div>
 
-                    <h3 className="font-display font-semibold text-xl text-[#1C1B1F] tracking-tight leading-tight">
+                    <h3 className="font-display font-semibold text-xl text-[var(--p-color-fg-strong)] tracking-tight leading-tight">
                       {item.object || "Demanda sem descrição"}
                     </h3>
 
                     <div className="flex flex-wrap gap-8 pt-4">
                       <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-semibold text-black/30 tracking-tighter flex items-center gap-1">
+                        <span className="type-kicker uppercase font-semibold text-black/30 tracking-tighter flex items-center gap-1">
                           <CurrencyCircleDollar size={14} /> Valor Estimado
                         </span>
-                        <span className="text-lg font-semibold text-[#1C1B1F]">
+                        <span className="text-lg font-semibold text-[var(--p-color-fg-strong)]">
                           {(item.total_estimated || 0).toLocaleString("pt-BR", {
                             style: "currency",
                             currency: "BRL",
@@ -352,18 +353,18 @@ export default function HistoricoPage() {
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-semibold text-black/30 tracking-tighter flex items-center gap-1">
+                        <span className="type-kicker uppercase font-semibold text-black/30 tracking-tighter flex items-center gap-1">
                           <ListNumbers size={14} /> Qtd. Itens
                         </span>
-                        <span className="text-lg font-semibold text-[#1C1B1F]">
+                        <span className="text-lg font-semibold text-[var(--p-color-fg-strong)]">
                           {item.items_count || 0}
                         </span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] uppercase font-semibold text-black/30 tracking-tighter flex items-center gap-1">
+                        <span className="type-kicker uppercase font-semibold text-black/30 tracking-tighter flex items-center gap-1">
                           <Info size={14} /> Campus
                         </span>
-                        <span className="text-lg font-semibold text-[#1C1B1F]">
+                        <span className="text-lg font-semibold text-[var(--p-color-fg-strong)]">
                           {item.campus || "Não informado"}
                         </span>
                       </div>
@@ -373,25 +374,27 @@ export default function HistoricoPage() {
                   <div className="flex md:flex-col justify-end gap-3 pt-6 md:pt-0 border-t md:border-t-0 md:border-l border-black/5 md:pl-8">
                     <button
                       onClick={() => openDetailSidebar(item)}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-4 bg-[#F3F2F1] text-[#1C1B1F] rounded-2xl font-semibold text-xs uppercase tracking-widest hover:bg-[#DCEAF0] transition-all"
+                      className="flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-4 bg-[var(--p-color-bg-muted)] text-[var(--p-color-fg-strong)] rounded-2xl font-semibold text-xs uppercase tracking-widest hover:bg-[var(--p-color-info-border)] transition-all"
                     >
                       <Files size={20} weight="bold" />
                       Ver Itens
                     </button>
-                    <button className="flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-4 bg-[#1C1B1F] text-white rounded-2xl font-semibold text-xs uppercase tracking-widest hover:bg-[#2D5D94] shadow-lg shadow-black/10 transition-all">
+                    <a href="/catalogo" className="flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-4 bg-[var(--p-color-fg-strong)] text-white rounded-2xl font-semibold text-xs hover:bg-[var(--p-color-brand-400)] shadow-lg shadow-black/10 transition-all">
                       <ArrowUUpLeft size={20} weight="bold" />
-                      Repetir em 2027
-                    </button>
+                      Criar nova solicitação
+                    </a>
                   </div>
                 </motion.div>
               ))}
           </AnimatePresence>
 
           {!loading && filteredData.length === 0 && (
-            <div className="py-20 text-center">
-              <h3 className="font-display font-semibold text-xl text-black/20 uppercase tracking-[0.2em]">
+            <div role="status" className="py-12 text-center">
+              <h3 className="font-display font-semibold text-xl text-[var(--p-color-fg)]">
                 Nenhum registro antigo encontrado
               </h3>
+              <p className="mt-2 text-sm text-[var(--p-color-fg-muted)]">{search || selectedYear !== "todos" ? "Ajuste a busca ou o ano selecionado para consultar o histórico." : "Ainda não há registros históricos disponíveis nesta visão."}</p>
+              {(search || selectedYear !== "todos") && <button type="button" onClick={() => { setSearch(""); setSelectedYear("todos"); }} className="mt-4 min-h-10 rounded-xl border border-[var(--p-color-border)] px-4 text-sm font-semibold text-[var(--p-color-brand-500)]">Limpar busca e ano</button>}
             </div>
           )}
         </div>

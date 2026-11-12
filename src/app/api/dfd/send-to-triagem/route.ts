@@ -4,6 +4,8 @@ import { canSendDfdToChefia } from "@/lib/dfd-send-permissions";
 import { createClient } from "@/utils/supabase/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { toPublicSiteUrl } from "@/lib/site-url";
+import { getDfdSubmissionBlocker } from "@/lib/dfd-submission";
+import { submissionOperationError } from "@/lib/submission-policy-server";
 
 type DfdForTriagem = {
   id: string;
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const id = String(body?.id || "").trim();
+    const resubmissionJustification = String(body?.resubmissionJustification || "").trim();
     if (!id) {
       return NextResponse.json({ error: "Informe o id da DFD." }, { status: 400 });
     }
@@ -87,14 +90,37 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       );
     }
-
-    if (currentStatus !== "triagem") {
-      const { error: updateError } = await admin
-        .from("dfds")
-        .update({ status: "triagem" })
-        .eq("id", target.id);
-      if (updateError) throw updateError;
+    if (currentStatus === "devolvida" && resubmissionJustification.length < 3) {
+      return NextResponse.json(
+        { error: "Explique brevemente o que foi corrigido antes de reenviar a DFD." },
+        { status: 400 },
+      );
     }
+
+    const { count: itemCount, error: itemCountError } = await admin
+      .from("dfd_items")
+      .select("id", { count: "exact", head: true })
+      .eq("dfd_id", target.id);
+    if (itemCountError) throw itemCountError;
+
+    const submissionBlocker = getDfdSubmissionBlocker({
+      targetStatus: "triagem",
+      itemCount: itemCount || 0,
+    });
+    if (submissionBlocker) {
+      return NextResponse.json({ error: submissionBlocker }, { status: 409 });
+    }
+
+    // The deadline, current status, corrections and history are checked under
+    // one row lock, including retries from pages opened before the deadline.
+    const { data: submission, error: submissionError } = await admin.rpc("submit_dfd_with_deadline", {
+      p_actor: user.id, p_dfd: target.id, p_justification: resubmissionJustification,
+    });
+    if (submissionError) {
+      const mapped = submissionOperationError(submissionError.message);
+      return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    }
+    if (submission?.alreadySent) return NextResponse.json({ ok: true, alreadySent: true });
 
     let notificationsCreated = 0;
     const reviewerIds = new Set<string>();
@@ -116,7 +142,7 @@ export async function POST(request: NextRequest) {
         .from("profiles")
         .select("id")
         .eq("campus_id", target.campus_id)
-        .in("role", ["chefia", "admin", "superadmin"]);
+        .in("role", ["admin", "superadmin"]);
       if (reviewersError) throw reviewersError;
       (reviewers || []).forEach((reviewer) => {
         if (reviewer.id) reviewerIds.add(String(reviewer.id));
@@ -137,13 +163,13 @@ export async function POST(request: NextRequest) {
         title: "Nova DFD na fila de análise",
         message: JSON.stringify({
           kind: "rich_notification",
-          template_key: "dfd_sent_to_chefia",
+          template_key: "dfd_submitted",
           heading: `DFD ${protocolLabel} encaminhada para análise`,
-          context_label: "Triagem da chefia",
+          context_label: "Análise da chefia",
           status_label: "Encaminhada",
           status_tone: "info",
           body: `${protocolLabel} foi enviada para análise da chefia.`,
-          cta_label: "Abrir DFD",
+          cta_label: "Analisar DFD",
           cta_url: dfdUrl,
           image_url: sentImageUrl,
           facts: [{ label: "Protocolo", value: protocolLabel }],

@@ -2,35 +2,36 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import {
-  User,
-  UsersThree,
-  ShieldCheck,
-  Crown,
-  Buildings,
-  Flask,
-} from "@phosphor-icons/react";
+import { User } from "@/components/icons/phosphor/exports/User";
+import { UsersThree } from "@/components/icons/phosphor/exports/UsersThree";
+import { ShieldCheck } from "@/components/icons/phosphor/exports/ShieldCheck";
+import { Crown } from "@/components/icons/phosphor/exports/Crown";
+import { Buildings } from "@/components/icons/phosphor/exports/Buildings";
+import { Flask } from "@/components/icons/phosphor/exports/Flask";
 import { useReducedMotion, motionProps } from "@/lib/use-reduced-motion";
 import type { UserCategory } from "@/lib/user-category";
 
-type AvatarSize = "sm" | "md" | "lg";
+type AvatarSize = "sm" | "md" | "lg" | "xl";
 
 const SIZE_CLASS: Record<AvatarSize, string> = {
-  sm: "h-8 w-8 text-[11px]",
+  sm: "h-8 w-8 type-caption",
   md: "h-10 w-10 text-xs",
   lg: "h-14 w-14 text-sm",
+  xl: "h-32 w-32 text-3xl",
 };
 
 const BADGE_SIZE: Record<AvatarSize, string> = {
   sm: "h-4 w-4",
   md: "h-4 w-4",
   lg: "h-5 w-5",
+  xl: "h-10 w-10",
 };
 
 const ICON_SIZE: Record<AvatarSize, number> = {
   sm: 9,
   md: 10,
   lg: 12,
+  xl: 22,
 };
 
 const CATEGORY_STYLE: Record<UserCategory, { ring: string; badge: string; icon: React.ElementType }> = {

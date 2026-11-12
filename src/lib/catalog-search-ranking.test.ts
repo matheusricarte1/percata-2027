@@ -7,6 +7,41 @@ import {
 } from "./catalog-search-ranking.ts";
 
 describe("catalog-search-ranking", () => {
+  it("does not rank a product above a title match only because the specification mentions it", () => {
+    const ranked = rerankCatalogSearchResults("papel A4", [
+      {
+        id: 1,
+        rank: 120,
+        descricao:
+          "IMPRESSORA MULTIFUNCIONAL - tecnologia de impressao, capacidade de entrada 100 folhas de papel A4",
+      },
+      {
+        id: 2,
+        rank: 80,
+        descricao: "PAPEL A4 - sulfite, branco, 75 g/m2, pacote com 500 folhas",
+      },
+    ]);
+
+    assert.equal(ranked[0].id, 2);
+  });
+
+  it("does not treat papelaria as a whole-word match for papel", () => {
+    const ranked = rerankCatalogSearchResults("papel", [
+      {
+        id: 1,
+        rank: 120,
+        descricao: "SERVICO DE CONFECCAO DE IMPRESSOS EM PAPELARIA - BLOCO",
+      },
+      {
+        id: 2,
+        rank: 80,
+        descricao: "PAPEL - SULFITE, FORMATO A4, 75G/M2",
+      },
+    ]);
+
+    assert.equal(ranked[0].id, 2);
+  });
+
   it("prioritizes the requested product noun over weak measurement hits", () => {
     const [first] = rerankCatalogSearchResults("TV televisor 85 polegadas", [
       {

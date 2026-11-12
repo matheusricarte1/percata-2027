@@ -2,7 +2,7 @@
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { NavigationFeedback } from "@/components/feedback/NavigationFeedback";
+import { DfdCartDraftSynchronizer } from "@/components/dfd/DfdCartDraftSynchronizer";
 import { AnimationRuntime } from "@/components/motion/AnimationRuntime";
 import { GlobalRouteFrame } from "@/components/motion/GlobalRouteFrame";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -14,16 +14,23 @@ import { getSafeUser, supabase } from "@/lib/supabase";
 import {
   mapUserSettingsRow,
   normalizeUserSettings,
-  parseUserSettingsJson,
+  parseUserSettingsSnapshot,
   type UserSettings,
 } from "@/lib/user-settings";
-import "@material/web/all.js";
+import {
+  USER_SETTINGS_SESSION_KEY,
+  USER_SETTINGS_VISUAL_KEY,
+  cleanupUnsafeLocalStorage,
+  pickVisualSettings,
+  readLocalJson,
+  readSessionJson,
+  writeLocalJson,
+  writeSessionJson,
+} from "@/lib/browser-storage";
 
 interface AppProvidersProps {
   children: ReactNode;
 }
-
-const SETTINGS_KEY = "percata:user-settings:v1";
 
 function applyStoredSettings(settings: Partial<UserSettings> | null) {
   if (!settings || typeof document === "undefined") return;
@@ -37,24 +44,20 @@ function applyStoredSettings(settings: Partial<UserSettings> | null) {
 }
 
 function loadStoredSettings(): Partial<UserSettings> | null {
-  try {
-    const raw = window.localStorage.getItem(SETTINGS_KEY);
-    return parseUserSettingsJson(raw);
-  } catch {
-    return null;
-  }
+  return (
+    parseUserSettingsSnapshot(readSessionJson(USER_SETTINGS_SESSION_KEY)) ||
+    parseUserSettingsSnapshot(readLocalJson(USER_SETTINGS_VISUAL_KEY))
+  );
 }
 
 function storeGlobalSettings(settings: UserSettings) {
-  try {
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  } catch {
-    // noop
-  }
+  writeSessionJson(USER_SETTINGS_SESSION_KEY, settings);
+  writeLocalJson(USER_SETTINGS_VISUAL_KEY, pickVisualSettings(settings));
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
   useEffect(() => {
+    cleanupUnsafeLocalStorage();
     applyStoredSettings(loadStoredSettings());
 
     let alive = true;
@@ -104,8 +107,8 @@ export function AppProviders({ children }: AppProvidersProps) {
         <CssBaseline enableColorScheme />
         <TooltipProvider>
           <GlobalRouteFrame>{children}</GlobalRouteFrame>
+          <DfdCartDraftSynchronizer />
           <AnimationRuntime />
-          <NavigationFeedback />
           <Toaster richColors position="top-right" closeButton />
         </TooltipProvider>
       </ThemeProvider>

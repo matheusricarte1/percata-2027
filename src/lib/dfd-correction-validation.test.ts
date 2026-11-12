@@ -1,0 +1,10 @@
+import { test } from "node:test";
+import { strict as assert } from "node:assert";
+import { getCorrectionIssue } from "./dfd-correction-validation";
+const valid = { administrative: true, collective: false, object: "Equipamentos", justification: "Necessidade do laboratório", reason: "", items: [{ quantidade: 1, valor_unitario_estimado: 5941 }] };
+test("corrected prices without a reason lead directly to the history reason field", () => assert.equal(getCorrectionIssue(valid)?.field, "correction-reason"));
+test("valid reason allows review without requiring legacy quantity justification", () => assert.equal(getCorrectionIssue({ ...valid, reason: "Preço corrigido" }), null));
+test("invalid item receives priority and identifies its field", () => assert.equal(getCorrectionIssue({ ...valid, items: [{ quantidade: 0, valor_unitario_estimado: 5941 }] })?.field, "correction-quantity-0"));
+test("catalogue replacement requires explicit nature choice", () => assert.equal(getCorrectionIssue({ ...valid, items: [{ quantidade: 1, valor_unitario_estimado: 100, catalogId: "1" }] })?.field, "correction-nature-0"));
+test("item removal requires its own reason", () => assert.equal(getCorrectionIssue({ ...valid, collective: true, items: [{ quantidade: 1, valor_unitario_estimado: 100, remove: true }] })?.field, "correction-removal-0"));
+test("empty assembly is allowed, empty official DFD is guided to catalogue", () => { assert.equal(getCorrectionIssue({ ...valid, items: [] })?.field, "correction-catalog"); assert.equal(getCorrectionIssue({ ...valid, collective: true, reason: "Revisão da montagem", items: [] }), null); });

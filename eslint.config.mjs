@@ -6,6 +6,11 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    // Preserve the upstream Lucide renderer, verified against the original package.
+    files: ["src/components/icons/lucide/Icon.js"],
+    rules: { "react/display-name": "off" },
+  },
+  {
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-require-imports": "off",
@@ -23,6 +28,12 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "scratch/**",
+    ".worktrees/**",
+    ".codex-tmp/**",
+    "output/**",
+    ".playwright-cli/**",
+    "artifacts/**",
+    ".superpowers/**",
   ]),
 ]);
 

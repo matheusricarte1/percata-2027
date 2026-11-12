@@ -2,17 +2,21 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Inbox, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle } from "@/components/icons/lucide/exports/AlertTriangle";
+import { CheckCircle2 } from "@/components/icons/lucide/exports/CheckCircle2";
+import { Inbox } from "@/components/icons/lucide/exports/Inbox";
+import { Loader2 } from "@/components/icons/lucide/exports/Loader2";
+import { RefreshCw } from "@/components/icons/lucide/exports/RefreshCw";
 import { cn } from "@/lib/utils";
 
 type FeedbackTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 const toneClasses: Record<FeedbackTone, string> = {
-  neutral: "border-[#D9E0E8] bg-white text-[#2E3A4A]",
-  info: "border-[#C7D7EA] bg-[#F4F7FA] text-[#164073]",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  warning: "border-amber-200 bg-amber-50 text-amber-800",
-  danger: "border-red-200 bg-red-50 text-red-800",
+  neutral: "border-[var(--p-color-border)] bg-white text-[var(--p-color-fg-default)]",
+  info: "border-[var(--p-color-info-border)] bg-[var(--p-color-surface-muted)] text-[var(--p-color-brand-500)]",
+  success: "border-[var(--p-color-success-border)] bg-[var(--p-color-success-bg)] text-[var(--p-color-success)]",
+  warning: "border-[var(--p-color-warning-border)] bg-[var(--p-color-warning-bg)] text-[var(--p-color-warning)]",
+  danger: "border-[var(--p-color-danger-border)] bg-[var(--p-color-danger-bg)] text-[var(--p-color-danger)]",
 };
 
 export function LoadingPanel({
@@ -31,27 +35,27 @@ export function LoadingPanel({
       role="status"
       aria-live="polite"
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-[#D9E0E8] bg-white p-6 shadow-sm",
+        "relative overflow-hidden rounded-2xl border border-[var(--p-color-border)] bg-white p-6 shadow-sm",
         className,
       )}
       initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
       animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
     >
-      <div className="absolute inset-x-0 top-0 h-1 overflow-hidden bg-[#E8EDF2]">
+      <div className="absolute inset-x-0 top-0 h-1 overflow-hidden bg-[var(--p-color-surface-subtle)]">
         <motion.div
-          className="h-full w-1/3 rounded-r-full bg-gradient-to-r from-[#164073] via-[#2A7C8C] to-[#EC2029]"
+          className="h-full w-1/3 rounded-r-full bg-gradient-to-r from-[var(--p-color-brand-500)] via-[var(--p-color-collab)] to-[var(--p-color-danger)]"
           animate={reduceMotion ? { x: 0 } : { x: ["-120%", "340%"] }}
           transition={reduceMotion ? { duration: 0.01 } : { duration: 1.25, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
       <div className="flex items-start gap-4">
-        <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#E8EDF2] text-[#164073]">
+        <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)]">
           <Loader2 className="h-5 w-5 animate-spin" />
         </span>
         <div>
-          <p className="font-display text-lg font-semibold text-[#164073]">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-[#5B6675]">{description}</p>
+          <p className="font-display text-lg font-semibold text-[var(--p-color-brand-500)]">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--p-color-fg-muted)]">{description}</p>
         </div>
       </div>
     </motion.div>
@@ -126,10 +130,11 @@ export function InlineBusy({
     <span
       role="status"
       aria-live="polite"
-      className={cn("inline-flex items-center gap-2 text-sm font-semibold text-[#164073]", className)}
+      className={cn("inline-flex items-center gap-2 text-sm font-semibold text-[var(--p-color-brand-500)]", className)}
     >
       <Loader2 className="h-4 w-4 animate-spin" />
       {label}
     </span>
   );
 }
+

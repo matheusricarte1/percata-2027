@@ -2,23 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  ArrowsClockwise,
-  Buildings,
-  CalendarBlank,
-  ChatCenteredDots,
-  CheckCircle,
-  Files,
-  Flask,
-  Gear,
-  MegaphoneSimple,
-  Package,
-  Plus,
-  ShieldCheck,
-  UploadSimple,
-  Users,
-  WarningCircle,
-} from "@phosphor-icons/react";
+import { ArrowsClockwise } from "@/components/icons/phosphor/exports/ArrowsClockwise";
+import { Buildings } from "@/components/icons/phosphor/exports/Buildings";
+import { CalendarBlank } from "@/components/icons/phosphor/exports/CalendarBlank";
+import { ChatCenteredDots } from "@/components/icons/phosphor/exports/ChatCenteredDots";
+import { CheckCircle } from "@/components/icons/phosphor/exports/CheckCircle";
+import { Files } from "@/components/icons/phosphor/exports/Files";
+import { Flask } from "@/components/icons/phosphor/exports/Flask";
+import { Gear } from "@/components/icons/phosphor/exports/Gear";
+import { MegaphoneSimple } from "@/components/icons/phosphor/exports/MegaphoneSimple";
+import { Package } from "@/components/icons/phosphor/exports/Package";
+import { Plus } from "@/components/icons/phosphor/exports/Plus";
+import { ShieldCheck } from "@/components/icons/phosphor/exports/ShieldCheck";
+import { UploadSimple } from "@/components/icons/phosphor/exports/UploadSimple";
+import { Users } from "@/components/icons/phosphor/exports/Users";
+import { WarningCircle } from "@/components/icons/phosphor/exports/WarningCircle";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getSafeUser, supabase } from "@/lib/supabase";
@@ -56,16 +54,19 @@ type Campus = {
   ativo: boolean;
 };
 
+type ChefiaAssignment = {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
 type Unidade = {
   id: string;
   nome: string;
   ativo: boolean;
   campus_id?: string | null;
-  chefia?: {
-    user_id: string;
-    full_name: string | null;
-    email: string | null;
-  } | null;
+  chefias?: ChefiaAssignment[];
+  chefia?: ChefiaAssignment | null;
 };
 
 type ChefiaOption = {
@@ -95,7 +96,7 @@ type TabItem = {
 };
 
 const TABS: TabItem[] = [
-  { key: "ajustes", label: "Ajustes", icon: Gear },
+  { key: "ajustes", label: "Minhas preferências", icon: Gear },
   { key: "acesso", label: "Acesso", icon: ShieldCheck, superadminOnly: true },
   { key: "estrutura", label: "Estrutura", icon: Buildings, superadminOnly: true },
   { key: "mensagens", label: "Mensagens", icon: MegaphoneSimple, superadminOnly: true },
@@ -109,6 +110,27 @@ export default function ConfiguracoesAdminPage() {
   const [role, setRole] = useState<UserRole>("solicitante");
   const [bootstrapping, setBootstrapping] = useState(true);
   const [activeTab, setActiveTab] = useState<AdminTab>("ajustes");
+
+  const visibleTabs = TABS.filter((tab) => !tab.superadminOnly || role === "superadmin");
+
+  useEffect(() => {
+    if (bootstrapping) return;
+    const syncTab = () => {
+      const requested = new URLSearchParams(window.location.search).get("aba");
+      const tab = TABS.find((entry) => entry.key === requested && (!entry.superadminOnly || role === "superadmin"));
+      setActiveTab(tab?.key || "ajustes");
+    };
+    syncTab();
+    window.addEventListener("popstate", syncTab);
+    return () => window.removeEventListener("popstate", syncTab);
+  }, [bootstrapping, role]);
+
+  const selectTab = (key: AdminTab) => {
+    setActiveTab(key);
+    const url = new URL(window.location.href);
+    url.searchParams.set("aba", key);
+    window.history.replaceState(null, "", url);
+  };
 
   const [loadingData, setLoadingData] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -221,7 +243,6 @@ export default function ConfiguracoesAdminPage() {
           const firstCampus = availableCampi[0]?.id || "";
           if (firstCampus) {
             setSelectedCampusId(firstCampus);
-            await loadStructure(firstCampus);
           }
         } catch (error: any) {
           try {
@@ -230,7 +251,6 @@ export default function ConfiguracoesAdminPage() {
             const firstCampus = fallbackCampi[0]?.id || "";
             if (firstCampus) {
               setSelectedCampusId(firstCampus);
-              await loadStructure(firstCampus);
             } else {
               setStructureNotice("Nenhum campus ativo encontrado.");
             }
@@ -247,7 +267,6 @@ export default function ConfiguracoesAdminPage() {
       setBootstrapping(false);
     }
     bootstrap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -302,11 +321,15 @@ export default function ConfiguracoesAdminPage() {
   async function handleAddLaboratorio() {
     const nome = sanitizePlainText(newLaboratorio, 180);
     if (!nome) return;
+    if (!selectedCampusId) {
+      toast.warning("Selecione um campus antes de adicionar o laboratório.");
+      return;
+    }
     const payload = await runAction(
       {
         action: "upsert_lab",
         nome,
-        campus_id: selectedCampusId || null,
+        campus_id: selectedCampusId,
       },
       "Laboratório salvo.",
     );
@@ -322,7 +345,7 @@ export default function ConfiguracoesAdminPage() {
   if (bootstrapping) {
     return (
       <div className="p-8">
-        <div className="rounded-[22px] border border-[#D6E3F2] bg-white p-8 text-sm font-semibold text-slate-500 shadow-sm">
+        <div className="rounded-[22px] border border-[var(--p-color-info-border)] bg-white p-8 text-sm font-semibold text-slate-500 shadow-sm">
           Carregando configurações...
         </div>
       </div>
@@ -341,39 +364,54 @@ export default function ConfiguracoesAdminPage() {
   }
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#F4F7FA] p-6 md:p-8">
-      <section className="overflow-hidden rounded-[22px] border border-[#C7D7EA] bg-[#F7FBFF] p-6 shadow-sm">
+    <div className="min-h-screen space-y-5 bg-[var(--p-color-surface-muted)] p-6 md:p-8">
+      <section className="overflow-hidden rounded-[22px] border border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] p-4 md:p-5 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+            <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-brand-400)]">
               Administração do sistema
             </p>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[#17233C] md:text-3xl">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)] md:text-3xl">
               Configurações do Sistema
             </h1>
-            <p className="mt-1 max-w-2xl text-sm font-medium text-[#52627A]">
-              Ajustes de conta e módulos de gestão centralizados em uma única seção.
+            <p className="mt-1 max-w-2xl text-sm font-medium text-[var(--p-color-fg-muted)]">
+              Preferências da sua conta e administração de usuários, acesso e estrutura.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-[#D6E3F2] bg-white/80 px-4 py-3 text-xs font-semibold uppercase tracking-widest text-[#164073]">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-[var(--p-color-info-border)] bg-white/80 px-4 py-3 text-xs font-semibold uppercase tracking-widest text-[var(--p-color-brand-500)]">
             <ShieldCheck size={16} weight="fill" />
             {isSuperadmin ? "Modo Superadmin" : "Modo Admin"}
           </div>
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-[#E1E8F0] bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          {TABS.filter((tab) => !tab.superadminOnly || isSuperadmin).map((tab) => (
+      <section className="rounded-[20px] border border-[var(--p-color-border-muted)] bg-white p-3 shadow-sm">
+        <p className="mb-2 px-1 text-xs text-[var(--p-color-fg-muted)]">Minhas preferências afeta sua conta. As demais abas são ferramentas de administração.</p>
+        <div role="tablist" aria-label="Seções de Configurações" className="flex flex-wrap gap-2">
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
-          onClick={() => setActiveTab(tab.key)}
+              role="tab"
+              id={`settings-tab-${tab.key}`}
+              aria-selected={activeTab === tab.key}
+              aria-controls={`settings-panel-${tab.key}`}
+              tabIndex={activeTab === tab.key ? 0 : -1}
+              onClick={() => selectTab(tab.key)}
+              onKeyDown={(event) => {
+                const index = visibleTabs.findIndex((entry) => entry.key === tab.key);
+                const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? visibleTabs.length - 1 : event.key === "ArrowRight" ? (index + 1) % visibleTabs.length : event.key === "ArrowLeft" ? (index - 1 + visibleTabs.length) % visibleTabs.length : -1;
+                if (nextIndex < 0) return;
+                event.preventDefault();
+                const next = visibleTabs[nextIndex];
+                selectTab(next.key);
+                document.getElementById(`settings-tab-${next.key}`)?.focus();
+              }}
           disabled={bootstrapping}
-              className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+              className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${
                 activeTab === tab.key
-                  ? "bg-[#164073] text-white shadow-sm"
-                  : "border border-[#D9E0E8] bg-[#F7FBFF] text-[#3E4C5F] hover:bg-[#E8EDF2]"
+                  ? "bg-[var(--p-color-brand-500)] text-white shadow-sm"
+                  : "border border-[var(--p-color-border)] bg-[var(--p-color-info-bg)] text-[var(--p-color-fg-muted)] hover:bg-[var(--p-color-surface-subtle)]"
               }`}
             >
               <tab.icon size={14} weight="fill" />
@@ -383,7 +421,8 @@ export default function ConfiguracoesAdminPage() {
         </div>
       </section>
 
-      {activeTab === "ajustes" && <SettingsPanel scope="Administração" />}
+      <div role="tabpanel" id={`settings-panel-${activeTab}`} aria-labelledby={`settings-tab-${activeTab}`} tabIndex={0} className="space-y-5 focus-visible:outline-2 focus-visible:outline-offset-2">
+      {activeTab === "ajustes" && <SettingsPanel scope="Administração" embedded />}
 
       {activeTab === "acesso" && isSuperadmin && (
         <div className="space-y-5">
@@ -427,13 +466,14 @@ export default function ConfiguracoesAdminPage() {
       {activeTab === "exportacao" && <ExportacaoModule />}
       {activeTab === "kits" && <KitsModule />}
       {activeTab === "campanhas" && <CampanhasModule />}
+      </div>
     </div>
   );
 }
 
 function ModuleLoading({ label }: { label: string }) {
   return (
-    <div className="rounded-2xl border border-[#D2D0CE] bg-white p-6 text-sm font-semibold text-slate-500">
+    <div className="rounded-2xl border border-[var(--p-color-border)] bg-white p-6 text-sm font-semibold text-slate-500">
       Carregando módulo de {label}...
     </div>
   );
@@ -502,16 +542,16 @@ function DfdDataGovernancePanel() {
   }
 
   return (
-    <section className="rounded-[22px] border border-[#F4B7B7] bg-[#FFF8F8] p-6 shadow-sm">
+    <section className="rounded-[22px] border border-[var(--p-color-danger-border)] bg-[#FFF8F8] p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A91520]">
+          <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-danger)]">
             Governança de dados
           </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)]">
             Limpeza da base de DFDs
           </h2>
-          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[#52627A]">
+          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[var(--p-color-fg-muted)]">
             Remove todas as DFDs da base atual (incluindo itens e logs vinculados).
             Os registros legados permanecem preservados.
           </p>
@@ -520,7 +560,7 @@ function DfdDataGovernancePanel() {
           type="button"
           onClick={loadPreview}
           disabled={loadingPreview || purging}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E6C0C0] bg-white px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[#A91520] transition hover:bg-[#FFF1F1] disabled:opacity-60"
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E6C0C0] bg-white px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--p-color-danger)] transition hover:bg-[#FFF1F1] disabled:opacity-60"
         >
           <ArrowsClockwise size={14} weight="bold" className={loadingPreview ? "animate-spin" : ""} />
           Atualizar prévia
@@ -529,27 +569,27 @@ function DfdDataGovernancePanel() {
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-[#F0D1D1] bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7A8797]">
+          <p className="type-caption font-semibold uppercase tracking-[0.1em] text-[#7A8797]">
             DFDs para remover
           </p>
-          <p className="mt-1 text-2xl font-bold text-[#A91520]">
+          <p className="mt-1 text-2xl font-bold text-[var(--p-color-danger)]">
             {loadingPreview ? "..." : String(preview?.purgeCount ?? 0)}
           </p>
           {preview?.samplePurgeProtocols?.length ? (
-            <p className="mt-1 text-xs text-[#5B6675]">
+            <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
               Exemplos: {preview.samplePurgeProtocols.join(", ")}
             </p>
           ) : null}
         </div>
-        <div className="rounded-xl border border-[#D9E0E8] bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7A8797]">
+        <div className="rounded-xl border border-[var(--p-color-border)] bg-white px-4 py-3">
+          <p className="type-caption font-semibold uppercase tracking-[0.1em] text-[#7A8797]">
             Registros legados preservados
           </p>
-          <p className="mt-1 text-2xl font-bold text-[#164073]">
+          <p className="mt-1 text-2xl font-bold text-[var(--p-color-brand-500)]">
             {loadingPreview ? "..." : String(preview?.legacyCount ?? 0)}
           </p>
           {preview?.sampleLegacyProtocols?.length ? (
-            <p className="mt-1 text-xs text-[#5B6675]">
+            <p className="mt-1 text-xs text-[var(--p-color-fg-muted)]">
               Exemplos: {preview.sampleLegacyProtocols.join(", ")}
             </p>
           ) : null}
@@ -557,14 +597,14 @@ function DfdDataGovernancePanel() {
       </div>
 
       <div className="mt-4 rounded-xl border border-[#F0D1D1] bg-white px-4 py-3">
-        <p className="text-xs font-semibold text-[#A91520]">
+        <p className="text-xs font-semibold text-[var(--p-color-danger)]">
           Ação destrutiva irreversível. Confirme digitando:
         </p>
-        <p className="mt-1 font-mono text-sm font-bold text-[#17233C]">{confirmationPhrase}</p>
+        <p className="mt-1 font-mono text-sm font-bold text-[var(--p-color-fg)]">{confirmationPhrase}</p>
         <input
           value={confirm}
           onChange={(event) => setConfirm(sanitizePlainText(event.target.value, 64))}
-          className="mt-3 h-11 w-full rounded-xl border border-[#E6C0C0] bg-[#FFFDFD] px-3 text-sm font-semibold text-[#2E3A4A] outline-none transition focus:border-[#A91520] focus:ring-2 focus:ring-[#F4B7B7]"
+          className="mt-3 h-11 w-full rounded-xl border border-[#E6C0C0] bg-[#FFFDFD] px-3 text-sm font-semibold text-[var(--p-color-fg-default)] outline-none transition focus:border-[var(--p-color-danger)] focus:ring-2 focus:ring-[var(--p-color-danger-border)]"
           placeholder={confirmationPhrase}
           disabled={purging}
         />
@@ -573,7 +613,7 @@ function DfdDataGovernancePanel() {
             type="button"
             onClick={purgeNonLegacyDfds}
             disabled={purging || loadingPreview}
-            className="h-10 rounded-lg bg-[#A91520] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#7F1018]"
+            className="h-10 rounded-lg bg-[var(--p-color-danger)] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#7F1018]"
           >
             {purging ? "Limpando base..." : "Apagar base de DFDs"}
           </Button>
@@ -640,20 +680,20 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
   }
 
   return (
-    <section className="rounded-[22px] border border-[#E1E8F0] bg-white p-6 shadow-sm">
+    <section className="rounded-[22px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+          <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-brand-400)]">
             Comunicação administrativa
           </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)]">
             Mensagens com imagem
           </h2>
-          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[#52627A]">
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[var(--p-color-fg-muted)]">
             Envie avisos para usuários do sistema e inclua foto (URL) e botão de ação opcional.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-xl border border-[#D9E0E8] bg-[#F7FBFF] px-3 py-2 text-xs font-semibold text-[#164073]">
+        <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-info-bg)] px-3 py-2 text-xs font-semibold text-[var(--p-color-brand-500)]">
           <ChatCenteredDots size={16} weight="duotone" />
           Campainha + painel do usuário
         </div>
@@ -661,21 +701,21 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Título</span>
+          <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Título</span>
           <input
             value={title}
             onChange={(event) => setTitle(sanitizePlainText(event.target.value, 120))}
-            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm font-semibold text-[var(--p-color-brand-500)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
             placeholder="Ex.: Janela de envio encerra hoje às 18h"
             maxLength={120}
           />
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Tipo</span>
+          <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Tipo</span>
           <select
             value={type}
             onChange={(event) => setType((event.target.value as any) || "info")}
-            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm font-semibold text-[var(--p-color-brand-500)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
           >
             <option value="info">Informação</option>
             <option value="success">Sucesso</option>
@@ -686,11 +726,11 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
       </div>
 
       <label className="mt-4 block">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Mensagem</span>
+        <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Mensagem</span>
         <textarea
           value={body}
           onChange={(event) => setBody(sanitizeLongText(event.target.value, 1200))}
-          className="mt-2 min-h-[120px] w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 py-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          className="mt-2 min-h-[120px] w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 py-3 text-sm text-[var(--p-color-fg-default)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
           maxLength={1200}
           placeholder="Explique em linguagem direta o que muda e o que o usuário precisa fazer."
         />
@@ -698,11 +738,11 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Alvo</span>
+          <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Alvo</span>
           <select
             value={scope}
             onChange={(event) => setScope((event.target.value as any) || "all")}
-            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm font-semibold text-[var(--p-color-brand-500)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
           >
             <option value="all">Todos os usuários</option>
             <option value="campus">Campus específico</option>
@@ -713,11 +753,11 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
 
         {scope === "campus" ? (
           <label className="block">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Campus</span>
+            <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Campus</span>
             <select
               value={targetCampusId}
               onChange={(event) => setTargetCampusId(event.target.value)}
-              className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+              className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm font-semibold text-[var(--p-color-brand-500)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
             >
               <option value="">Selecione o campus</option>
               {campi.map((campus) => (
@@ -731,11 +771,11 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
 
         {scope === "role" ? (
           <label className="block">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Papel</span>
+            <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Papel</span>
             <select
               value={targetRole}
               onChange={(event) => setTargetRole(event.target.value)}
-              className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+              className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm font-semibold text-[var(--p-color-brand-500)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
             >
               <option value="solicitante">Solicitante</option>
               <option value="chefia">Chefia</option>
@@ -747,11 +787,11 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
 
         {scope === "user" ? (
           <label className="block">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">ID do usuário</span>
+            <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">ID do usuário</span>
             <input
               value={targetUserId}
               onChange={(event) => setTargetUserId(sanitizePlainText(event.target.value, 80))}
-              className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm font-semibold text-[#164073] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+              className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm font-semibold text-[var(--p-color-brand-500)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
               placeholder="UUID do perfil"
             />
           </label>
@@ -760,44 +800,44 @@ function BroadcastMessagesPanel({ campi }: { campi: Campus[] }) {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <label className="block lg:col-span-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">URL da imagem (opcional)</span>
+          <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">URL da imagem (opcional)</span>
           <input
             value={imageUrl}
             onChange={(event) => setImageUrl(sanitizePlainText(event.target.value, 600))}
-            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm text-[var(--p-color-fg-default)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
             placeholder="https://..."
           />
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">Texto do botão</span>
+          <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">Texto do botão</span>
           <input
             value={ctaLabel}
             onChange={(event) => setCtaLabel(sanitizePlainText(event.target.value, 60))}
-            className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+            className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm text-[var(--p-color-fg-default)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
             placeholder="Abrir documento"
           />
         </label>
       </div>
 
       <label className="mt-4 block">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">URL do botão (opcional)</span>
+        <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">URL do botão (opcional)</span>
         <input
           value={ctaUrl}
           onChange={(event) => setCtaUrl(sanitizePlainText(event.target.value, 600))}
-          className="mt-2 h-11 w-full rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 text-sm text-[#2E3A4A] outline-none transition focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          className="mt-2 h-11 w-full rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 text-sm text-[var(--p-color-fg-default)] outline-none transition focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
           placeholder="https://..."
         />
       </label>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4">
-        <p className="text-xs font-medium text-[#52627A]">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-info-bg)] p-4">
+        <p className="text-xs font-medium text-[var(--p-color-fg-muted)]">
           A mensagem aparece na campainha do usuário e pode incluir foto e botão.
         </p>
         <Button
           type="button"
           onClick={sendBroadcast}
           disabled={sending}
-          className="h-10 rounded-lg bg-[#164073] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#0F2E57]"
+          className="h-10 rounded-lg bg-[var(--p-color-brand-500)] px-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-[var(--p-color-brand-600)]"
         >
           {sending ? "Enviando..." : "Enviar mensagem"}
         </Button>
@@ -840,6 +880,9 @@ function SystemAccessLockPanel() {
   }, []);
 
   async function saveLock(nextEnabled: boolean) {
+    if (nextEnabled && !window.confirm("Bloquear o sistema para todos os usuários, exceto superadmins?")) {
+      return;
+    }
     setSaving(true);
     try {
       const response = await fetch("/api/superadmin/access-lock", {
@@ -866,16 +909,16 @@ function SystemAccessLockPanel() {
   }
 
   return (
-    <section className="rounded-[22px] border border-[#E1E8F0] bg-white p-6 shadow-sm">
+    <section className="rounded-[22px] border border-[var(--p-color-border-muted)] bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#47739F]">
+          <p className="type-kicker font-semibold uppercase tracking-[0.16em] text-[var(--p-color-brand-400)]">
             Controle global
           </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[#17233C]">
+          <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight text-[var(--p-color-fg)]">
             Bloqueio de acesso
           </h2>
-          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[#52627A]">
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[var(--p-color-fg-muted)]">
             Quando ativo, usuários solicitantes, chefias e admins são bloqueados
             nas rotas internas. O superadmin continua acessando o sistema para
             manutenção e liberação.
@@ -884,8 +927,8 @@ function SystemAccessLockPanel() {
         <div
           className={`rounded-2xl border px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] ${
             enabled
-              ? "border-[#F4B7B7] bg-[#FFF1F1] text-[#A91520]"
-              : "border-[#CFE6DE] bg-[#F2FBF7] text-[#2E6B52]"
+              ? "border-[var(--p-color-danger-border)] bg-[#FFF1F1] text-[var(--p-color-danger)]"
+              : "border-[var(--p-color-success-border)] bg-[#F2FBF7] text-[#2E6B52]"
           }`}
         >
           {enabled ? "Bloqueado" : "Liberado"}
@@ -893,26 +936,26 @@ function SystemAccessLockPanel() {
       </div>
 
       <label className="mt-6 block">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+        <span className="type-caption font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
           Mensagem exibida
         </span>
         <textarea
           value={message}
           onChange={(event) => setMessage(sanitizeLongText(event.target.value, 240))}
-          className="mt-2 min-h-[92px] w-full resize-none rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] px-4 py-3 text-sm font-medium text-[#2E3A4A] outline-none focus:border-[#164073] focus:ring-2 focus:ring-[#C7D7EA]"
+          className="mt-2 min-h-[92px] w-full resize-none rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-4 py-3 text-sm font-medium text-[var(--p-color-fg-default)] outline-none focus:border-[var(--p-color-brand-500)] focus:ring-2 focus:ring-[var(--p-color-info-border)]"
           maxLength={240}
           disabled={loading || saving}
         />
       </label>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D9E0E8] bg-[#F7FBFF] p-4">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-info-bg)] p-4">
         <div className="flex items-center gap-3">
           <WarningCircle
             size={24}
             weight="fill"
-            className={enabled ? "text-[#A91520]" : "text-[#164073]"}
+            className={enabled ? "text-[var(--p-color-danger)]" : "text-[var(--p-color-brand-500)]"}
           />
-          <p className="text-sm font-semibold text-[#17233C]">
+          <p className="text-sm font-semibold text-[var(--p-color-fg)]">
             {enabled
               ? "O bloqueio global está ativo."
               : "O sistema está liberado para os usuários."}
@@ -924,8 +967,8 @@ function SystemAccessLockPanel() {
           disabled={loading || saving}
           className={
             enabled
-              ? "bg-[#164073] text-white hover:bg-[#0F2E57]"
-              : "bg-[#A91520] text-white hover:bg-[#7F1018]"
+              ? "bg-[var(--p-color-brand-500)] text-white hover:bg-[var(--p-color-brand-600)]"
+              : "bg-[var(--p-color-danger)] text-white hover:bg-[#7F1018]"
           }
         >
           {saving
@@ -992,7 +1035,7 @@ function StructureSettingsPanel(props: {
 
   return (
     <>
-      <div className="rounded-[20px] border border-[#E1E8F0] bg-white p-5 shadow-sm">
+      <div className="rounded-[20px] border border-[var(--p-color-border-muted)] bg-white p-5 shadow-sm">
         {structureNotice ? (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
             {structureNotice}
@@ -1000,7 +1043,7 @@ function StructureSettingsPanel(props: {
         ) : null}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-end">
           <div className="space-y-1">
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            <label className="type-kicker font-semibold uppercase tracking-widest text-slate-400">
               Campus
             </label>
             <select
@@ -1050,14 +1093,14 @@ function StructureSettingsPanel(props: {
               }
             }}
             disabled={saving || loadingData}
-            className="h-11 rounded-xl bg-[#164073] hover:bg-upe-blue-deep text-xs uppercase"
+            className="h-11 rounded-xl bg-[var(--p-color-brand-500)] hover:bg-upe-blue-deep text-xs uppercase"
           >
             <UploadSimple size={16} className="mr-2" />
             Importar Lista Petrolina
           </Button>
         </div>
 
-        <div className="mt-4 rounded-xl border border-slate-100 bg-[#F3F2F1] px-3 py-2 text-xs text-slate-600">
+        <div className="mt-4 rounded-xl border border-slate-100 bg-[var(--p-color-bg-muted)] px-3 py-2 text-xs text-slate-600">
           Campus em edição: <strong>{campusLabel}</strong>
           {selectedCampusId && !loadingData && !supportsLabCampus && (
             <span className="ml-2 inline-flex items-center gap-1 text-amber-700">
@@ -1069,10 +1112,10 @@ function StructureSettingsPanel(props: {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="rounded-[20px] border border-[#E1E8F0] bg-white p-5 shadow-sm">
+        <div className="rounded-[20px] border border-[var(--p-color-border-muted)] bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <Buildings size={20} className="text-[#164073]" weight="fill" />
-            <h2 className="text-lg font-semibold uppercase tracking-tight text-[#164073]">
+            <Buildings size={20} className="text-[var(--p-color-brand-500)]" weight="fill" />
+            <h2 className="text-lg font-semibold uppercase tracking-tight text-[var(--p-color-brand-500)]">
               Setores / Departamentos
             </h2>
           </div>
@@ -1089,7 +1132,7 @@ function StructureSettingsPanel(props: {
               type="button"
               onClick={handleAddDepartamento}
               disabled={saving || loadingData || !newDepartamento.trim()}
-              className="h-10 rounded-xl bg-[#164073] hover:bg-upe-blue-deep text-xs uppercase"
+              className="h-10 rounded-xl bg-[var(--p-color-brand-500)] hover:bg-upe-blue-deep text-xs uppercase"
             >
               <Plus size={14} className="mr-1" />
               Adicionar
@@ -1100,7 +1143,7 @@ function StructureSettingsPanel(props: {
             {departamentos.map((item) => (
               <div
                 key={item.id}
-                className="rounded-xl border border-slate-200 bg-[#F3F2F1] p-3"
+                className="rounded-xl border border-slate-200 bg-[var(--p-color-bg-muted)] p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <input
@@ -1117,7 +1160,7 @@ function StructureSettingsPanel(props: {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 rounded-lg text-[10px] uppercase"
+                    className="h-9 rounded-lg type-kicker uppercase"
                     disabled={saving}
                     onClick={() => {
                       const nome = sanitizePlainText(draftDeptNames[item.id] ?? item.nome, 160);
@@ -1141,7 +1184,7 @@ function StructureSettingsPanel(props: {
                   <Button
                     type="button"
                     variant={item.ativo ? "outline" : "default"}
-                    className={`h-9 rounded-lg text-[10px] uppercase ${
+                    className={`h-9 rounded-lg type-kicker uppercase ${
                       !item.ativo ? "bg-emerald-600 hover:bg-emerald-700" : ""
                     }`}
                     disabled={saving}
@@ -1176,10 +1219,10 @@ function StructureSettingsPanel(props: {
           </div>
         </div>
 
-        <div className="rounded-[20px] border border-[#E1E8F0] bg-white p-5 shadow-sm">
+        <div className="rounded-[20px] border border-[var(--p-color-border-muted)] bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <Flask size={20} className="text-[#164073]" weight="fill" />
-            <h2 className="text-lg font-semibold uppercase tracking-tight text-[#164073]">
+            <Flask size={20} className="text-[var(--p-color-brand-500)]" weight="fill" />
+            <h2 className="text-lg font-semibold uppercase tracking-tight text-[var(--p-color-brand-500)]">
               Laboratórios
             </h2>
           </div>
@@ -1196,7 +1239,7 @@ function StructureSettingsPanel(props: {
               type="button"
               onClick={handleAddLaboratorio}
               disabled={saving || loadingData || !newLaboratorio.trim()}
-              className="h-10 rounded-xl bg-[#164073] hover:bg-upe-blue-deep text-xs uppercase"
+              className="h-10 rounded-xl bg-[var(--p-color-brand-500)] hover:bg-upe-blue-deep text-xs uppercase"
             >
               <Plus size={14} className="mr-1" />
               Adicionar
@@ -1207,7 +1250,7 @@ function StructureSettingsPanel(props: {
             {laboratorios.map((item) => (
               <div
                 key={item.id}
-                className="rounded-xl border border-slate-200 bg-[#F3F2F1] p-3"
+                className="rounded-xl border border-slate-200 bg-[var(--p-color-bg-muted)] p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <input
@@ -1224,7 +1267,7 @@ function StructureSettingsPanel(props: {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-9 rounded-lg text-[10px] uppercase"
+                    className="h-9 rounded-lg type-kicker uppercase"
                     disabled={saving}
                     onClick={() => {
                       const nome = sanitizePlainText(draftLabNames[item.id] ?? item.nome, 180);
@@ -1248,7 +1291,7 @@ function StructureSettingsPanel(props: {
                   <Button
                     type="button"
                     variant={item.ativo ? "outline" : "default"}
-                    className={`h-9 rounded-lg text-[10px] uppercase ${
+                    className={`h-9 rounded-lg type-kicker uppercase ${
                       !item.ativo ? "bg-emerald-600 hover:bg-emerald-700" : ""
                     }`}
                     disabled={saving}
@@ -1307,69 +1350,70 @@ function UnitChefiaSelector({
   disabled: boolean;
   runAction: (body: Record<string, any>, successMessage?: string) => Promise<any>;
 }) {
-  const currentChefiaId = unit.chefia?.user_id || "__none__";
-  const currentOption = chefiaOptions.find((option) => option.id === currentChefiaId) || null;
-  const currentChefiaName =
-    unit.chefia?.full_name ||
-    currentOption?.full_name ||
-    unit.chefia?.email ||
-    currentOption?.email ||
-    "Sem chefia definida";
-  const currentChefiaAvatar =
-    currentOption?.avatar_url ||
-    null;
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const assignments = unit.chefias || (unit.chefia ? [unit.chefia] : []);
+  const assignedIds = new Set(assignments.map((person) => person.user_id));
+  const availableOptions = chefiaOptions.filter((person) =>
+    person.campus_id === unit.campus_id && !assignedIds.has(person.id),
+  );
+
+  async function addChefia() {
+    if (!selectedUserId) return;
+    const result = await runAction({
+      action: "set_unit_chefia", unit_type: unitType, unit_id: unit.id, user_id: selectedUserId,
+    }, "Chefia adicionada.");
+    if (result) setSelectedUserId("");
+  }
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-[#C7D7EA] hover:bg-[#F8FBFF]">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2.5">
-          <CategoryAvatar
-            name={currentChefiaName}
-            avatarUrl={currentChefiaAvatar}
-            category="chefia"
-            size="sm"
-          />
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-              Chefia do espaço
-            </p>
-            <p className="mt-0.5 text-xs font-semibold text-[#164073]">
-              {currentChefiaName}
-            </p>
-          </div>
-        </div>
-        <select
-          value={currentChefiaId}
-          disabled={disabled}
-          onChange={(event) =>
-            runAction(
-              {
-                action: "set_unit_chefia",
-                unit_type: unitType,
-                unit_id: unit.id,
-                user_id:
-                  event.target.value === "__none__" ? null : event.target.value,
-              },
-              "Chefia do espaço atualizada.",
-            )
-          }
-          className="h-10 min-w-[260px] rounded-xl border border-slate-200 bg-[#F8FAFC] px-3 text-xs font-semibold text-[#164073] outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
+    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <p className="type-kicker font-semibold uppercase tracking-widest text-slate-400">
+        Chefias do espaço ({assignments.length})
+      </p>
+      <div className="mt-2 space-y-2">
+        {assignments.map((person) => {
+          const option = chefiaOptions.find((entry) => entry.id === person.user_id);
+          const name = person.full_name || person.email || "Usuário sem nome";
+          return (
+            <div key={person.user_id} className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <CategoryAvatar name={name} avatarUrl={option?.avatar_url || null} category="chefia" size="sm" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[var(--p-color-brand-500)]">{name}</p>
+                  {person.email && <p className="break-all type-caption text-slate-500">{person.email}</p>}
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={disabled}
+                aria-label={`Remover chefia de ${name}`}
+                onClick={() => runAction({
+                  action: "remove_unit_chefia", unit_type: unitType, unit_id: unit.id, user_id: person.user_id,
+                }, "Papel de chefia removido; vínculo como membro preservado.")}
+              >Remover chefia</Button>
+            </div>
+          );
+        })}
+        {assignments.length === 0 && <p className="text-xs text-slate-500">Sem chefia definida</p>}
+      </div>
+      <div className="mt-3 flex flex-col gap-2 md:flex-row">
+        <select value={selectedUserId} disabled={disabled || !unit.ativo}
+          aria-label={`Adicionar chefia em ${unit.nome}`}
+          onChange={(event) => setSelectedUserId(event.target.value)}
+          className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-[var(--p-color-surface-soft)] px-3 text-xs font-semibold text-[var(--p-color-brand-500)] outline-none focus:ring-2 focus:ring-upe-accent-washed-blue/70"
         >
-          <option value="__none__">Sem chefia definida</option>
-          {chefiaOptions.map((option) => (
+          <option value="">Selecione uma pessoa para adicionar</option>
+          {availableOptions.map((option) => (
             <option key={option.id} value={option.id}>
-              {(option.full_name || option.email || "Usuário sem nome").trim()}
-              {option.email ? ` - ${option.email}` : ""}
+              {option.full_name || option.email || "Usuário sem nome"}{option.email ? ` - ${option.email}` : ""}
             </option>
           ))}
         </select>
+        <Button type="button" disabled={disabled || !unit.ativo || !selectedUserId} onClick={addChefia}>
+          Adicionar chefia
+        </Button>
       </div>
-      {currentOption?.email ? (
-        <p className="mt-1 text-[11px] text-slate-500">{currentOption.email}</p>
-      ) : null}
-      <p className="mt-2 text-[11px] leading-5 text-slate-500">
-        Ao escolher alguém aqui, essa pessoa passa a receber/analisar as DFDs deste
-        setor ou laboratório como chefia.
+      <p className="mt-2 type-caption leading-5 text-slate-500">
+        Todas as chefias vinculadas podem analisar as DFDs deste setor ou laboratório.
+        Ao adicionar uma pessoa, o acesso de chefia é habilitado automaticamente.
       </p>
     </div>
   );

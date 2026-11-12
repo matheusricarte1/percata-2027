@@ -75,8 +75,7 @@ export function calculateCapitalPriorities(inputs: CapitalPriorityInput[]): Map<
     if (!item.eligible) { result.set(item.key, pending("Item fora da carteira consolidada de capital.")); continue; }
     if (!item.campusId) { result.set(item.key, pending("Campus não identificado.")); continue; }
     if (!Number.isFinite(item.value) || item.value <= 0) { result.set(item.key, pending("Valor total inválido ou ausente.")); continue; }
-    if (!Number.isInteger(item.criticidadeLevel) || item.criticidadeLevel < 1 || item.criticidadeLevel > 4 ||
-        !Number.isInteger(item.prioridadeLevel) || item.prioridadeLevel < 1 || item.prioridadeLevel > 4) {
+    if (!Number.isInteger(item.criticidadeLevel) || item.criticidadeLevel < 1 || item.criticidadeLevel > 4 || !Number.isInteger(item.prioridadeLevel) || item.prioridadeLevel < 1 || item.prioridadeLevel > 4) {
       result.set(item.key, pending("Avaliação de criticidade e prioridade da chefia incompleta.")); continue;
     }
     const campus = campusGroups.get(item.campusId) || [];

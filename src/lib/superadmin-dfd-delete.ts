@@ -47,7 +47,7 @@ export function isDfdDeleteConfirmationValid(
   typedValue: string | null | undefined,
   protocol: string | null | undefined,
 ) {
-  return String(typedValue || "").trim() === String(protocol || "").trim();
+  return Boolean(String(protocol || "").trim()) && String(typedValue || "").trim() === String(protocol || "").trim();
 }
 
 export function getDfdDeleteStepLabels() {

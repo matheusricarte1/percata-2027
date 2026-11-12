@@ -9,7 +9,19 @@ export type CollectiveRoomStatus =
 export type CollectiveRoomRole = "membro" | "chefia" | "admin" | "superadmin";
 export type CollectiveExpenseClass = "custeio" | "investimento" | "outro" | "sem-gnd";
 
+export type CollectiveFiscalOption = {
+  efisco_item_id?: number | string | null;
+  codigo_efisco?: string | null;
+  efisco_item_natureza_id?: number | string | null;
+  codigo_natureza_despesa?: string | null;
+  natureza_key?: string | null;
+  gnd?: string | null;
+  classe_despesa?: string | null;
+};
+
 export type CollectiveContribution = {
+  efisco_item_id?: number | string | null;
+  efisco_item_natureza_id?: number | string | null;
   unit_id?: string | null;
   unit_type?: CollectiveUnitType | string | null;
   user_id?: string | null;
@@ -23,15 +35,21 @@ export type CollectiveContribution = {
   quantidade?: number | null;
   valor_unitario_estimado?: number | null;
   justificativa_item?: string | null;
+  justificativa_quantidade?: string | null;
   link_referencia?: string | null;
   gnd?: string | null;
   gnd_derivado?: string | null;
   codigo_natureza_despesa?: string | null;
+  natureza_count?: number | null;
+  has_mixed_expense_classes?: boolean | null;
+  has_missing_natureza?: boolean | null;
+  requires_natureza_review?: boolean | null;
   tipo_objeto?: string | null;
   codigo_grupo?: string | null;
   nome_grupo?: string | null;
   codigo_classe?: string | null;
   nome_classe?: string | null;
+  fiscal_options?: CollectiveFiscalOption[];
 };
 
 export type CollectiveContributor = {
@@ -96,7 +114,7 @@ function getCollectiveExpenseClassKey(item: CollectiveContribution) {
 function getCollectiveExpenseLabel(expenseClass: CollectiveExpenseClass) {
   if (expenseClass === "custeio") return "Custeio";
   if (expenseClass === "investimento") return "Investimento";
-  if (expenseClass === "sem-gnd") return "Sem GND";
+  if (expenseClass === "sem-gnd") return "Sem natureza";
   return "Outras naturezas";
 }
 
@@ -153,6 +171,12 @@ export function aggregateCollectiveContributions(
       Number(current.valor_unitario_estimado || 0),
       Number(contribution.valor_unitario_estimado || 0),
     );
+    const quantityBasis = String(contribution.justificativa_quantidade || "").trim();
+    if (quantityBasis && !String(current.justificativa_quantidade || "").includes(quantityBasis)) {
+      current.justificativa_quantidade = [current.justificativa_quantidade, quantityBasis]
+        .filter(Boolean)
+        .join("\n");
+    }
 
     const userId = String(contribution.user_id || "").trim();
     if (userId) {
@@ -356,6 +380,21 @@ export function formatContributorDistribution(contributors: CollectiveContributo
     .join("; ");
 }
 
+const COLLECTIVE_DISTRIBUTION_LABEL = /distribui[çc][ãa]o por usu[áa]rio:/i;
+
+function stripCollectiveDistributionText(value?: string | null) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return (raw.split(COLLECTIVE_DISTRIBUTION_LABEL)[0] || "").trim();
+}
+
+export function formatCollectiveJustificationText(value?: string | null) {
+  return stripCollectiveDistributionText(value)
+    .replace(/https?:\/\/percata\.vercel\.app\/\S+/gi, "")
+    .replace(/https?:\/\/localhost:\d+\/\S+/gi, "")
+    .trim();
+}
+
 export function parseCollectiveDistributionText(
   justificativa?: string | null,
 ): ParsedCollectiveContributor[] {
@@ -386,6 +425,18 @@ export function parseCollectiveDistributionText(
       };
     })
     .filter((entry): entry is ParsedCollectiveContributor => Boolean(entry));
+}
+
+export function formatParsedCollectiveDistribution(
+  distribution: ParsedCollectiveContributor[],
+) {
+  return distribution
+    .map((entry) => `${entry.name}: ${Number(entry.quantidade || 0)}`)
+    .join("; ");
+}
+
+export function formatCollectiveDistributionText(justificativa?: string | null) {
+  return formatParsedCollectiveDistribution(parseCollectiveDistributionText(justificativa));
 }
 
 export function stripCollectiveContributionProfileFields<

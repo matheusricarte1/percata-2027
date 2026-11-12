@@ -1,17 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  FileCsv,
-  Selection,
-  Lightning,
-  ArrowsClockwise,
-  DownloadSimple,
-} from "@phosphor-icons/react";
+import { FileCsv } from "@/components/icons/phosphor/exports/FileCsv";
+import { Selection } from "@/components/icons/phosphor/exports/Selection";
+import { Lightning } from "@/components/icons/phosphor/exports/Lightning";
+import { ArrowsClockwise } from "@/components/icons/phosphor/exports/ArrowsClockwise";
+import { DownloadSimple } from "@/components/icons/phosphor/exports/DownloadSimple";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  OperationalAccordion,
+  OperationalChip,
+  OperationalEmptyState,
+  OperationalKpiCard,
+  OperationalTimeline,
+  SkeuoDocumentCard,
+  SkeuoPaperStack,
+} from "@/components/ui/operational";
 import { downloadWorkbookFromSheets } from "@/lib/export-excel";
 import {
   buildCsv,
@@ -25,6 +32,7 @@ import {
   type DfdItemReportRow,
   type DfdReportRow,
 } from "@/lib/admin-reports";
+import { MechanicalValue } from "@/components/ui/MechanicalValue";
 
 type Consolidado = {
   codigo_tce: string;
@@ -67,7 +75,10 @@ async function fetchCatalogRowsForItems(items: DfdItemReportRow[]) {
 
   for (let i = 0; i < codes.length; i += chunkSize) {
     const chunk = codes.slice(i, i + chunkSize);
-    const { data, error } = await supabase.from("catalogo").select("*").in("codigo_efisco", chunk);
+    const { data, error } = await supabase
+      .from("catalogo_efisco_v2")
+      .select("*")
+      .in("codigo_efisco", chunk);
     if (error) throw error;
     rows.push(...((data || []) as ReportLookupRow[]));
   }
@@ -400,27 +411,26 @@ export default function ExportacaoPage() {
   };
 
   return (
-    <div className="p-8 space-y-8 pb-20 min-h-screen bg-[#F3F2F1]">
+    <div className="p-8 space-y-8 pb-20 min-h-screen bg-[var(--p-color-bg-muted)]">
       <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-6">
-        <div className="rounded-[36px] bg-white p-8 text-[#1E2430] shadow-sm border border-[#D2D0CE]">
-          <div className="h-1 w-28 rounded-full bg-[#164073] mb-4" />
+        <div className="rounded-[36px] bg-white p-8 text-[var(--p-color-fg-strong)] shadow-sm border border-[var(--p-color-border)]">
+          <div className="h-1 w-28 rounded-full bg-[var(--p-color-brand-500)] mb-4" />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-3">
-              <span className="inline-flex items-center gap-2 bg-[#E8EDF2] px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.2em] text-[#164073]">
-                <Selection size={14} weight="bold" />
+              <OperationalChip tone="action" icon={<Selection size={14} weight="bold" />} className="type-kicker uppercase tracking-[0.2em]">
                 Exportação PCA
-              </span>
+              </OperationalChip>
               <h1 className="font-display text-4xl font-semibold tracking-tight leading-none uppercase">
                 Relatórios e-Fisco
               </h1>
-              <p className="text-[#5B6675] text-sm font-medium">
+              <p className="text-[var(--p-color-fg-muted)] text-sm font-medium">
                 XLSX completo com DFDs, itens, resumos e dados auxiliares para conferência.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={downloadCsv}
-                className="h-12 rounded-2xl bg-[#164073] text-white hover:bg-upe-blue-deep font-semibold uppercase tracking-widest text-xs"
+                className="h-12 rounded-2xl bg-[var(--p-color-brand-500)] text-white hover:bg-upe-blue-deep font-semibold uppercase tracking-widest text-xs"
               >
                 <DownloadSimple size={18} className="mr-2" weight="bold" />
                 CSV completo
@@ -434,16 +444,24 @@ export default function ExportacaoPage() {
               </Button>
             </div>
           </div>
+          <div className="mt-6">
+            <SkeuoPaperStack
+              title="Dossiê de exportação"
+              subtitle={`${dfds.length} DFDs, ${dfdItems.length} itens e ${consolidado.length} linhas consolidadas.`}
+              stamp={loading ? "Carregando" : "Pronto"}
+              tone={loading ? "warning" : "success"}
+            />
+          </div>
         </div>
 
-        <div className="rounded-[36px] bg-white border border-[#D2D0CE] p-6 shadow-sm flex flex-col gap-4">
+        <div className="rounded-[36px] bg-white border border-[var(--p-color-border)] p-6 shadow-sm flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/40">
+            <p className="type-kicker font-semibold uppercase tracking-[0.2em] text-black/40">
               Saúde Operacional
             </p>
             <button
               onClick={fetchData}
-              className="w-9 h-9 rounded-xl bg-[#E8EDF2] text-[#2D5D94] hover:bg-[#DCEAF0] flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-400)] hover:bg-[var(--p-color-info-border)] flex items-center justify-center"
             >
               <ArrowsClockwise size={18} weight="bold" />
             </button>
@@ -467,6 +485,46 @@ export default function ExportacaoPage() {
         </div>
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <OperationalAccordion
+          items={[
+            {
+              title: "Pacote XLSX",
+              badge: <OperationalChip tone="success">Multiabas</OperationalChip>,
+              defaultOpen: true,
+              content: "Inclui Consolidado, DFDs, Itens, resumos, metadados e cadastros auxiliares disponíveis no carregamento.",
+            },
+            {
+              title: "Pacote CSV",
+              badge: <OperationalChip tone="collab">Arquivo único</OperationalChip>,
+              content: "Usa uma linha por item com os dados da DFD e do item; DFDs sem item também entram no relatório.",
+            },
+          ]}
+        />
+        <div className="rounded-2xl border border-[var(--p-color-border)] bg-white p-4 shadow-sm">
+          <p className="mb-3 text-sm font-semibold text-[var(--p-color-brand-500)]">Como o arquivo é preparado</p>
+          <OperationalTimeline
+            items={[
+              { title: "Coleta", description: "DFDs, itens e cadastros auxiliares são consultados.", tone: "action" },
+              { title: "Enriquecimento", description: "Campi, unidades, perfis e autoria coletiva entram nas planilhas.", tone: "collab" },
+              { title: "Download", description: "O arquivo escolhido é gerado com os dados disponíveis.", tone: "success" },
+            ]}
+          />
+        </div>
+      </div>
+
+      <SkeuoDocumentCard
+        title="Avisos operacionais"
+        meta={reportNotice || "Sem avisos críticos no carregamento atual."}
+        stamp={reportNotice ? "Atenção" : "OK"}
+        tone={reportNotice ? "warning" : "collab"}
+      >
+        <div className="flex flex-wrap gap-2">
+          <OperationalChip tone="warning">{pendingEmailAlerts} e-mails pendentes</OperationalChip>
+          <OperationalChip tone="insight">{Object.keys(lookupSheets).length} bases auxiliares</OperationalChip>
+        </div>
+      </SkeuoDocumentCard>
+
       {reportNotice ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
           {reportNotice}
@@ -474,51 +532,48 @@ export default function ExportacaoPage() {
       ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div className="bg-white border border-[#D2D0CE] rounded-[28px] p-6">
-          <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-            Valor homologado
-          </p>
-          <p className="mt-2 text-3xl font-display font-semibold text-[#164073]">
-            {loading
+        <OperationalKpiCard
+          label="Valor homologado"
+          value={
+            loading
               ? "..."
-              : Number(kpis?.valor_homologado || totalFinanceiro).toLocaleString(
-                  "pt-BR",
-                  { style: "currency", currency: "BRL" },
-                )}
-          </p>
-        </div>
-        <div className="bg-white border border-[#D2D0CE] rounded-[28px] p-6">
-          <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-            Itens consolidados
-          </p>
-          <p className="mt-2 text-3xl font-display font-semibold text-[#164073]">
-            {loading ? "..." : consolidado.length}
-          </p>
-        </div>
-        <div className="bg-white border border-[#D2D0CE] rounded-[28px] p-6">
-          <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-            Itens prioritários
-          </p>
-          <p className="mt-2 text-3xl font-display font-semibold text-[#164073]">
-            {loading ? "..." : consolidado.filter((x) => x.destaque_pareto).length}
-          </p>
-        </div>
-        <div className="bg-white border border-[#D2D0CE] rounded-[28px] p-6">
-          <p className="text-[10px] uppercase tracking-widest text-black/40 font-semibold">
-            DFDs no relatório
-          </p>
-          <p className="mt-2 text-3xl font-display font-semibold text-[#164073]">
-            {loading ? "..." : dfds.length}
-          </p>
-        </div>
+              : Number(kpis?.valor_homologado || totalFinanceiro).toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })
+          }
+          icon={<DownloadSimple size={17} weight="duotone" />}
+          tone="action"
+        />
+        <OperationalKpiCard
+          label="Itens consolidados"
+          value={loading ? "..." : consolidado.length}
+          icon={<Selection size={17} weight="duotone" />}
+          tone="collab"
+          helper="Prévia da tabela"
+        />
+        <OperationalKpiCard
+          label="Itens prioritários"
+          value={loading ? "..." : consolidado.filter((x) => x.destaque_pareto).length}
+          icon={<Lightning size={17} weight="duotone" />}
+          tone="warning"
+          helper="Pareto"
+        />
+        <OperationalKpiCard
+          label="DFDs no relatório"
+          value={loading ? "..." : dfds.length}
+          icon={<FileCsv size={17} weight="duotone" />}
+          tone="success"
+          helper="Inclui sem item"
+        />
       </div>
 
-      <div className="bg-white border border-[#D2D0CE] rounded-[32px] overflow-hidden">
+      <div className="bg-white border border-[var(--p-color-border)] rounded-[32px] overflow-hidden">
         <div className="px-6 py-4 border-b border-black/5 flex items-center justify-between">
-          <h2 className="font-display text-xl font-semibold text-[#164073] uppercase tracking-tight">
+          <h2 className="font-display text-xl font-semibold text-[var(--p-color-brand-500)] uppercase tracking-tight">
             Prévia do Layout de Exportação
           </h2>
-          <span className="text-[10px] uppercase tracking-widest text-black/35 font-semibold">
+          <span className="type-kicker uppercase tracking-widest text-black/35 font-semibold">
             {consolidado.length} linhas
           </span>
         </div>
@@ -526,17 +581,17 @@ export default function ExportacaoPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#F4F7FA]">
-                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest text-black/40">
+              <tr className="bg-[var(--p-color-surface-muted)]">
+                <th className="px-6 py-3 text-left type-kicker uppercase tracking-widest text-black/40">
                   Código
                 </th>
-                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest text-black/40">
+                <th className="px-6 py-3 text-left type-kicker uppercase tracking-widest text-black/40">
                   Descrição
                 </th>
-                <th className="px-6 py-3 text-right text-[10px] uppercase tracking-widest text-black/40">
+                <th className="px-6 py-3 text-right type-kicker uppercase tracking-widest text-black/40">
                   Quantidade
                 </th>
-                <th className="px-6 py-3 text-right text-[10px] uppercase tracking-widest text-black/40">
+                <th className="px-6 py-3 text-right type-kicker uppercase tracking-widest text-black/40">
                   Valor
                 </th>
               </tr>
@@ -552,17 +607,17 @@ export default function ExportacaoPage() {
                 ))}
               {!loading &&
                 consolidado.slice(0, 20).map((item) => (
-                  <tr key={item.codigo_tce} className="hover:bg-[#F3F2F1]">
-                    <td className="px-6 py-3 font-mono text-xs text-[#2D5D94]">
+                  <tr key={item.codigo_tce} className="hover:bg-[var(--p-color-bg-muted)]">
+                    <td className="px-6 py-3 font-mono text-xs text-[var(--p-color-brand-400)]">
                       {item.codigo_tce}
                     </td>
-                    <td className="px-6 py-3 font-semibold text-[#1C1B1F]">
+                    <td className="px-6 py-3 font-semibold text-[var(--p-color-fg-strong)]">
                       {item.descricao}
                     </td>
                     <td className="px-6 py-3 text-right font-semibold text-black/60">
                       {item.quantidade_total}
                     </td>
-                    <td className="px-6 py-3 text-right font-semibold text-[#164073]">
+                    <td className="px-6 py-3 text-right font-semibold text-[var(--p-color-brand-500)]">
                       {Number(item.valor_total_estimado || 0).toLocaleString(
                         "pt-BR",
                         { style: "currency", currency: "BRL" },
@@ -573,12 +628,12 @@ export default function ExportacaoPage() {
               {!loading && consolidado.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3 text-black/40">
-                      <Lightning size={28} weight="duotone" />
-                      <p className="text-sm font-semibold uppercase tracking-widest">
-                        Sem dados consolidados para exportação
-                      </p>
-                    </div>
+                    <OperationalEmptyState
+                      icon={<Lightning size={28} weight="duotone" />}
+                      title="Sem dados consolidados para exportação"
+                      description="Quando houver DFDs ou itens elegíveis, a prévia e os downloads serão habilitados."
+                      className="border-0 p-4 shadow-none"
+                    />
                   </td>
                 </tr>
               )}
@@ -599,11 +654,13 @@ export default function ExportacaoPage() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-[#F4F7FA] border border-black/5 rounded-xl px-3 py-2 flex justify-between items-center">
-      <span className="text-[10px] uppercase tracking-wider text-black/45 font-semibold">
+    <div className="bg-[var(--p-color-surface-muted)] border border-black/5 rounded-xl px-3 py-2 flex justify-between items-center">
+      <span className="type-kicker uppercase tracking-wider text-black/45 font-semibold">
         {label}
       </span>
-      <span className="font-display font-semibold text-[#164073]">{value}</span>
+      <span className="min-w-0 overflow-visible font-display font-semibold text-[var(--p-color-brand-500)]">
+        <MechanicalValue value={value} />
+      </span>
     </div>
   );
 }

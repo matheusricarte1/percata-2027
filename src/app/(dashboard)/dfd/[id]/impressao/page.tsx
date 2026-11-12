@@ -1,12 +1,28 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Printer, DownloadSimple, SealCheck, X } from "@phosphor-icons/react";
+import { Printer } from "@/components/icons/phosphor/exports/Printer";
+import { DownloadSimple } from "@/components/icons/phosphor/exports/DownloadSimple";
+import { SealCheck } from "@/components/icons/phosphor/exports/SealCheck";
+import { X } from "@/components/icons/phosphor/exports/X";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { resolveCampusBranding } from "@/lib/campus-branding";
 import { buildDfdPrintExportCsv } from "@/lib/dfd-print-export";
+import {
+  formatCollectiveJustificationText,
+  formatParsedCollectiveDistribution,
+  parseCollectiveDistributionText,
+  type ParsedCollectiveContributor,
+} from "@/lib/collective-dfd";
+import {
+  DFD_PLANNING_FIELD_LABELS,
+  DFD_PLANNING_FIELD_ORDER,
+  hasPlanningSubsidies,
+  type DfdPlanningSubsidies,
+} from "@/lib/dfd-planning";
+import { AvatarStack } from "@/components/user/AvatarStack";
 import QRCode from "qrcode";
 
 interface PrintItem {
@@ -15,6 +31,19 @@ interface PrintItem {
   qtd: number;
   un: string;
   valor: number;
+  gnd?: string;
+  natureza?: string;
+  localUso?: string;
+  justificativa?: string;
+  linkReferencia?: string;
+  distribuicaoUsuarios: ParsedCollectiveContributor[];
+}
+
+interface PrintAuthor {
+  nome: string;
+  email: string;
+  quantidadeTotal: number;
+  valorTotalEstimado: number;
 }
 
 interface PrintData {
@@ -32,10 +61,12 @@ interface PrintData {
   campusSigla: string;
   objeto: string;
   justificativa: string;
+  planning_subsidies?: DfdPlanningSubsidies | null;
   gnd: string;
   origem?: string;
   salaColetiva?: string;
   coautores?: string;
+  coautoresDetalhados: PrintAuthor[];
   itens: PrintItem[];
 }
 
@@ -130,6 +161,12 @@ export default function DFDPrintPage() {
           qtd: Number(item.quantidade || 0),
           un: item.unidade_medida || "UN",
           valor: Number(item.valor_unitario_estimado || 0),
+          gnd: String(item.gnd || item.gnd_derivado || "").trim(),
+          natureza: String(item.codigo_natureza_despesa || "").trim(),
+          localUso: String(item.local_uso || "").trim(),
+          justificativa: formatCollectiveJustificationText(item.justificativa_item),
+          linkReferencia: String(item.link_referencia || "").trim(),
+          distribuicaoUsuarios: parseCollectiveDistributionText(item.justificativa_item),
         }));
 
         const gndCounter = new Map<string, number>();
@@ -197,6 +234,7 @@ export default function DFDPrintPage() {
           justificativa:
             dfdData?.justificativa_contratacao ||
             "Sem justificativa cadastrada para esta demanda.",
+          planning_subsidies: dfdData?.planning_subsidies || {},
           gnd: gndPrincipal,
           origem:
             dfdData?.origin_type === "collective"
@@ -211,6 +249,14 @@ export default function DFDPrintPage() {
               return `${name} (qtd ${Number(author.quantidade_total || 0)})`;
             })
             .join("; "),
+          coautoresDetalhados: (authorsResult.data || []).map((author: any) => ({
+            nome: String(
+              author.author_name_snapshot || author.author_email_snapshot || "Autor não identificado",
+            ).trim(),
+            email: String(author.author_email_snapshot || "").trim(),
+            quantidadeTotal: Number(author.quantidade_total || 0),
+            valorTotalEstimado: Number(author.valor_total_estimado || 0),
+          })),
           itens: items,
         };
         setData(normalizedData);
@@ -258,7 +304,33 @@ export default function DFDPrintPage() {
 
   const exportData = () => {
     if (!data) return;
-    const csv = buildDfdPrintExportCsv(data);
+    const csv = buildDfdPrintExportCsv({
+      ...data,
+      sala_coletiva: data.salaColetiva,
+      coautores_detalhados: data.coautoresDetalhados.map((author) => ({
+        nome: author.nome,
+        email: author.email,
+        quantidade_total: author.quantidadeTotal,
+        valor_total_estimado: author.valorTotalEstimado,
+      })),
+      itens: data.itens.map((item) => ({
+        cod: item.cod,
+        desc: item.desc,
+        qtd: item.qtd,
+        un: item.un,
+        valor: item.valor,
+        gnd: item.gnd,
+        natureza: item.natureza,
+        local_uso: item.localUso,
+        justificativa_item: item.justificativa,
+        link_referencia: item.linkReferencia,
+        distribuicao_usuarios: formatParsedCollectiveDistribution(item.distribuicaoUsuarios),
+        distribuicao_usuarios_json:
+          item.distribuicaoUsuarios.length > 0
+            ? JSON.stringify(item.distribuicaoUsuarios)
+            : "",
+      })),
+    });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -273,8 +345,8 @@ export default function DFDPrintPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F4F7FA]">
-        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#5B6675]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--p-color-surface-muted)]">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-muted)]">
           Preparando documento de impressão...
         </p>
       </div>
@@ -283,8 +355,8 @@ export default function DFDPrintPage() {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F4F7FA]">
-        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#5B6675]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--p-color-surface-muted)]">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-muted)]">
           DFD não encontrada para impressão.
         </p>
       </div>
@@ -294,11 +366,11 @@ export default function DFDPrintPage() {
   const branding = resolveCampusBranding(data.campus || data.campusSigla);
 
   return (
-    <div className="flex min-h-screen flex-col items-center gap-6 bg-[#F4F7FA] p-8 print:bg-white print:p-0">
+    <div className="flex min-h-screen flex-col items-center gap-6 bg-[var(--p-color-surface-muted)] p-8 print:bg-white print:p-0">
       <div className="print:hidden flex gap-3">
         <button
           onClick={handleBack}
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-4 text-sm font-semibold text-[#3E4C5F] transition hover:bg-[#F4F7FA]"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-white px-4 text-sm font-semibold text-[var(--p-color-fg-muted)] transition hover:bg-[var(--p-color-surface-muted)]"
           aria-label="Voltar para a tela anterior"
         >
           <X size={16} weight="bold" />
@@ -306,32 +378,32 @@ export default function DFDPrintPage() {
         </button>
         <button
           onClick={() => window.print()}
-          className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#164073] px-5 text-sm font-semibold text-white transition hover:bg-[#0F2E57]"
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--p-color-brand-500)] px-5 text-sm font-semibold text-white transition hover:bg-[var(--p-color-brand-600)]"
         >
           <Printer size={18} weight="fill" />
           Imprimir / Salvar PDF
         </button>
         <button
           onClick={exportData}
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D9E0E8] bg-white px-5 text-sm font-semibold text-[#3E4C5F] transition hover:bg-[#F4F7FA]"
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--p-color-border)] bg-white px-5 text-sm font-semibold text-[var(--p-color-fg-muted)] transition hover:bg-[var(--p-color-surface-muted)]"
         >
           <DownloadSimple size={18} />
           Exportar dados
         </button>
       </div>
 
-      <div className="w-full max-w-[210mm] min-h-[297mm] border border-[#D9E0E8] bg-white p-[16mm] shadow-2xl print:border-none print:shadow-none">
-        <header className="rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] p-5">
+      <div className="w-full max-w-[210mm] min-h-[297mm] border border-[var(--p-color-border)] bg-white p-[16mm] shadow-2xl print:border-none print:shadow-none">
+        <header className="rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+              <p className="type-kicker font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
                 Documento de Formalização de Demanda
               </p>
-              <h1 className="text-2xl font-semibold tracking-tight text-[#164073]">
+              <h1 className="text-2xl font-semibold tracking-tight text-[var(--p-color-brand-500)]">
                 {data.protocolo}
               </h1>
-              <p className="text-xs text-[#5B6675]">{data.data}</p>
-              <span className="inline-flex rounded-full bg-[#E8EDF2] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#164073]">
+              <p className="text-xs text-[var(--p-color-fg-muted)]">{data.data}</p>
+              <span className="inline-flex rounded-full bg-[var(--p-color-surface-subtle)] px-3 py-1 type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-brand-500)]">
                 Status Atual: {data.status}
               </span>
             </div>
@@ -343,7 +415,7 @@ export default function DFDPrintPage() {
                 className="h-[52px] w-auto object-contain"
               />
               <span
-                className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                className="rounded-full px-3 py-1 type-kicker font-semibold uppercase tracking-[0.12em]"
                 style={{ backgroundColor: branding.accentSoft, color: branding.accent }}
               >
                 {data.campus}
@@ -372,22 +444,101 @@ export default function DFDPrintPage() {
           />
         </section>
 
-        <section className="mt-5 rounded-2xl border border-[#D9E0E8] p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+        <section className="mt-5 rounded-2xl border border-[var(--p-color-border)] p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
             Objeto da Contratação
           </h2>
-          <p className="mt-2 text-base font-semibold text-[#164073]">{data.objeto}</p>
+          <p className="mt-2 text-base font-semibold text-[var(--p-color-brand-500)]">{data.objeto}</p>
 
-          <h3 className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#7D98B8]">
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
             Justificativa da Necessidade
           </h3>
-          <p className="mt-2 text-sm leading-relaxed text-[#3E4C5F]">{data.justificativa}</p>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--p-color-fg-muted)]">{data.justificativa}</p>
         </section>
 
-        <section className="mt-5 rounded-2xl border border-[#D9E0E8] overflow-hidden">
+        {data.origem === "DFD coletiva convertida" ? (
+          <section className="mt-5 rounded-2xl border border-[var(--p-color-info-border)] bg-[var(--p-color-info-bg)] p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--p-color-brand-500)]">
+              Coautoria coletiva
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <InfoCard label="Origem" value={data.origem} />
+              <InfoCard label="Sala coletiva" value={data.salaColetiva || "Não informada"} />
+            </div>
+            {data.coautoresDetalhados.length > 0 ? (
+              <>
+                <AvatarStack
+                  members={data.coautoresDetalhados.map((author, index) => ({
+                    id: author.email || `${author.nome}-${index}`,
+                    name: author.nome,
+                    email: author.email || null,
+                    avatarUrl: null,
+                  }))}
+                  total={data.coautoresDetalhados.length}
+                  label={`${data.coautoresDetalhados.length} coautor(es) preservados`}
+                  size="sm"
+                  className="mt-3"
+                />
+                <div className="mt-3 overflow-hidden rounded-xl border border-[var(--p-color-border)] bg-white">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)] uppercase tracking-[0.12em]">
+                        <th className="px-3 py-2 text-left">Usuário</th>
+                        <th className="px-3 py-2 text-left">E-mail</th>
+                        <th className="px-3 py-2 text-center">Qtd.</th>
+                        <th className="px-3 py-2 text-right">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.coautoresDetalhados.map((author, index) => (
+                        <tr key={`${author.email}-${index}`} className="border-t border-[var(--p-color-surface-subtle)]">
+                          <td className="px-3 py-2 font-medium text-[var(--p-color-fg-default)]">{author.nome}</td>
+                          <td className="px-3 py-2 text-[var(--p-color-fg-muted)]">{author.email || "Não informado"}</td>
+                          <td className="px-3 py-2 text-center text-[var(--p-color-fg-default)]">{author.quantidadeTotal}</td>
+                          <td className="px-3 py-2 text-right text-[var(--p-color-brand-500)]">
+                            {author.valorTotalEstimado.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
+          </section>
+        ) : null}
+
+        {hasPlanningSubsidies(data.planning_subsidies) ? (
+          <section className="mt-5 rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-subtle)]">
+              Complementos do planejamento
+            </h2>
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              {DFD_PLANNING_FIELD_ORDER.map((field) => {
+                const text = String(data.planning_subsidies?.[field] || "").trim();
+                if (!text) return null;
+                return (
+                  <div key={field} className="rounded-xl border border-[var(--p-color-border)] bg-white px-3 py-2">
+                    <p className="type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
+                      {DFD_PLANNING_FIELD_LABELS[field]}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--p-color-fg-muted)]">
+                      {text}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="mt-5 rounded-2xl border border-[var(--p-color-border)] overflow-hidden">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#E8EDF2] text-[#164073] uppercase tracking-[0.12em]">
+              <tr className="bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-500)] uppercase tracking-[0.12em]">
                 <th className="px-3 py-2 text-left">Código</th>
                 <th className="px-3 py-2 text-left">Descrição</th>
                 <th className="px-3 py-2 text-center">Qtd</th>
@@ -398,18 +549,48 @@ export default function DFDPrintPage() {
             </thead>
             <tbody>
               {data.itens.map((item, index) => (
-                <tr key={`${item.cod}-${index}`} className="border-t border-[#E8EDF2] align-top">
-                  <td className="px-3 py-3 font-semibold text-[#3E4C5F]">{item.cod}</td>
-                  <td className="px-3 py-3 text-[#2E3A4A]">{item.desc}</td>
-                  <td className="px-3 py-3 text-center text-[#2E3A4A]">{item.qtd}</td>
-                  <td className="px-3 py-3 text-center text-[#2E3A4A]">{item.un}</td>
-                  <td className="px-3 py-3 text-right text-[#2E3A4A]">
+                <tr key={`${item.cod}-${index}`} className="border-t border-[var(--p-color-surface-subtle)] align-top">
+                  <td className="px-3 py-3 font-semibold text-[var(--p-color-fg-muted)]">{item.cod}</td>
+                  <td className="px-3 py-3 text-[var(--p-color-fg-default)]">
+                    <p>{item.desc}</p>
+                    <div className="mt-2 grid gap-1 type-kicker leading-relaxed text-[var(--p-color-fg-muted)]">
+                      {item.gnd || item.natureza ? (
+                        <p>
+                          <span className="font-semibold uppercase text-[var(--p-color-brand-500)]">Natureza/GND:</span>{" "}
+                          {[item.natureza, item.gnd].filter(Boolean).join(" · ")}
+                        </p>
+                      ) : null}
+                      {item.localUso ? (
+                        <p>
+                          <span className="font-semibold uppercase text-[var(--p-color-brand-500)]">Local:</span>{" "}
+                          {item.localUso}
+                        </p>
+                      ) : null}
+                      {item.justificativa ? (
+                        <p className="whitespace-pre-wrap">
+                          <span className="font-semibold uppercase text-[var(--p-color-brand-500)]">Justificativa:</span>{" "}
+                          {item.justificativa}
+                        </p>
+                      ) : null}
+                      {item.distribuicaoUsuarios.length > 0 ? (
+                        <p>
+                          <span className="font-semibold uppercase text-[var(--p-color-brand-500)]">
+                            Distribuição por usuário:
+                          </span>{" "}
+                          {formatParsedCollectiveDistribution(item.distribuicaoUsuarios)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-center text-[var(--p-color-fg-default)]">{item.qtd}</td>
+                  <td className="px-3 py-3 text-center text-[var(--p-color-fg-default)]">{item.un}</td>
+                  <td className="px-3 py-3 text-right text-[var(--p-color-fg-default)]">
                     {item.valor.toLocaleString("pt-BR", {
                       style: "currency",
                       currency: "BRL",
                     })}
                   </td>
-                  <td className="px-3 py-3 text-right font-semibold text-[#164073]">
+                  <td className="px-3 py-3 text-right font-semibold text-[var(--p-color-brand-500)]">
                     {(item.qtd * item.valor).toLocaleString("pt-BR", {
                       style: "currency",
                       currency: "BRL",
@@ -420,11 +601,11 @@ export default function DFDPrintPage() {
             </tbody>
           </table>
 
-          <div className="flex items-center justify-between border-t border-[#D9E0E8] bg-[#F4F7FA] px-4 py-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5B6675]">
+          <div className="flex items-center justify-between border-t border-[var(--p-color-border)] bg-[var(--p-color-surface-muted)] px-4 py-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--p-color-fg-muted)]">
               GND predominante: {data.gnd}
             </span>
-            <span className="text-lg font-semibold text-[#164073]">
+            <span className="text-lg font-semibold text-[var(--p-color-brand-500)]">
               {total.toLocaleString("pt-BR", {
                 style: "currency",
                 currency: "BRL",
@@ -433,19 +614,19 @@ export default function DFDPrintPage() {
           </div>
         </section>
 
-        <footer className="mt-8 grid grid-cols-[1fr_auto] gap-4 rounded-2xl border border-[#D9E0E8] bg-[#FAFBFC] p-4">
+        <footer className="mt-8 grid grid-cols-[1fr_auto] gap-4 rounded-2xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] p-4">
           <div>
-            <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#164073]">
+            <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--p-color-brand-500)]">
               <SealCheck size={14} />
               Validação de Integridade
             </p>
-            <p className="mt-2 text-[11px] text-[#5B6675]">
+            <p className="mt-2 type-caption text-[var(--p-color-fg-muted)]">
               Este PDF foi emitido pelo PERCATA com assinatura criptográfica SHA-256.
             </p>
-            <p className="mt-1 font-mono text-[10px] text-[#3E4C5F] break-all">
+            <p className="mt-1 font-mono type-kicker text-[var(--p-color-fg-muted)] break-all">
               {signature || "assinatura indisponível"}
             </p>
-            <p className="mt-1 text-[10px] text-[#7D98B8]">
+            <p className="mt-1 type-kicker text-[var(--p-color-fg-subtle)]">
               Escaneie o QR Code para validar autenticidade no PERCATA.
             </p>
           </div>
@@ -454,10 +635,10 @@ export default function DFDPrintPage() {
               <img
                 src={qrDataUrl}
                 alt="QR Code de verificação da DFD"
-                className="h-[108px] w-[108px] rounded-md border border-[#D9E0E8] bg-white p-1"
+                className="h-[108px] w-[108px] rounded-md border border-[var(--p-color-border)] bg-white p-1"
               />
             ) : (
-              <div className="flex h-[108px] w-[108px] items-center justify-center rounded-md border border-dashed border-[#D9E0E8] text-[10px] text-[#A7B1BD]">
+              <div className="flex h-[108px] w-[108px] items-center justify-center rounded-md border border-dashed border-[var(--p-color-border)] type-kicker text-[var(--p-color-border-strong)]">
                 QR indisponível
               </div>
             )}
@@ -470,11 +651,11 @@ export default function DFDPrintPage() {
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+    <div className="rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] px-3 py-2">
+      <p className="type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
         {label}
       </p>
-      <p className="mt-1 text-sm font-medium text-[#2E3A4A]">{value}</p>
+      <p className="mt-1 text-sm font-medium text-[var(--p-color-fg-default)]">{value}</p>
     </div>
   );
 }
@@ -497,23 +678,23 @@ function AvatarCard({
     .toUpperCase();
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[#D9E0E8] bg-[#FAFBFC] p-3">
+    <div className="flex items-center gap-3 rounded-xl border border-[var(--p-color-border)] bg-[var(--p-color-bg-elevated)] p-3">
       {avatarUrl ? (
         <img
           src={avatarUrl}
           alt={name}
-          className="h-10 w-10 rounded-full border border-[#D9E0E8] object-cover"
+          className="h-10 w-10 rounded-full border border-[var(--p-color-border)] object-cover"
         />
       ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E8EDF2] text-xs font-semibold text-[#164073]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--p-color-surface-subtle)] text-xs font-semibold text-[var(--p-color-brand-500)]">
           {initials}
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7D98B8]">
+        <p className="type-kicker font-semibold uppercase tracking-[0.12em] text-[var(--p-color-fg-subtle)]">
           {title}
         </p>
-        <p className="truncate text-sm font-medium text-[#2E3A4A]">{name}</p>
+        <p className="truncate text-sm font-medium text-[var(--p-color-fg-default)]">{name}</p>
       </div>
     </div>
   );

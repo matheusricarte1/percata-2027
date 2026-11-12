@@ -6,6 +6,7 @@ import {
   type DfdDraftPayload,
   type DfdDraftSnapshot,
 } from "@/lib/dfd-draft-schema";
+import { buildDfdDraftCartSaveInput } from "@/lib/dfd-draft-cart";
 
 /**
  * Server Actions para o rascunho do wizard nova-dfd.
@@ -88,17 +89,49 @@ export async function saveDfdDraftAction(params: {
   }
 }
 
-export async function clearDfdDraftAction(): Promise<{ ok: boolean }> {
+/**
+ * Persiste o carrinho enquanto ele ainda é uma seleção, antes de o usuário
+ * chegar ao wizard. A função SQL atualiza somente payload.cartItems, de modo
+ * que não substitui os campos do formulário já salvos no rascunho.
+ */
+export async function saveDfdDraftCartAction(params: {
+  cartItems: unknown[];
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const cartItems = buildDfdDraftCartSaveInput(params.cartItems || []);
+    const serialized = JSON.stringify(cartItems);
+    if (serialized.length > 512_000) {
+      return { ok: false, error: "Carrinho excede o tamanho máximo permitido no rascunho." };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Não autenticado." };
+
+    const { error } = await supabase.rpc("save_dfd_draft_cart", {
+      p_cart_items: cartItems,
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Erro ao salvar itens do rascunho." };
+  }
+}
+
+export async function clearDfdDraftAction(): Promise<{ ok: boolean; error?: string }> {
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return { ok: false };
+    if (!user) return { ok: false, error: "Não autenticado." };
 
-    await supabase.from("dfd_drafts").delete().eq("user_id", user.id);
+    const { error } = await supabase.from("dfd_drafts").delete().eq("user_id", user.id);
+    if (error) return { ok: false, error: error.message };
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "Erro ao descartar rascunho." };
   }
 }

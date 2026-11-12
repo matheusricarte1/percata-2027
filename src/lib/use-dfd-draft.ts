@@ -6,7 +6,16 @@ import {
   loadDfdDraftAction,
   saveDfdDraftAction,
 } from "@/app/actions/dfdDraftActions";
-import type { DfdDraftPayload, DfdDraftSnapshot } from "@/lib/dfd-draft-schema";
+import {
+  readLocalJson,
+  removeLocalJson,
+  writeLocalJson,
+} from "@/lib/browser-storage";
+import {
+  DFD_DRAFT_SCHEMA_VERSION,
+  type DfdDraftPayload,
+  type DfdDraftSnapshot,
+} from "@/lib/dfd-draft-schema";
 
 /**
  * Hook de rascunho do wizard DFD com autosave debounced.
@@ -28,8 +37,32 @@ import type { DfdDraftPayload, DfdDraftSnapshot } from "@/lib/dfd-draft-schema";
  */
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
+type DraftSaveLocation = "server" | "local";
+type DraftSaveResult = { ok: true; location: DraftSaveLocation } | { ok: false };
 
 const DEBOUNCE_MS = 1500;
+const LOCAL_DRAFT_KEY = "percata:dfd-draft:v1";
+
+function isMissingDraftTableError(error: unknown) {
+  const message = String((error as any)?.message || error || "").toLowerCase();
+  return message.includes("dfd_drafts") && message.includes("schema cache");
+}
+
+function isExpiredSnapshot(snapshot: DfdDraftSnapshot | null) {
+  if (!snapshot) return true;
+  return snapshot.expires_at ? new Date(snapshot.expires_at).getTime() < Date.now() : false;
+}
+
+function buildLocalSnapshot(payload: DfdDraftPayload, step: string | null): DfdDraftSnapshot {
+  const now = new Date();
+  return {
+    payload,
+    schema_version: DFD_DRAFT_SCHEMA_VERSION,
+    current_step: step,
+    updated_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
 
 function hashPayload(payload: DfdDraftPayload): number {
   // FNV-1a 32-bit. Suficiente para detectar mudança.
@@ -45,6 +78,7 @@ function hashPayload(payload: DfdDraftPayload): number {
 export function useDfdDraft() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<DfdDraftSnapshot | null>(null);
+  const [location, setLocation] = useState<DraftSaveLocation | null>(null);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -54,7 +88,8 @@ export function useDfdDraft() {
     step: string | null;
   } | null>(null);
   const lastHashRef = useRef<number | null>(null);
-  const inFlightRef = useRef<Promise<void> | null>(null);
+  const inFlightRef = useRef<Promise<DraftSaveResult> | null>(null);
+  const lastSaveLocationRef = useRef<DraftSaveLocation>("server");
 
   // Carrega ao montar.
   useEffect(() => {
@@ -62,7 +97,22 @@ export function useDfdDraft() {
     (async () => {
       try {
         const snap = await loadDfdDraftAction();
-        if (!cancelled) setDraft(snap);
+        if (cancelled) return;
+        if (snap) {
+          setDraft(snap);
+          setLocation("server");
+          writeLocalJson(LOCAL_DRAFT_KEY, snap);
+          lastHashRef.current = hashPayload(snap.payload);
+          lastSaveLocationRef.current = "server";
+          return;
+        }
+        const localSnap = readLocalJson<DfdDraftSnapshot>(LOCAL_DRAFT_KEY);
+        if (localSnap && !isExpiredSnapshot(localSnap)) {
+          setDraft(localSnap);
+          setLocation("local");
+          lastHashRef.current = hashPayload(localSnap.payload);
+          lastSaveLocationRef.current = "local";
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -72,44 +122,61 @@ export function useDfdDraft() {
     };
   }, []);
 
-  const performSave = useCallback(async () => {
+  const performSave = useCallback(async (): Promise<DraftSaveResult> => {
     const pending = pendingRef.current;
-    if (!pending) return;
+    if (!pending) return { ok: true, location: lastSaveLocationRef.current };
     pendingRef.current = null;
 
     const hash = hashPayload(pending.payload);
     if (lastHashRef.current === hash) {
       // Nada mudou — não bate no servidor.
       setStatus("saved");
-      return;
+      return { ok: true, location: lastSaveLocationRef.current };
     }
 
     setStatus("saving");
     setLastError(null);
-    const inFlight = saveDfdDraftAction({
+    const inFlight: Promise<DraftSaveResult> = saveDfdDraftAction({
       payload: pending.payload,
       currentStep: pending.step,
     })
-      .then((res) => {
+      .then((res): DraftSaveResult => {
         if (res.ok) {
           lastHashRef.current = hash;
+          writeLocalJson(LOCAL_DRAFT_KEY, buildLocalSnapshot(pending.payload, pending.step));
           setStatus("saved");
+          lastSaveLocationRef.current = "server";
+          setLocation("server");
+          return { ok: true, location: "server" };
         } else {
+          if (isMissingDraftTableError(res.error)) {
+            lastHashRef.current = hash;
+            writeLocalJson(LOCAL_DRAFT_KEY, buildLocalSnapshot(pending.payload, pending.step));
+            setStatus("saved");
+            setLastError(null);
+            lastSaveLocationRef.current = "local";
+            setLocation("local");
+            return { ok: true, location: "local" };
+          }
           setStatus("error");
           setLastError(res.error || "Falha ao salvar rascunho.");
+          return { ok: false };
         }
       })
-      .catch((err) => {
+      .catch((err): DraftSaveResult => {
         setStatus("error");
         setLastError(err?.message || "Falha ao salvar rascunho.");
+        return { ok: false };
       });
     inFlightRef.current = inFlight;
-    await inFlight;
+    const saved = await inFlight;
     if (inFlightRef.current === inFlight) inFlightRef.current = null;
+    return saved;
   }, []);
 
   const save = useCallback(
     (payload: DfdDraftPayload, step?: string | null) => {
+      setStatus("saving");
       pendingRef.current = { payload, step: step ?? null };
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
@@ -127,7 +194,7 @@ export function useDfdDraft() {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-      await performSave();
+      return performSave();
     },
     [performSave],
   );
@@ -147,11 +214,22 @@ export function useDfdDraft() {
       timerRef.current = null;
     }
     pendingRef.current = null;
+    if (location !== "local") {
+      const result = await clearDfdDraftAction();
+      if (!result.ok) {
+        setStatus("error");
+        setLastError(result.error || "Não foi possível descartar o rascunho no PERCATA.");
+        return false;
+      }
+    }
     lastHashRef.current = null;
-    await clearDfdDraftAction();
+    removeLocalJson(LOCAL_DRAFT_KEY);
     setDraft(null);
+    setLocation(null);
     setStatus("idle");
-  }, []);
+    setLastError(null);
+    return true;
+  }, [location]);
 
   // beforeunload: tenta flushar (best effort — browsers cortam após ~1s).
   useEffect(() => {
@@ -170,6 +248,7 @@ export function useDfdDraft() {
   return {
     loading,
     draft,
+    location,
     status,
     lastError,
     save,

@@ -10,6 +10,7 @@ import {
   upsertContribution,
 } from "@/lib/collective-room-api";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { submissionOperationError } from "@/lib/submission-policy-server";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -32,11 +33,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const room = await loadRoomOrNull(admin, id);
     if (!room) return apiError("DFD coletiva nao encontrada.", 404);
     if (!actorHasUnit(actor, room.unit_id, room.unit_type)) return apiError("Acesso negado.", 403);
-    // RACE CONDITION FIX (Onda 1, P2): o check de status sem row lock permitia
-    // que dois PATCH mudassem o status entre check e upsert. A solução real
-    // é mover para uma RPC com SELECT ... FOR UPDATE. Por ora, mantemos o
-    // check aqui mas o upsert é idempotente (chave única por user+key) e o
-    // audit_log (migration 0039) captura a sequência exata caso aconteça.
+    // The database RPC locks the room and rechecks status and deadline at write time.
     if (room.status !== "aberta") {
       return apiError("A DFD coletiva precisa estar aberta para receber contribuicoes.", 409);
     }
@@ -55,6 +52,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ contribution: saved }, { status: 201 });
   } catch (error: any) {
+    if (/SUBMISSION_CLOSED|STATUS_CHANGED|FORBIDDEN/.test(String(error?.message))) { const mapped = submissionOperationError(error.message); return apiError(mapped.error, mapped.status); }
     return apiError(error?.message || "Erro ao adicionar contribuicao.", 500);
   }
 }

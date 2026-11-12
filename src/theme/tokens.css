@@ -15,10 +15,9 @@
  *   - quando MUI for removido (ver docs/MIGRATION_REMOVE_MUI.md),
  *     este arquivo se torna a única fonte real.
  *
- * Dark mode: ativado por `html[data-theme-mode="dark"]`. Hoje há 3 ativadores
- * conflitantes (InitColorSchemeScript do MUI, manual via dataset, e
- * next-themes em Sonner). O patch separado em providers/AppProviders.tsx
- * deve eleger 1 só dono — este arquivo apenas define os valores.
+ * Dark mode: ativado por `html[data-theme-mode="dark"]`. O AppProviders é o
+ * dono prático do dataset; MUI ainda participa enquanto a remoção gradual não
+ * for concluída. Este arquivo apenas define os valores.
  */
 
 :root {
@@ -38,11 +37,18 @@
   --p-color-bg: #ffffff;
   --p-color-bg-elevated: #fafbfc;
   --p-color-bg-muted: #f3f2f1;
+  --p-color-surface: #ffffff;
+  --p-color-surface-soft: #f8fafc;
+  --p-color-surface-muted: #f4f7fa;
+  --p-color-surface-subtle: #e8edf2;
   --p-color-fg: #17233c;
+  --p-color-fg-strong: #1e2430;
+  --p-color-fg-default: #2e3a4a;
   --p-color-fg-muted: #5b6675;
   --p-color-fg-subtle: #7d98b8;
   --p-color-border: #d9e0e8;
   --p-color-border-strong: #b3c0d4;
+  --p-color-border-muted: #e8edf2;
 
   --p-color-success: #2f6b3f;
   --p-color-success-bg: #e7f0ea;
@@ -60,11 +66,21 @@
   --p-color-info-bg: #eaf2ff;
   --p-color-info-border: #c7d7ea;
 
+  --p-color-collab: #1f6f78;
+  --p-color-collab-hover: #155a62;
+  --p-color-collab-bg: #e6f5f4;
+  --p-color-collab-border: #b8dddd;
+  --p-color-insight: #7a5fb4;
+  --p-color-insight-bg: #f3efff;
+  --p-color-insight-border: #d9cdf7;
+
   /* Ação primária (CTA) — mapeia para brand por padrão. */
   --p-color-action: var(--p-color-brand-500);
   --p-color-action-hover: var(--p-color-brand-600);
   --p-color-action-active: var(--p-color-brand-700);
   --p-color-action-fg: #ffffff;
+  --p-color-scrim-strong: rgba(3, 12, 31, 0.45);
+  --p-color-scrim-soft: rgba(3, 12, 31, 0.35);
 
   /* ============ Raio ============ */
   --p-radius-xs: 4px;
@@ -84,6 +100,8 @@
     0 8px 24px rgba(0, 0, 0, 0.06);
   --p-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.1),
     0 16px 48px rgba(0, 0, 0, 0.08);
+  --p-shadow-action: 0 12px 24px rgba(22, 64, 115, 0.18);
+  --p-shadow-selection-collab: inset 4px 0 0 var(--p-color-collab);
 
   /* ============ Movimento ============ */
   --p-motion-fast: 120ms;
@@ -100,11 +118,31 @@
   --p-focus-ring-offset: 2px;
 
   /* ============ Tipografia ============ */
-  --p-font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+  --p-font-sans: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
     sans-serif;
-  --p-font-display: "Outfit", var(--p-font-sans);
+  --p-font-display: var(--font-outfit), "Outfit", var(--p-font-sans);
   --p-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     monospace;
+  --p-type-display-xl-size: 3rem;
+  --p-type-display-xl-line: 3.5rem;
+  --p-type-display-lg-size: 2.25rem;
+  --p-type-display-lg-line: 2.75rem;
+  --p-type-title-lg-size: 1.5rem;
+  --p-type-title-lg-line: 2rem;
+  --p-type-title-md-size: 1.25rem;
+  --p-type-title-md-line: 1.75rem;
+  --p-type-body-size: 0.875rem;
+  --p-type-body-line: 1.5rem;
+  --p-type-caption-size: 0.75rem;
+  --p-type-caption-line: 1rem;
+  --p-type-kicker-size: 0.625rem;
+  --p-type-kicker-line: 0.875rem;
+  --p-type-micro-size: 0.5625rem;
+  --p-type-micro-line: 0.75rem;
+  --p-type-control-size: 0.75rem;
+  --p-type-control-line: 1rem;
+  --p-type-letter-kicker: 0.14em;
+  --p-type-letter-control: 0.1em;
 
   /* ============ Compat (mapeia tokens legados) ============ */
   /* MD/Material Web */
@@ -114,6 +152,29 @@
   --upe-blue-upe: var(--p-color-brand-500);
   /* Semantic legacy */
   --semantic-action: var(--p-color-action);
+  --semantic-action-strong: var(--p-color-action-hover);
+  --semantic-action-soft: var(--p-color-info-bg);
+  --semantic-action-border: var(--p-color-info-border);
+  --semantic-collab: var(--p-color-collab);
+  --semantic-collab-strong: var(--p-color-collab-hover);
+  --semantic-collab-soft: var(--p-color-collab-bg);
+  --semantic-collab-border: var(--p-color-collab-border);
+  --semantic-success: var(--p-color-success);
+  --semantic-success-soft: var(--p-color-success-bg);
+  --semantic-success-border: var(--p-color-success-border);
+  --semantic-warning: var(--p-color-warning);
+  --semantic-warning-soft: var(--p-color-warning-bg);
+  --semantic-warning-border: var(--p-color-warning-border);
+  --semantic-danger: var(--p-color-danger);
+  --semantic-danger-soft: var(--p-color-danger-bg);
+  --semantic-danger-border: var(--p-color-danger-border);
+  --semantic-insight: var(--p-color-insight);
+  --semantic-insight-soft: var(--p-color-insight-bg);
+  --semantic-insight-border: var(--p-color-insight-border);
+  --semantic-neutral-soft: var(--p-color-surface-soft);
+  --semantic-neutral-border: var(--p-color-border);
+  --semantic-text: var(--p-color-fg);
+  --semantic-text-muted: var(--p-color-fg-muted);
 }
 
 /* ============ Dark mode ============ */
@@ -135,6 +196,9 @@ html[data-theme-mode="dark"] {
     0 8px 24px rgba(0, 0, 0, 0.45);
   --p-elevation-4: 0 8px 24px rgba(0, 0, 0, 0.55),
     0 16px 48px rgba(0, 0, 0, 0.5);
+  --p-color-scrim-strong: rgba(3, 12, 31, 0.65);
+  --p-color-scrim-soft: rgba(3, 12, 31, 0.5);
+  --p-shadow-action: 0 12px 24px rgba(3, 12, 31, 0.35);
 
   /* Ação no dark fica mais clara para manter contraste em fg-subtle. */
   --p-color-action: var(--p-color-brand-400);

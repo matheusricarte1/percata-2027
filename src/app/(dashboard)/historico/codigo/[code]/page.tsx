@@ -3,7 +3,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Files, Hash, CurrencyCircleDollar } from "@phosphor-icons/react";
+import { ArrowLeft } from "@/components/icons/phosphor/exports/ArrowLeft";
+import { Files } from "@/components/icons/phosphor/exports/Files";
+import { Hash } from "@/components/icons/phosphor/exports/Hash";
+import { CurrencyCircleDollar } from "@/components/icons/phosphor/exports/CurrencyCircleDollar";
 import { supabase } from "@/lib/supabase";
 import { ProductSkeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -101,12 +104,12 @@ export default function HistoricoDetailByCodePage() {
       <div className="p-8 space-y-6">
         <Link
           href="/historico"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#D2D0CE] text-sm font-semibold"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[var(--p-color-border)] text-sm font-semibold"
         >
           <ArrowLeft size={18} weight="bold" />
           Voltar ao Histórico
         </Link>
-        <div className="bg-white rounded-3xl p-10 border border-[#D2D0CE] text-center">
+        <div className="bg-white rounded-3xl p-10 border border-[var(--p-color-border)] text-center">
           <h2 className="text-xl font-semibold text-black/50 uppercase tracking-wider">
             Demanda não encontrada
           </h2>
@@ -122,25 +125,25 @@ export default function HistoricoDetailByCodePage() {
     <div className="p-8 space-y-8">
       <Link
         href="/historico"
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#D2D0CE] text-sm font-semibold hover:bg-[#F3F2F1]"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[var(--p-color-border)] text-sm font-semibold hover:bg-[var(--p-color-bg-muted)]"
       >
         <ArrowLeft size={18} weight="bold" />
         Voltar ao Histórico
       </Link>
 
-      <div className="bg-white rounded-[32px] border border-[#D2D0CE] p-8 space-y-4">
+      <div className="bg-white rounded-[32px] border border-[var(--p-color-border)] p-8 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="font-mono text-xs font-bold text-[#2D5D94]/50">
+          <span className="font-mono text-xs font-bold text-[var(--p-color-brand-400)]/50">
             {demand.demand_code}
           </span>
-          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-semibold uppercase tracking-widest">
+          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full type-kicker font-semibold uppercase tracking-widest">
             {demand.status || "Em pactuação"}
           </span>
-          <span className="px-3 py-1 bg-slate-50 text-slate-700 rounded-full text-[10px] font-semibold uppercase tracking-widest">
+          <span className="px-3 py-1 bg-slate-50 text-slate-700 rounded-full type-kicker font-semibold uppercase tracking-widest">
             Ano {demand.legacy_year}
           </span>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[#1C1B1F]">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--p-color-fg-strong)]">
           {demand.object || "Demanda sem descrição"}
         </h1>
         <div className="flex flex-wrap gap-6 text-sm text-black/60 font-medium">
@@ -158,9 +161,9 @@ export default function HistoricoDetailByCodePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[32px] border border-[#D2D0CE] overflow-hidden">
+      <div className="bg-white rounded-[32px] border border-[var(--p-color-border)] overflow-hidden">
         <div className="px-8 py-5 border-b border-black/5">
-          <h2 className="text-lg font-semibold uppercase tracking-tight text-[#1C1B1F]">
+          <h2 className="text-lg font-semibold uppercase tracking-tight text-[var(--p-color-fg-strong)]">
             Itens da Demanda
           </h2>
         </div>
@@ -168,12 +171,12 @@ export default function HistoricoDetailByCodePage() {
           {items.map((item) => (
             <div key={item.id} className="p-6 md:p-8 flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#E8EDF2] text-[#2D5D94]">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--p-color-surface-subtle)] text-[var(--p-color-brand-400)]">
                   <Hash size={12} weight="bold" />
                   {item.efisco_code || "Sem código"}
                 </span>
               </div>
-              <p className="font-semibold text-[#1C1B1F]">
+              <p className="font-semibold text-[var(--p-color-fg-strong)]">
                 {item.efisco_description || "Descrição não informada"}
               </p>
               <div className="text-sm text-black/60 flex flex-wrap gap-6">
@@ -191,7 +194,7 @@ export default function HistoricoDetailByCodePage() {
                 <span>Local: {item.local_uso || "Não informado"}</span>
               </div>
               {item.item_justification && (
-                <p className="text-sm text-black/50 bg-slate-50 rounded-xl p-3 border border-[#D2D0CE]">
+                <p className="text-sm text-black/50 bg-slate-50 rounded-xl p-3 border border-[var(--p-color-border)]">
                   {item.item_justification}
                 </p>
               )}

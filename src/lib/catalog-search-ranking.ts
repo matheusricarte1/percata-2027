@@ -272,8 +272,7 @@ function groupMatchesText(group: StrongTermGroup | { terms: string[] }, text: st
   return group.terms.some((term) => {
     if (term.includes(" ")) return text.includes(term);
     const boundaryMatch = new RegExp(`(^|\\s)${term}(\\s|$)`).test(text);
-    if (term.length <= 3) return boundaryMatch;
-    return boundaryMatch || text.includes(term);
+    return boundaryMatch;
   });
 }
 
@@ -498,9 +497,22 @@ export function rerankCatalogSearchResults<T extends CatalogSearchItem>(
       if (functionalType === "kit" && materialCoOccurrence) adjustedRank *= 1.14;
       if (contextualBlock) adjustedRank *= 0.35;
 
-      return { item: { ...item, rank: adjustedRank } as T, adjustedRank, index };
+      return {
+        item: { ...item, rank: adjustedRank } as T,
+        adjustedRank,
+        index,
+        baseStrongMatches,
+      };
     })
     .sort((a, b) => b.adjustedRank - a.adjustedRank || a.index - b.index);
 
-  return diversifyByPrefix(scored).map((entry) => entry.item);
+  // If at least one candidate contains a requested term in its item title,
+  // specification-only mentions must not displace title matches. This is what
+  // prevents a printer that merely supports A4 paper from outranking paper A4.
+  const titleMatched = scored.filter((entry) => entry.baseStrongMatches > 0);
+  const eligible = titleMatched.length > 0
+    ? scored.filter((entry) => entry.baseStrongMatches > 0)
+    : scored;
+
+  return diversifyByPrefix(eligible).map((entry) => entry.item);
 }

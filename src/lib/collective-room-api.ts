@@ -12,9 +12,17 @@ import {
   summarizeCollectiveRoom,
   type CollectiveRoomRole,
   type CollectiveContribution,
+  type CollectiveFiscalOption,
   type CollectiveRoomStatus,
   type CollectiveUnitType,
 } from "@/lib/collective-dfd";
+import {
+  buildCollectiveDfdJustification,
+  sanitizePlanningSubsidies,
+  type DfdPlanningSubsidies,
+} from "@/lib/dfd-planning";
+import { buildCollectiveDfdRoutingFields } from "@/lib/dfd-routing";
+import { resolveDfdFiscalFields } from "@/lib/catalog-fiscal";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@/utils/supabase/server";
 
@@ -42,6 +50,7 @@ export type CollectiveRoomRow = {
   title: string;
   description: string | null;
   scope: string | null;
+  planning_subsidies?: DfdPlanningSubsidies | null;
   status: CollectiveRoomStatus;
   unit_id: string;
   unit_type: CollectiveUnitType;
@@ -214,7 +223,9 @@ export function actorHasUnit(actor: CollectiveRoomActor, unitId: string, unitTyp
 export function actorIsChefiaForUnit(actor: CollectiveRoomActor, unitId: string) {
   if (isAdminActor(actor)) return true;
   return actor.units.some(
-    (unit) => unit.unit_id === unitId && unit.role_in_unit === "chefia",
+    (unit) =>
+      unit.role_in_unit === "chefia" &&
+      unit.unit_id === unitId,
   );
 }
 
@@ -246,6 +257,108 @@ export function assertCanSeeRoom(actor: CollectiveRoomActor, room: CollectiveRoo
     );
   }
   return actorHasUnit(actor, room.unit_id, room.unit_type);
+}
+
+function normalizeFiscalCode(value: unknown) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeFiscalOption(row: any): CollectiveFiscalOption {
+  return {
+    efisco_item_id: row.efisco_item_id ?? null,
+    codigo_efisco: row.codigo_efisco || null,
+    efisco_item_natureza_id: row.efisco_item_natureza_id ?? null,
+    codigo_natureza_despesa: row.codigo_natureza_despesa || null,
+    natureza_key: row.natureza_key || null,
+    gnd: row.gnd || null,
+    classe_despesa: row.classe_despesa || null,
+  };
+}
+
+function dedupeFiscalOptions(rows: any[]) {
+  const seen = new Set<string>();
+  const options: CollectiveFiscalOption[] = [];
+  for (const row of rows) {
+    const option = normalizeFiscalOption(row);
+    const key = [
+      option.efisco_item_id,
+      option.codigo_efisco,
+      option.efisco_item_natureza_id,
+      option.codigo_natureza_despesa,
+      option.gnd,
+    ].join("::");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push(option);
+  }
+  return options;
+}
+
+async function loadCollectiveFiscalOptions(
+  admin: SupabaseAdmin,
+  contributions: any[],
+) {
+  const ids = Array.from(
+    new Set(
+      contributions
+        .map((row) => Number(row.efisco_item_id))
+        .filter((value) => Number.isFinite(value) && value > 0),
+    ),
+  );
+  const codes = Array.from(
+    new Set(
+      contributions
+        .map((row) => normalizeFiscalCode(row.codigo_item_efisco || row.codigo_tce))
+        .filter(Boolean),
+    ),
+  );
+
+  const [byIdResult, byCodeResult] = await Promise.all([
+    ids.length
+      ? admin
+          .from("catalogo_item_naturezas_v2")
+          .select(
+            "efisco_item_id,codigo_efisco,efisco_item_natureza_id,codigo_natureza_despesa,natureza_key,gnd,classe_despesa",
+          )
+          .in("efisco_item_id", ids)
+      : Promise.resolve({ data: [], error: null }),
+    codes.length
+      ? admin
+          .from("catalogo_item_naturezas_v2")
+          .select(
+            "efisco_item_id,codigo_efisco,efisco_item_natureza_id,codigo_natureza_despesa,natureza_key,gnd,classe_despesa",
+          )
+          .in("codigo_efisco", codes)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (byIdResult.error) throw byIdResult.error;
+  if (byCodeResult.error) throw byCodeResult.error;
+
+  const byItemId = new Map<number, CollectiveFiscalOption[]>();
+  const byCode = new Map<string, CollectiveFiscalOption[]>();
+  for (const option of dedupeFiscalOptions([...(byIdResult.data || []), ...(byCodeResult.data || [])])) {
+    const itemId = Number(option.efisco_item_id);
+    if (Number.isFinite(itemId) && itemId > 0) {
+      byItemId.set(itemId, [...(byItemId.get(itemId) || []), option]);
+    }
+    const code = normalizeFiscalCode(option.codigo_efisco);
+    if (code) byCode.set(code, [...(byCode.get(code) || []), option]);
+  }
+
+  return { byItemId, byCode };
+}
+
+function fiscalOptionsForContribution(
+  lookup: Awaited<ReturnType<typeof loadCollectiveFiscalOptions>>,
+  contribution: any,
+) {
+  const itemId = Number(contribution.efisco_item_id);
+  if (Number.isFinite(itemId) && itemId > 0) {
+    const options = lookup.byItemId.get(itemId);
+    if (options?.length) return options;
+  }
+  const code = normalizeFiscalCode(contribution.codigo_item_efisco || contribution.codigo_tce);
+  return code ? lookup.byCode.get(code) || [] : [];
 }
 
 export async function insertRoomEvent(
@@ -353,6 +466,7 @@ export async function buildRoomDetail(
   if (linksError) throw linksError;
 
   const rawContributions = (contributionRows || []) as any[];
+  const fiscalOptionsLookup = await loadCollectiveFiscalOptions(admin, rawContributions);
   const profileIds = Array.from(
     new Set(rawContributions.map((row) => row.user_id).filter(Boolean)),
   );
@@ -374,6 +488,7 @@ export async function buildRoomDetail(
         user_name: profile?.full_name || null,
         user_email: profile?.email || null,
         user_avatar_url: profile?.avatar_url || row.user_avatar_url || null,
+        fiscal_options: fiscalOptionsForContribution(fiscalOptionsLookup, row),
       } satisfies CollectiveContribution;
     });
   const aggregatedItems = aggregateCollectiveContributions(activeContributions);
@@ -382,7 +497,9 @@ export async function buildRoomDetail(
   const unitNames = await loadUnitNames(admin, [
     { unit_id: room.unit_id, unit_type: room.unit_type },
   ]);
+  const campusName = await getCampusName(admin, room.campus_id || actor.campus_id);
   const actorRoomRole = resolveCollectiveRoomRole(actor, room);
+  const isChefiaLikeActor = actorRoomRole === "chefia" || actorRoomRole === "admin" || actorRoomRole === "superadmin";
   const isProposalOwner = room.created_by === actor.id;
 
   return {
@@ -391,23 +508,20 @@ export async function buildRoomDetail(
       unit_name:
         unitNames.get(`${room.unit_type}:${room.unit_id}`) ||
         "Unidade vinculada",
+      campus_name: campusName,
       can_edit_metadata: canEditCollectiveRoom(room.status, actorRoomRole, {
         isProposalOwner,
       }),
       can_publish:
-        (actorRoomRole === "chefia" ||
-          actorRoomRole === "admin" ||
-          actorRoomRole === "superadmin") &&
-        room.status === "proposta",
+        isChefiaLikeActor && room.status === "proposta",
       can_reopen:
-        (actorRoomRole === "chefia" ||
-          actorRoomRole === "admin" ||
-          actorRoomRole === "superadmin") &&
+        isChefiaLikeActor &&
         (room.status === "em_consolidacao_chefia" ||
           room.status === "pronta_para_conversao"),
       can_contribute: room.status === "aberta",
       can_convert: canConvertCollectiveRoom(room.status, actorRoomRole),
       actor_role: actorRoomRole,
+      can_admin_correct: (actor.role === "superadmin" || (actor.role === "admin" && actor.campus_id === room.campus_id)) && ["proposta", "aberta", "em_consolidacao_chefia", "pronta_para_conversao"].includes(room.status),
       is_proposal_owner: isProposalOwner,
     },
     summary,
@@ -419,6 +533,7 @@ export async function buildRoomDetail(
         user_name: profile?.full_name || null,
         user_email: profile?.email || null,
         user_avatar_url: profile?.avatar_url || row.user_avatar_url || null,
+        fiscal_options: fiscalOptionsForContribution(fiscalOptionsLookup, row),
         can_edit: canEditCollectiveContribution({
           roomStatus: room.status,
           actorRole: actorRoomRole,
@@ -446,6 +561,8 @@ export function contributionFromPayload(params: {
     Number(item.valor_unitario_estimado || item.valor_unitario || item.unitValue || 0),
   );
   const contribution: CollectiveContribution = {
+    efisco_item_id: item.efisco_item_id || null,
+    efisco_item_natureza_id: item.efisco_item_natureza_id || null,
     unit_id: params.room.unit_id,
     unit_type: params.room.unit_type,
     user_id: params.actor.id,
@@ -462,7 +579,11 @@ export function contributionFromPayload(params: {
     quantidade: quantity,
     valor_unitario_estimado: value,
     justificativa_item: sanitizeLongText(
-      item.justificativa_item || item.justificativa_quantidade || item.justificativa,
+      item.justificativa_item || item.justificativa,
+      4000,
+    ),
+    justificativa_quantidade: sanitizeLongText(
+      item.justificativa_quantidade || item.base_calculo || "",
       4000,
     ),
     link_referencia: sanitizeText(item.link_referencia || item.link, 1000),
@@ -472,6 +593,10 @@ export function contributionFromPayload(params: {
       item.codigo_natureza_despesa || item.codigo_natureza_preferencial,
       80,
     ),
+    natureza_count: Number(item.natureza_count || 0) || null,
+    has_mixed_expense_classes: Boolean(item.has_mixed_expense_classes),
+    has_missing_natureza: Boolean(item.has_missing_natureza),
+    requires_natureza_review: Boolean(item.requires_natureza_review),
     tipo_objeto: sanitizeText(item.tipo_objeto, 80),
     codigo_grupo: sanitizeText(item.codigo_grupo, 80),
     nome_grupo: sanitizeText(item.nome_grupo || item.grupo, 260),
@@ -504,40 +629,11 @@ export async function upsertContribution(
   admin: SupabaseAdmin,
   contribution: ReturnType<typeof contributionFromPayload>,
 ) {
-  const { data: existing, error: existingError } = await admin
-    .from("dfd_collective_contributions")
-    .select("id,quantidade")
-    .eq("room_id", contribution.room_id)
-    .eq("user_id", contribution.user_id)
-    .eq("collective_key", contribution.collective_key)
-    .eq("status", "aberta")
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  if (existing?.id) {
-    const { data, error } = await admin
-      .from("dfd_collective_contributions")
-      .update({
-        quantidade:
-          Number(existing.quantidade || 0) + Number(contribution.quantidade || 0),
-        valor_unitario_estimado: contribution.valor_unitario_estimado,
-        justificativa_item: contribution.justificativa_item,
-        link_referencia: contribution.link_referencia,
-        user_avatar_url: contribution.user_avatar_url,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id)
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
   const { data, error } = await admin
-    .from("dfd_collective_contributions")
-    .insert(toCollectiveContributionDbRow(contribution))
-    .select("*")
-    .single();
+    .rpc("write_collective_contribution_with_deadline", {
+      p_actor: contribution.user_id, p_id: null,
+      p_patch: toCollectiveContributionDbRow(contribution), p_add: true,
+    });
   if (error) throw error;
   return data;
 }
@@ -550,6 +646,16 @@ async function getCampusLegacy(admin: SupabaseAdmin, campusId: string | null) {
     .eq("id", campusId)
     .maybeSingle();
   return String(data?.sigla || data?.nome || campusId).trim() || "SEM_CAMPUS";
+}
+
+async function getCampusName(admin: SupabaseAdmin, campusId: string | null) {
+  if (!campusId) return "Campus não informado";
+  const { data } = await admin
+    .from("campi")
+    .select("sigla,nome")
+    .eq("id", campusId)
+    .maybeSingle();
+  return String(data?.nome || data?.sigla || "Campus não informado").trim();
 }
 
 function buildCollectiveAuthorRows(params: {
@@ -622,12 +728,11 @@ export async function convertRoomToOfficialDfds(params: {
   }
 
   const detail = await buildRoomDetail(admin, actor, room);
+  // The person who performs the conversion is a workflow actor, not the
+  // requester. The room owner remains the requester throughout the DFD lifecycle.
+  const requesterId = room.created_by;
   const groups = splitCollectiveItemsByExpenseClass(detail.items);
   if (groups.length === 0) throw new Error("A sala nao possui contribuicoes ativas.");
-  if (groups.some((group) => group.expenseClass === "sem-gnd")) {
-    throw new Error("Revise itens sem GND antes de converter a sala.");
-  }
-
   const campusLegacy = await getCampusLegacy(admin, room.campus_id || actor.campus_id);
   const createdDfds = [];
 
@@ -644,60 +749,84 @@ export async function convertRoomToOfficialDfds(params: {
       .insert({
         numero_protocolo: buildProtocol(index),
         objeto_contratacao: `${room.title} - ${group.label}`,
-        justificativa_contratacao:
-          [room.description, room.scope]
-            .map((value) => String(value || "").trim())
-            .filter(Boolean)
-            .join("\n\n") || "DFD coletiva gerada a partir de demanda setorial.",
-        solicitante_id: actor.id,
+        justificativa_contratacao: buildCollectiveDfdJustification({
+          description: room.description,
+          scope: room.scope,
+          planningSubsidies: sanitizePlanningSubsidies(room.planning_subsidies),
+        }),
+        planning_subsidies: sanitizePlanningSubsidies(room.planning_subsidies),
+        solicitante_id: requesterId,
         campus: campusLegacy,
         campus_id: room.campus_id || actor.campus_id || null,
         unidade_id: room.unit_id,
         tipo_unidade: room.unit_type,
+        ...buildCollectiveDfdRoutingFields({
+          unitId: room.unit_id,
+          unitType: room.unit_type,
+        }),
         origin_type: "collective",
         collective_origin_room_id: room.id,
         collective_origin_room_title: room.title,
         collective_origin_expense_class: group.expenseClass,
         previsao_recebimento: null,
         valor_total_estimado: valorTotalEstimado,
-        status: "triagem",
+        status: "rascunho",
       })
       .select("id,numero_protocolo")
       .single();
     if (dfdError) throw dfdError;
 
-    const itemsToInsert = group.items.map((item) => ({
-      dfd_id: dfd.id,
-      codigo_tce: String(item.codigo_tce || item.codigo_item_efisco || "").trim(),
-      codigo_item_efisco: String(item.codigo_item_efisco || item.codigo_tce || "").trim(),
-      descricao: String(item.descricao || "").trim(),
-      quantidade: Number(item.quantidade || 0),
-      valor_unitario_estimado: Number(item.valor_unitario_estimado || 0),
-      justificativa_item: [
-        String(item.justificativa_item || "").trim(),
-        `Distribuicao por usuario: ${formatContributorDistribution(item.contributors)}`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      justificativa_quantidade: null,
-      local_uso: detail.room.unit_name,
-      link_referencia: String(item.link_referencia || ""),
-      gnd: String(item.gnd || item.gnd_derivado || "3.3.90.30"),
-      gnd_derivado: String(item.gnd_derivado || item.gnd || "") || null,
-      tipo_objeto: item.tipo_objeto || null,
-      codigo_grupo: item.codigo_grupo || null,
-      nome_grupo: item.nome_grupo || null,
-      codigo_classe: item.codigo_classe || null,
-      nome_classe: item.nome_classe || null,
-      codigo_material_servico: null,
-      nome_material_servico: null,
-      codigo_natureza_despesa: item.codigo_natureza_despesa || null,
-    }));
+    const itemsToInsert = group.items.map((item) => {
+      const fiscal = resolveDfdFiscalFields({
+        ...item,
+        codigo_tce: item.codigo_tce || item.codigo_item_efisco,
+      });
+      return {
+        dfd_id: dfd.id,
+        codigo_tce: String(item.codigo_tce || item.codigo_item_efisco || "").trim(),
+        codigo_item_efisco: String(item.codigo_item_efisco || item.codigo_tce || "").trim(),
+        descricao: String(item.descricao || "").trim(),
+        quantidade: Number(item.quantidade || 0),
+        valor_unitario_estimado: Number(item.valor_unitario_estimado || 0),
+        justificativa_item: [
+          String(item.justificativa_item || "").trim(),
+          `Distribuicao por usuario: ${formatContributorDistribution(item.contributors)}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        justificativa_quantidade: String(item.justificativa_quantidade || "").trim() || null,
+        unidade_medida: String(item.unidade_medida || "UN").trim() || "UN",
+        local_uso: detail.room.unit_name,
+        link_referencia: String(item.link_referencia || ""),
+        gnd: fiscal.gnd,
+        gnd_derivado: fiscal.gnd_derivado,
+        tipo_objeto: item.tipo_objeto || null,
+        codigo_grupo: item.codigo_grupo || null,
+        nome_grupo: item.nome_grupo || null,
+        codigo_classe: item.codigo_classe || null,
+        nome_classe: item.nome_classe || null,
+        codigo_material_servico: null,
+        nome_material_servico: null,
+        codigo_natureza_despesa: fiscal.codigo_natureza_despesa,
+        efisco_item_id: fiscal.efisco_item_id,
+        efisco_item_natureza_id: fiscal.efisco_item_natureza_id,
+        requires_natureza_review: fiscal.requires_natureza_review,
+      };
+    });
 
     const { error: itemsError } = await admin.from("dfd_items").insert(itemsToInsert);
     if (itemsError) {
       await admin.from("dfds").delete().eq("id", dfd.id);
       throw itemsError;
+    }
+
+    const { error: statusError } = await admin
+      .rpc("finish_collective_dfd_conversion", {
+        p_actor: actor.id, p_dfd: dfd.id, p_room: room.id,
+      });
+    if (statusError) {
+      await admin.from("dfds").delete().eq("id", dfd.id);
+      throw statusError;
     }
 
     const { error: linkError } = await admin.from("dfd_collective_room_dfds").insert({

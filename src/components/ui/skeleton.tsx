@@ -10,7 +10,7 @@ function Skeleton({
     <div
       aria-hidden="true"
       className={cn(
-        "skeleton-shimmer relative overflow-hidden rounded-md bg-[#E8EDF2]",
+        "skeleton-shimmer relative overflow-hidden rounded-md bg-[var(--p-color-surface-subtle)]",
         className,
       )}
       {...props}

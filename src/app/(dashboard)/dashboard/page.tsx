@@ -1,7 +1,7 @@
 "use client";
 
-import UnifiedDashboard from "@/components/dashboard/UnifiedDashboard";
+import CampusBiDashboard from "@/components/dashboard/CampusBiDashboard";
 
 export default function DashboardPage() {
-  return <UnifiedDashboard />;
+  return <CampusBiDashboard />;
 }

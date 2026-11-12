@@ -27,16 +27,14 @@ test("small units do not receive a local penalty", () => {
 });
 
 test("Pareto is the chefia flag and missing classification remains pending", () => {
-  const portfolio = [1000, 1200, 1500, 1800, 2200, 25000, 3000, 3200].map((value, index) => input(`i${index}`, "campus", "unit", value));
+  const portfolio = [1000, 1200, 1500, 1800, 2200, 25000, 3000].map((value, index) => input(`i${index}`, "campus", "unit", value));
   portfolio[0].chefiaPareto = true;
   portfolio[1].criticidadeLevel = 0;
-  portfolio[6].prioridadeLevel = 5;
   const result = calculateCapitalPriorities(portfolio);
   assert.equal(result.get("i0")?.paretoBonus, 28);
   assert.equal(result.get("i5")?.paretoBonus, 0);
   assert.equal(result.get("i1")?.status, "pending");
   assert.equal(result.get("i1")?.finalScore, undefined);
-  assert.equal(result.get("i6")?.status, "pending");
 });
 
 test("local adjustment adds only excess local penalty and stays within the cap", () => {
@@ -50,4 +48,13 @@ test("local adjustment adds only excess local penalty and stays within the cap",
       assert.ok((score.finalScore || 0) >= 0 && (score.finalScore || 0) <= 280);
     }
   }
+});
+
+test("capital rejects nonfinite, fractional and out-of-range assessment levels", () => {
+ const portfolio = [1000,1200,1500,1800,2200,3000,5000].map((v,i)=>input(String(i),"campus","unit",v));
+ for (const invalid of [5, 1.5, NaN, Infinity, -1]) {
+  const changed=portfolio.map((row,i)=>i===6?{...row,criticidadeLevel:invalid}:row);
+  const result=calculateCapitalPriorities(changed).get("6");
+  assert.equal(result?.status,"pending"); assert.equal(result?.finalScore,undefined);
+ }
 });

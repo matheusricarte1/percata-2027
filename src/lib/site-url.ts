@@ -19,10 +19,9 @@ function normalizeOrigin(value: string | null | undefined): string | null {
 
 export function getPublicSiteOrigin(fallbackOrigin?: string | null): string {
   const configuredOrigin =
-    normalizeOrigin(process.env.NEXT_PUBLIC_SITE_URL) ||
-    normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL) ||
-    normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
-    normalizeOrigin(process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL);
+    normalizeOrigin(process.env.SITE_URL) ||
+    normalizeOrigin(process.env.APP_URL) ||
+    normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL);
 
   if (configuredOrigin) return configuredOrigin;
 

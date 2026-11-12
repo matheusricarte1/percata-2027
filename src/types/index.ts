@@ -32,6 +32,8 @@ export type DFDItemStatus =
 // Catálogo E-Fisco (somente guia taxonômico, sem preço)
 // -------------------------------------------------------
 export interface ItemEfisco {
+  efisco_item_id?: number | string;
+  efisco_item_natureza_id?: number | string;
   codigo_tce: string;
   descricao: string;
   gnd: GND;
@@ -48,6 +50,10 @@ export interface ItemEfisco {
   codigo_natureza_despesa?: string;
   gnd_derivado?: string;
   natureza_count?: number;
+  has_mixed_expense_classes?: boolean;
+  has_missing_natureza?: boolean;
+  requires_natureza_review?: boolean;
+  gnds?: string[];
 }
 
 // -------------------------------------------------------
@@ -82,6 +88,7 @@ export interface DFD {
   fiscal_contrato_id: string; // Próprio solicitante por padrão
   objeto_contratacao: string;
   justificativa_contratacao: string; // mín 100 chars
+  planning_subsidies?: Record<string, string>;
   previsao_recebimento: string; // ISO date
   status: DFDStatus;
   gnd_principal: GND;

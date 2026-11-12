@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildCollectiveDfdRoutingFields,
   resolveDfdRouting,
   type AcademicContext,
   type DfdPurpose,
@@ -46,5 +47,21 @@ describe("resolveDfdRouting", () => {
 
     assert.equal(result.analysisUnitType, "departamento");
     assert.match(result.reason, /compartilhado/i);
+  });
+});
+
+describe("buildCollectiveDfdRoutingFields", () => {
+  it("routes converted collective DFDs to the room unit explicitly", () => {
+    const routing = buildCollectiveDfdRoutingFields({
+      unitId: "81f0a9d5-bbc1-4d18-bd47-072dbdeb1597",
+      unitType: "departamento",
+    });
+
+    assert.deepEqual(routing, {
+      analysis_unidade_id: "81f0a9d5-bbc1-4d18-bd47-072dbdeb1597",
+      analysis_tipo_unidade: "departamento",
+      analysis_routing_reason:
+        "DFD coletiva convertida: analise encaminhada para a unidade responsavel pela sala coletiva.",
+    });
   });
 });

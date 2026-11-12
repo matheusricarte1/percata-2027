@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         { label: "Provedor", value: providerStatus.provider.toUpperCase() },
       ],
       details: [
-        "O canal SMTP/Resend respondeu ao disparo do sistema.",
+        "O canal SMTP do Gmail respondeu ao disparo do sistema.",
         providerStatus.redirectTo
           ? "O redirecionamento de homologação está ativo; o destinatário original fica registrado no corpo do e-mail."
           : "Nenhum redirecionamento de homologação está ativo; a mensagem foi enviada para o e-mail solicitado.",

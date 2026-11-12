@@ -1,0 +1,16 @@
+# Local dependency and build artifacts are not part of the application source.
+node_modules
+.next
+.worktrees
+.codex-tmp
+.superpowers
+coverage
+*.log
+.playwright-cli
+output
+artifacts
+scratch
+docs
+e2e
+/*.png
+*.tsbuildinfo

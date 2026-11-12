@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CarrinhoItem, ItemEfisco } from "@/types";
 
-type CarrinhoEntry = CarrinhoItem & { uid: string };
+export type CarrinhoEntry = CarrinhoItem & { uid: string };
 
 interface CarrinhoStore {
   items: CarrinhoEntry[];
@@ -24,6 +24,9 @@ interface CarrinhoStore {
   // Limpar carrinho
   clear: () => void;
   clearCarrinho: () => void;
+  // Restaura um rascunho somente quando o carrinho local está vazio.
+  // Assim, uma aba já em uso nunca é sobrescrita por um rascunho antigo.
+  restoreDraftItems: (items: CarrinhoEntry[]) => void;
   // Total estimado
   total: () => number;
   // Agrupa itens por local_de_uso (para gerar DFDs separadas no checkout)
@@ -72,6 +75,8 @@ export const useCarrinhoStore = create<CarrinhoStore>()(
 
       clear: () => set({ items: [] }),
       clearCarrinho: () => set({ items: [] }),
+      restoreDraftItems: (items) =>
+        set((state) => (state.items.length > 0 ? state : { items })),
 
       total: () =>
         get().items.reduce(

@@ -1,6 +1,15 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getHomeForRole, normalizeRole } from "@/lib/access";
+import {
+  canUseSolicitanteWorkspace,
+  getHomeForRole,
+  normalizeRole,
+} from "@/lib/access";
+import {
+  ACCESS_DENIED_MESSAGE,
+  getLoginAccessDecision,
+  normalizeLoginEmail,
+} from "@/lib/login-access";
 import {
   ACCESS_LOCK_KEY,
   ACCESS_LOCK_PATH,
@@ -25,28 +34,6 @@ function isSolicitantePath(pathname: string): boolean {
 
 function isDfdDetailPath(pathname: string): boolean {
   return pathname === "/dfd" || pathname.startsWith("/dfd/");
-}
-
-function normalizeEmail(value: string | null | undefined): string {
-  return String(value || "").trim().toLowerCase();
-}
-
-async function isAllowedLoginEmail(supabase: any, email: string): Promise<boolean> {
-  const normalized = normalizeEmail(email);
-  if (!normalized) return false;
-
-  const [profileRes, legacyRes, legacyMapRes] = await Promise.all([
-    supabase.from("profiles").select("id,is_active").ilike("email", normalized).limit(1),
-    supabase.from("legacy_user_directory").select("id").ilike("email", normalized).limit(1),
-    supabase.from("legacy_user_profile_links").select("id").eq("legacy_email", normalized).limit(1),
-  ]);
-
-  const inProfiles =
-    !profileRes.error && (profileRes.data || []).some((row: any) => row.is_active !== false);
-  const inLegacy = !legacyRes.error && (legacyRes.data || []).length > 0;
-  const inLegacyMapping = !legacyMapRes.error && (legacyMapRes.data || []).length > 0;
-
-  return inProfiles || inLegacy || inLegacyMapping;
 }
 
 function isAccessLockBypassPath(pathname: string): boolean {
@@ -75,8 +62,8 @@ export async function proxy(request: NextRequest) {
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_PUBLISHABLE!,
     {
       cookies: {
         getAll() {
@@ -138,9 +125,9 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user) {
-    const email = normalizeEmail(user.email);
-    const allowedLoginEmail = await isAllowedLoginEmail(supabase, email);
-    if (!allowedLoginEmail) {
+    const email = normalizeLoginEmail(user.email);
+    const loginAccess = await getLoginAccessDecision(supabase, email);
+    if (!loginAccess.allowed) {
       try {
         await supabase.auth.signOut();
       } catch {}
@@ -150,7 +137,7 @@ export async function proxy(request: NextRequest) {
         redirectUrl.pathname = "/auth/auth-code-error";
         redirectUrl.searchParams.set(
           "error",
-          "Acesso restrito. Solicite ativação prévia do seu usuário pela administração.",
+          ACCESS_DENIED_MESSAGE,
         );
         return NextResponse.redirect(redirectUrl);
       }
@@ -168,6 +155,23 @@ export async function proxy(request: NextRequest) {
     const homeForRole = getHomeForRole(role);
     const accessLock = preAuthAccessLock;
 
+    // Campus alone is not enough to complete the institutional context. The
+    // onboarding flow requires at least one department; laboratories remain
+    // optional. Keep this check server-side so a profile cannot bypass the
+    // onboarding gate by having only `profiles.campus_id` populated.
+    let hasDepartment = false;
+    if (!profileError && (role === "solicitante" || role === "chefia" || role === "superadmin")) {
+      const { data: departmentUnit, error: departmentError } = await supabase
+        .from("user_units")
+        .select("unit_id")
+        .eq("user_id", user.id)
+        .eq("unit_type", "departamento")
+        .limit(1)
+        .maybeSingle();
+
+      hasDepartment = !departmentError && Boolean(departmentUnit?.unit_id);
+    }
+
     if (shouldBlockForAccessLock(accessLock, role, pathname)) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json(
@@ -184,7 +188,8 @@ export async function proxy(request: NextRequest) {
 
     if (!profileError) {
       const needsOnboarding =
-        (role === "solicitante" || role === "chefia" || role === "superadmin") && !profile?.campus_id;
+        (role === "solicitante" || role === "chefia" || role === "superadmin") &&
+        (!profile?.campus_id || !hasDepartment);
 
       if (needsOnboarding && !isOnboardingRoute && !isAuthRoute) {
         const redirectUrl = request.nextUrl.clone();
@@ -229,8 +234,7 @@ export async function proxy(request: NextRequest) {
     if (
       isSolicitantePath(pathname) &&
       !(
-        role === "solicitante" ||
-        role === "superadmin" ||
+        canUseSolicitanteWorkspace(role) ||
         (role === "admin" && isDfdDetailPath(pathname))
       )
     ) {

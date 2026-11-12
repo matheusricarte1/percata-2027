@@ -36,11 +36,19 @@ yarn-error.log*
 # vercel
 .vercel
 
+# disposable local tooling artifacts
+/.codex-tmp/
+/.playwright-cli/
+/output/
+/artifacts/
+*.log
+__pycache__/
+*.pyc
+
 # local brainstorming/mockup companion sessions
 .superpowers/
+.worktrees/
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-.vercel

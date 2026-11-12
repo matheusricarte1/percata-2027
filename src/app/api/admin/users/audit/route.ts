@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuthorizedRole } from "@/lib/api-auth";
+import { getAdminCampusUserIds } from "@/lib/admin-campus-scope";
 
 function isMissingAuditTableError(error: any): boolean {
   const text = String(error?.message || error || "").toLowerCase();
@@ -14,20 +15,23 @@ function isMissingAuditTableError(error: any): boolean {
 
 export const GET = withAuthorizedRole(
   ["admin", "superadmin"],
-  async ({ request, supabaseAdmin }) => {
+  async ({ request, supabaseAdmin, user, role }) => {
     const limitParam = Number(request.nextUrl.searchParams.get("limit") || 20);
     const limit = Number.isFinite(limitParam)
       ? Math.max(1, Math.min(limitParam, 100))
       : 20;
 
     const admin = supabaseAdmin!;
-    const { data, error } = await admin
+    const allowed = await getAdminCampusUserIds(admin, user.id, role);
+    if (allowed?.size === 0) return NextResponse.json({ data: [] });
+    let query = admin
       .from("admin_user_audit_logs")
       .select(
         "id,actor_email,actor_role,target_email,action,details,created_at",
       )
-      .order("created_at", { ascending: false })
-      .limit(limit);
+      .order("created_at", { ascending: false });
+    if (allowed) query = query.in("target_profile_id", [...allowed]);
+    const { data, error } = await query.limit(limit);
     if (error) {
       if (isMissingAuditTableError(error)) {
         return NextResponse.json({
